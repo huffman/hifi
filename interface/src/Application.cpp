@@ -64,6 +64,7 @@
 
 #include <EntityScriptingInterface.h>
 #include <ErrorDialog.h>
+#include <Finally.h>
 #include <FramebufferCache.h>
 #include <gpu/Batch.h>
 #include <gpu/Context.h>
@@ -149,10 +150,10 @@
 #include "ui/Stats.h"
 #include "ui/AddressBarDialog.h"
 #include "ui/UpdateDialog.h"
-
 #include "ui/overlays/Cube3DOverlay.h"
 
 #include "PluginContainerProxy.h"
+#include "AnimDebugDraw.h"
 
 // ON WIndows PC, NVidia Optimus laptop, we want to enable NVIDIA GPU
 // FIXME seems to be broken.
@@ -611,6 +612,15 @@ Application::Application(int& argc, char** argv, QElapsedTimer &startup_time) :
     // Setup the userInputMapper with the actions
     auto userInputMapper = DependencyManager::get<UserInputMapper>();
     connect(userInputMapper.data(), &UserInputMapper::actionEvent, &_controllerScriptingInterface, &AbstractControllerScriptingInterface::actionEvent);
+    connect(userInputMapper.data(), &UserInputMapper::actionEvent, [this](int action, float state) {
+        if (state) {
+            switch (action) {
+            case UserInputMapper::Action::TOGGLE_MUTE:
+                DependencyManager::get<AudioClient>()->toggleMute();
+                break;
+            }
+        }
+    });
 
     // Setup the keyboardMouseDevice and the user input mapper with the default bindings
     _keyboardMouseDevice->registerToUserInputMapper(*userInputMapper);
@@ -1009,6 +1019,16 @@ void Application::paintGL() {
     if (nullptr == _displayPlugin) {
         return;
     }
+
+    // Some plugins process message events, potentially leading to 
+    // re-entering a paint event.  don't allow further processing if this 
+    // happens
+    if (_inPaint) {
+        return;
+    }
+    _inPaint = true;
+    Finally clearFlagLambda([this] { _inPaint = false; });
+
     auto displayPlugin = getActiveDisplayPlugin();
     displayPlugin->preRender();
     _offscreenContext->makeCurrent();
@@ -1203,7 +1223,7 @@ void Application::paintGL() {
         // Ensure all operations from the previous context are complete before we try to read the fbo
         glWaitSync(sync, 0, GL_TIMEOUT_IGNORED);
         glDeleteSync(sync);
-        
+
         {
             PROFILE_RANGE(__FUNCTION__ "/pluginDisplay");
             displayPlugin->display(finalTexture, toGlm(size));
@@ -1218,7 +1238,6 @@ void Application::paintGL() {
     _offscreenContext->makeCurrent();
     _frameCount++;
     Stats::getInstance()->setRenderDetails(renderArgs._details);
-
 
     // Reset the gpu::Context Stages
     // Back to the default framebuffer;
@@ -2879,6 +2898,11 @@ void Application::update(float deltaTime) {
         loadViewFrustum(_myCamera, _viewFrustum);
     }
 
+    // Update animation debug draw renderer
+    {
+        AnimDebugDraw::getInstance().update();
+    }
+
     quint64 now = usecTimestampNow();
 
     // Update my voxel servers with my current voxel query...
@@ -3038,9 +3062,8 @@ void Application::queryOctree(NodeType_t serverType, PacketType::Value packetTyp
                     voxelDetailsForCode(rootCode, rootDetails);
                     AACube serverBounds(glm::vec3(rootDetails.x * TREE_SCALE,
                                                   rootDetails.y * TREE_SCALE,
-                                                  rootDetails.z * TREE_SCALE),
+                                                  rootDetails.z * TREE_SCALE) - glm::vec3(HALF_TREE_SCALE),
                                         rootDetails.s * TREE_SCALE);
-
                     ViewFrustum::location serverFrustumLocation = _viewFrustum.cubeInFrustum(serverBounds);
 
                     if (serverFrustumLocation != ViewFrustum::OUTSIDE) {
@@ -3105,9 +3128,8 @@ void Application::queryOctree(NodeType_t serverType, PacketType::Value packetTyp
                     voxelDetailsForCode(rootCode, rootDetails);
                     AACube serverBounds(glm::vec3(rootDetails.x * TREE_SCALE,
                                                   rootDetails.y * TREE_SCALE,
-                                                  rootDetails.z * TREE_SCALE),
+                                                  rootDetails.z * TREE_SCALE) - glm::vec3(HALF_TREE_SCALE),
                                         rootDetails.s * TREE_SCALE);
-
 
 
                     ViewFrustum::location serverFrustumLocation = _viewFrustum.cubeInFrustum(serverBounds);
@@ -3128,7 +3150,7 @@ void Application::queryOctree(NodeType_t serverType, PacketType::Value packetTyp
             } else if (unknownView) {
                 if (wantExtraDebugging) {
                     qCDebug(interfaceapp) << "no known jurisdiction for node " << *node << ", give it budget of "
-                    << perUnknownServer << " to send us jurisdiction.";
+                                            << perUnknownServer << " to send us jurisdiction.";
                 }
 
                 // set the query's position/orientation to be degenerate in a manner that will get the scene quickly
@@ -3543,6 +3565,7 @@ void Application::displaySide(RenderArgs* renderArgs, Camera& theCamera, bool se
         renderContext._drawHitEffect = sceneInterface->doEngineDisplayHitEffect();
 
         renderContext._occlusionStatus = Menu::getInstance()->isOptionChecked(MenuOption::DebugAmbientOcclusion);
+        renderContext._fxaaStatus = Menu::getInstance()->isOptionChecked(MenuOption::Antialiasing);
 
         renderArgs->_shouldRender = LODManager::shouldRender;
 
@@ -4703,53 +4726,68 @@ void Application::updateDisplayMode() {
 
     auto offscreenUi = DependencyManager::get<OffscreenUi>();
     DisplayPluginPointer oldDisplayPlugin = _displayPlugin;
-    if (oldDisplayPlugin != newDisplayPlugin) {
-        if (!_currentDisplayPluginActions.isEmpty()) {
-            auto menu = Menu::getInstance();
-            foreach(auto itemInfo, _currentDisplayPluginActions) {
-                menu->removeMenuItem(itemInfo.first, itemInfo.second);
-            }
-            _currentDisplayPluginActions.clear();
-        }
-
-        if (newDisplayPlugin) {
-            _offscreenContext->makeCurrent();
-            _activatingDisplayPlugin = true;
-            newDisplayPlugin->activate();
-            _activatingDisplayPlugin = false;
-            _offscreenContext->makeCurrent();
-            offscreenUi->resize(fromGlm(newDisplayPlugin->getRecommendedUiSize()));
-            _offscreenContext->makeCurrent();
-        }
-
-        oldDisplayPlugin = _displayPlugin;
-        _displayPlugin = newDisplayPlugin;
-        
-        // If the displayPlugin is a screen based HMD, then it will want the HMDTools displayed
-        // Direct Mode HMDs (like windows Oculus) will be isHmd() but will have a screen of -1
-        bool newPluginWantsHMDTools = newDisplayPlugin ?
-                                        (newDisplayPlugin->isHmd() && (newDisplayPlugin->getHmdScreen() >= 0)) : false;
-        bool oldPluginWantedHMDTools = oldDisplayPlugin ? 
-                                        (oldDisplayPlugin->isHmd() && (oldDisplayPlugin->getHmdScreen() >= 0)) : false;
-                                        
-        // Only show the hmd tools after the correct plugin has
-        // been activated so that it's UI is setup correctly
-        if (newPluginWantsHMDTools) {
-            _pluginContainer->showDisplayPluginsTools();
-        }
-
-        if (oldDisplayPlugin) {
-            oldDisplayPlugin->deactivate();
-            _offscreenContext->makeCurrent();
-            
-            // if the old plugin was HMD and the new plugin is not HMD, then hide our hmdtools
-            if (oldPluginWantedHMDTools && !newPluginWantsHMDTools) {
-                DependencyManager::get<DialogsManager>()->hmdTools(false);
-            }
-        }
-        emit activeDisplayPluginChanged();
-        resetSensors();
+    if (newDisplayPlugin == oldDisplayPlugin) {
+        return;
     }
+
+    // Some plugins *cough* Oculus *cough* process message events from inside their 
+    // display function, and we don't want to change the display plugin underneath 
+    // the paintGL call, so we need to guard against that
+    if (_inPaint) {
+        qDebug() << "Deferring plugin switch until out of painting";
+        // Have the old plugin stop requesting renders
+        oldDisplayPlugin->stop();
+        QCoreApplication::postEvent(this, new LambdaEvent([this] {
+            updateDisplayMode();
+        }));
+        return;
+    }
+
+    if (!_currentDisplayPluginActions.isEmpty()) {
+        auto menu = Menu::getInstance();
+        foreach(auto itemInfo, _currentDisplayPluginActions) {
+            menu->removeMenuItem(itemInfo.first, itemInfo.second);
+        }
+        _currentDisplayPluginActions.clear();
+    }
+
+    if (newDisplayPlugin) {
+        _offscreenContext->makeCurrent();
+        _activatingDisplayPlugin = true;
+        newDisplayPlugin->activate();
+        _activatingDisplayPlugin = false;
+        _offscreenContext->makeCurrent();
+        offscreenUi->resize(fromGlm(newDisplayPlugin->getRecommendedUiSize()));
+        _offscreenContext->makeCurrent();
+    }
+
+    oldDisplayPlugin = _displayPlugin;
+    _displayPlugin = newDisplayPlugin;
+        
+    // If the displayPlugin is a screen based HMD, then it will want the HMDTools displayed
+    // Direct Mode HMDs (like windows Oculus) will be isHmd() but will have a screen of -1
+    bool newPluginWantsHMDTools = newDisplayPlugin ?
+                                    (newDisplayPlugin->isHmd() && (newDisplayPlugin->getHmdScreen() >= 0)) : false;
+    bool oldPluginWantedHMDTools = oldDisplayPlugin ? 
+                                    (oldDisplayPlugin->isHmd() && (oldDisplayPlugin->getHmdScreen() >= 0)) : false;
+                                        
+    // Only show the hmd tools after the correct plugin has
+    // been activated so that it's UI is setup correctly
+    if (newPluginWantsHMDTools) {
+        _pluginContainer->showDisplayPluginsTools();
+    }
+
+    if (oldDisplayPlugin) {
+        oldDisplayPlugin->deactivate();
+        _offscreenContext->makeCurrent();
+            
+        // if the old plugin was HMD and the new plugin is not HMD, then hide our hmdtools
+        if (oldPluginWantedHMDTools && !newPluginWantsHMDTools) {
+            DependencyManager::get<DialogsManager>()->hmdTools(false);
+        }
+    }
+    emit activeDisplayPluginChanged();
+    resetSensors();
     Q_ASSERT_X(_displayPlugin, "Application::updateDisplayMode", "could not find an activated display plugin");
 }
 
@@ -4919,7 +4957,7 @@ void Application::setPalmData(Hand* hand, UserInputMapper::PoseValue pose, float
 
     // Store the one fingertip in the palm structure so we can track velocity
     const float FINGER_LENGTH = 0.3f;   //  meters
-    const glm::vec3 FINGER_VECTOR(0.0f, 0.0f, FINGER_LENGTH);
+    const glm::vec3 FINGER_VECTOR(0.0f, FINGER_LENGTH, 0.0f);
     const glm::vec3 newTipPosition = position + rotation * FINGER_VECTOR;
     glm::vec3 oldTipPosition = palm->getTipRawPosition();
     if (deltaTime > 0.0f) {
@@ -5046,9 +5084,20 @@ void Application::emulateMouse(Hand* hand, float click, float shift, int index) 
 }
 
 void Application::crashApplication() {
+    qCDebug(interfaceapp) << "Intentionally crashed Interface";
     QObject* object = nullptr;
     bool value = object->isWindowType();
     Q_UNUSED(value);
-    
-    qCDebug(interfaceapp) << "Intentionally crashed Interface";
+}
+
+void Application::setActiveDisplayPlugin(const QString& pluginName) {
+    auto menu = Menu::getInstance();
+    foreach(DisplayPluginPointer displayPlugin, PluginManager::getInstance()->getDisplayPlugins()) {
+        QString name = displayPlugin->getName();
+        QAction* action = menu->getActionForOption(name);
+        if (pluginName == name) {
+            action->setChecked(true);
+        }
+    }
+    updateDisplayMode();
 }

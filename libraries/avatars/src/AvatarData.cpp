@@ -141,7 +141,7 @@ void AvatarData::setHandPosition(const glm::vec3& handPosition) {
     _handPosition = glm::inverse(getOrientation()) * (handPosition - _position);
 }
 
-QByteArray AvatarData::toByteArray() {
+QByteArray AvatarData::toByteArray(bool cullSmallChanges, bool sendAll) {
     // TODO: DRY this up to a shared method
     // that can pack any type given the number of bytes
     // and return the number of bytes to push the pointer
@@ -234,11 +234,20 @@ QByteArray AvatarData::toByteArray() {
 
     // joint data
     *destinationBuffer++ = _jointData.size();
+    unsigned char* validityPosition = destinationBuffer;
     unsigned char validity = 0;
     int validityBit = 0;
-    foreach (const JointData& data, _jointData) {
-        if (data.valid) {
-            validity |= (1 << validityBit);
+
+    _lastSentJointData.resize(_jointData.size());
+
+    for (int i=0; i < _jointData.size(); i++) {
+        const JointData& data = _jointData.at(i);
+        if (sendAll || _lastSentJointData[i].rotation != data.rotation) {
+            if (sendAll ||
+                !cullSmallChanges ||
+                fabsf(glm::dot(data.rotation, _lastSentJointData[i].rotation)) <= AVATAR_MIN_ROTATION_DOT) {
+                validity |= (1 << validityBit);
+            }
         }
         if (++validityBit == BITS_IN_BYTE) {
             *destinationBuffer++ = validity;
@@ -248,13 +257,35 @@ QByteArray AvatarData::toByteArray() {
     if (validityBit != 0) {
         *destinationBuffer++ = validity;
     }
-    foreach (const JointData& data, _jointData) {
-        if (data.valid) {
+
+    validityBit = 0;
+    validity = *validityPosition++;
+    for (int i = 0; i < _jointData.size(); i ++) {
+        const JointData& data = _jointData[ i ];
+        if (validity & (1 << validityBit)) {
             destinationBuffer += packOrientationQuatToBytes(destinationBuffer, data.rotation);
+        }
+        if (++validityBit == BITS_IN_BYTE) {
+            validityBit = 0;
+            validity = *validityPosition++;
         }
     }
 
     return avatarDataByteArray.left(destinationBuffer - startPosition);
+}
+
+void AvatarData::doneEncoding(bool cullSmallChanges) {
+    // The server has finished sending this version of the joint-data to other nodes.  Update _lastSentJointData.
+    _lastSentJointData.resize(_jointData.size());
+    for (int i = 0; i < _jointData.size(); i ++) {
+        const JointData& data = _jointData[ i ];
+        if (_lastSentJointData[i].rotation != data.rotation) {
+            if (!cullSmallChanges ||
+                fabsf(glm::dot(data.rotation, _lastSentJointData[i].rotation)) <= AVATAR_MIN_ROTATION_DOT) {
+                _lastSentJointData[i].rotation = data.rotation;
+            }
+        }
+    }
 }
 
 bool AvatarData::shouldLogError(const quint64& now) {
@@ -494,6 +525,10 @@ int AvatarData::parseDataFromBuffer(const QByteArray& buffer) {
     }
     int numValidJoints = 0;
     _jointData.resize(numJoints);
+
+    QVector<bool> valids;
+    valids.resize(numJoints);
+
     { // validity bits
         unsigned char validity = 0;
         int validityBit = 0;
@@ -505,7 +540,7 @@ int AvatarData::parseDataFromBuffer(const QByteArray& buffer) {
             if (valid) {
                 ++numValidJoints;
             }
-            _jointData[i].valid = valid;
+            valids[i] = valid;
             validityBit = (validityBit + 1) % BITS_IN_BYTE;
         }
     }
@@ -527,7 +562,7 @@ int AvatarData::parseDataFromBuffer(const QByteArray& buffer) {
     { // joint data
         for (int i = 0; i < numJoints; i++) {
             JointData& data = _jointData[i];
-            if (data.valid) {
+            if (valids[i]) {
                 _hasNewJointRotations = true;
                 sourceBuffer += unpackOrientationQuatFromBytes(sourceBuffer, data.rotation);
             }
@@ -731,7 +766,6 @@ void AvatarData::setJointData(int index, const glm::quat& rotation) {
         _jointData.resize(index + 1);
     }
     JointData& data = _jointData[index];
-    data.valid = true;
     data.rotation = rotation;
 }
 
@@ -746,7 +780,6 @@ void AvatarData::clearJointData(int index) {
     if (_jointData.size() <= index) {
         _jointData.resize(index + 1);
     }
-    _jointData[index].valid = false;
 }
 
 bool AvatarData::isJointDataValid(int index) const {
@@ -759,7 +792,7 @@ bool AvatarData::isJointDataValid(int index) const {
             Q_RETURN_ARG(bool, result), Q_ARG(int, index));
         return result;
     }
-    return index < _jointData.size() && _jointData.at(index).valid;
+    return index < _jointData.size();
 }
 
 glm::quat AvatarData::getJointRotation(int index) const {
@@ -1060,7 +1093,11 @@ void AvatarData::setJointMappingsFromNetworkReply() {
 void AvatarData::sendAvatarDataPacket() {
     auto nodeList = DependencyManager::get<NodeList>();
 
-    QByteArray avatarByteArray = toByteArray();
+    // about 2% of the time, we send a full update (meaning, we transmit all the joint data), even if nothing has changed.
+    // this is to guard against a joint moving once, the packet getting lost, and the joint never moving again.
+    bool sendFullUpdate = randFloat() < AVATAR_SEND_FULL_UPDATE_RATIO;
+    QByteArray avatarByteArray = toByteArray(true, sendFullUpdate);
+    doneEncoding(true);
 
     auto avatarPacket = NLPacket::create(PacketType::AvatarData, avatarByteArray.size());
     avatarPacket->write(avatarByteArray);
