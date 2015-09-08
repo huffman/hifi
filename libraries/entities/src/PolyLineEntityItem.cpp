@@ -133,7 +133,7 @@ bool PolyLineEntityItem::setNormals(const QVector<glm::vec3>& normals) {
         binormal = glm::normalize(glm::cross(tangent, normal)) * width;
         
         //This checks to make sure binormal is not a NAN
-        assert(binormal.x == binormal.x);
+        // assert(binormal.x == binormal.x);
         v1 = point + binormal;
         v2 = point - binormal;
         _vertices << v1 << v2;

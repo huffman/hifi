@@ -86,8 +86,10 @@ void RenderablePolyLineEntityItem::updateGeometry() {
     
     int numTailStrips =  5;
     int numHeadStrips = 10;
-    int startHeadIndex = _normals.size() - numHeadStrips;
-    for (int i = 0; i < _normals.size(); i++) {
+    int size = glm::min(_points.size(), glm::min(_normals.size(), _strokeWidths.size()));
+    int startHeadIndex = size - numHeadStrips;
+
+    for (int i = 0; i < size; i++) {
         uCoord = 0.26f;
         vCoord = 0.0f;
         //tail
@@ -124,7 +126,7 @@ void RenderablePolyLineEntityItem::updateGeometry() {
 
 void RenderablePolyLineEntityItem::render(RenderArgs* args) {
     QWriteLocker lock(&_quadReadWriteLock);
-    if (_points.size() < 2  || _vertices.size() != _normals.size() * 2) {
+    if (_points.size() < 2  ) { //|| _vertices.size() != _normals.size() * 2) {
         return;
     }
     
