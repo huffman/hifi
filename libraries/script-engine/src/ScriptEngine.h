@@ -16,6 +16,7 @@
 
 #include <QtCore/QObject>
 #include <QtCore/QUrl>
+#include <QtCore/QSet>
 #include <QtCore/QWaitCondition>
 #include <QtScript/QScriptEngine>
 
@@ -63,6 +64,8 @@ public:
                           int numArguments = -1);
 
     Q_INVOKABLE void setIsAvatar(bool isAvatar);
+    Q_INVOKABLE void callScriptMethod(QString methodName, QScriptValue script, QScriptValueList args);
+
     bool isAvatar() const { return _isAvatar; }
 
     void setAvatarData(AvatarData* avatarData, const QString& objectName);
@@ -152,6 +155,7 @@ protected:
     Sound* _avatarSound;
     int _numAvatarSoundSentBytes;
     bool _isAgent = false;
+    QSet<QUrl> _includedURLs;
     
 private:
     void stopAllTimers();

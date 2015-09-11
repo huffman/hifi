@@ -260,6 +260,20 @@ bool ScriptEngine::setScriptContents(const QString& scriptContents, const QStrin
     return true;
 }
 
+void ScriptEngine::callScriptMethod(QString methodName, QScriptValue script, QScriptValueList args) {
+    if (QThread::currentThread() != thread()) {
+            QMetaObject::invokeMethod(this,
+                "callScriptMethod",
+                Q_ARG(QString, methodName),
+                Q_ARG(QScriptValue, script),
+                Q_ARG(QScriptValueList, args));
+        return;
+    }
+
+    //qDebug() << "About to call " << methodName << "() current thread : " << QThread::currentThread() << "engine thread : " << thread();
+    script.property(methodName).call(script, args);
+}
+
 void ScriptEngine::loadURL(const QUrl& scriptURL, bool reload) {
     if (_isRunning) {
         return;
@@ -860,7 +874,14 @@ void ScriptEngine::include(const QStringList& includeFiles, QScriptValue callbac
     }
     QList<QUrl> urls;
     for (QString file : includeFiles) {
-        urls.append(resolvePath(file));
+        QUrl thisURL { resolvePath(file) };
+        if (!_includedURLs.contains(thisURL)) {
+            urls.append(thisURL);
+            _includedURLs << thisURL;
+        }
+        else {
+            qCDebug(scriptengine) << "Script.include() ignoring previously included url:" << thisURL;
+        }
     }
 
     BatchLoader* loader = new BatchLoader(urls);
