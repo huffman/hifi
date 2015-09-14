@@ -45,7 +45,8 @@ class ScriptEngine : public QScriptEngine, public ScriptUser {
 public:
     ScriptEngine(const QString& scriptContents = NO_SCRIPT,
                  const QString& fileNameString = QString(""),
-                 AbstractControllerScriptingInterface* controllerScriptingInterface = NULL);
+                 AbstractControllerScriptingInterface* controllerScriptingInterface = NULL,
+                 bool wantSignals = true);
 
     ~ScriptEngine();
 
@@ -64,8 +65,6 @@ public:
                           int numArguments = -1);
 
     Q_INVOKABLE void setIsAvatar(bool isAvatar);
-    Q_INVOKABLE void callScriptMethod(QString methodName, QScriptValue script, QScriptValueList args);
-
     bool isAvatar() const { return _isAvatar; }
 
     void setAvatarData(AvatarData* avatarData, const QString& objectName);
@@ -156,7 +155,8 @@ protected:
     int _numAvatarSoundSentBytes;
     bool _isAgent = false;
     QSet<QUrl> _includedURLs;
-    
+    bool _wantSignals = true;
+
 private:
     void stopAllTimers();
     void sendAvatarIdentityPacket();
