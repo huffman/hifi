@@ -204,7 +204,7 @@ Map = function(data) {
 
         
         var position = Vec3.subtract(MyAvatar.position, center)
-        position.y += (Math.sin(time) * 20);
+        position.y += 60 + (Math.sin(time) * 10);
         position = Vec3.multiply(position, ROOT_SCALE);
         avatarArrowEntity.position = position;
         // Vec3.print("Position:", avatarArrowEntity.position);
