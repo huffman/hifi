@@ -9,12 +9,16 @@ var entityManager = new EntityManager();
 // From http://evanw.github.io/lightgl.js/docs/raytracer.html
 function raySphereIntersection(origin, ray, center, radius) {
     var offset = Vec3.subtract(origin, center);
-    var a = Vec3.dot(ray, ray);
+
     // var a = ray.dot(ray);
-    var b = 2 * Vec3.dot(ray, offset);
+    var a = Vec3.dot(ray, ray);
+
     // var b = 2 * ray.dot(offset);
-    var c = Vec3.dot(offset, offset) - radius * radius;
+    var b = 2 * Vec3.dot(ray, offset);
+
     // var c = offset.dot(offset) - radius * radius;
+    var c = Vec3.dot(offset, offset) - radius * radius;
+
     var discriminant = b * b - 4 * a * c;
 
     if (discriminant > 0) {
