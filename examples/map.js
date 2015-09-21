@@ -28,6 +28,16 @@ function raySphereIntersection(origin, ray, center, radius) {
     return null;
 };
 
+function parseJSON(userData) {
+    var data = {};
+    try {
+        data = JSON.parse(userData.replace(/(\r\n|\n|\r)/gm,""));
+    } catch (e) {
+        print("Error parsing JSON data: ", userData);
+    }
+    return data;
+}
+
 
 Map = function(data) {
     var visible = false;
@@ -62,7 +72,8 @@ Map = function(data) {
     for (var i = 0; i < entities.length; ++i) {
         var entityID = entities[i];
         var properties = Entities.getEntityProperties(entityID);
-        if (properties.userData == "mapped" || properties.userData == "tracked") {
+        var mapData = parseJSON(properties.userData).mapData;
+        if (mapData) {
 
             print("Found: ", properties.name);
 
@@ -103,13 +114,7 @@ Map = function(data) {
     for (var i = 0; i < entities.length; ++i) {
         var entityID = entities[i];
         var properties = Entities.getEntityProperties(entityID);
-        var mapData = null;
-        try {
-            var data = JSON.parse(properties.userData.replace(/(\r\n|\n|\r)/gm,""));
-            mapData = data.mapData;
-        } catch (e) {
-            print("Caught: ", properties.name);
-        }
+        var mapData = parseJSON(properties.userData).mapData;
 
         if (mapData) {
             print("Creating copy of", properties.name);
@@ -121,24 +126,43 @@ Map = function(data) {
             properties.position = Vec3.multiply(properties.position, ROOT_SCALE);
             var extra = { };
 
-            if (mapData.track) {
-                extra.trackingEntityID= entityID;
-                trackedEntities.push(entity);
-                rootObject.addChild(entity);
-            }
             if (mapData.waypoint) {
                 print("Waypoint: ", mapData.waypoint.name);
                 // properties.type = "Model";
                 // properties.modelURL = "atp:ca49a13938376b3eb68d7b2b9189afb3f580c07b6950ea9e65b5260787204145.fbx";
                 extra.waypoint = mapData.waypoint;
                 extra.waypoint.position = position;
+                properties.dimensions = { x: 40, y: 40, z: 40 };
             }
 
             var entity = entityManager.add(properties.type, properties);
-            entity.__extra__ = extra;
+
+            if (mapData.track) {
+                extra.trackingEntityID = entityID;
+                trackedEntities.push(entity);
+            }
+
             if (mapData.waypoint) {
                 waypointEntities.push(entity);
+
+                print("Adding label");
+                // Add text to display above waypoint
+                var label = entityManager.add("Text", {
+                    name: "Waypoint Label (" + extra.waypoint.name + ")",
+                    // dimensions: { x: 0.1, y: 0.05, z: 0.01 },
+                    dimensions: { x: 40, y: 20.0, z: 0.1 },
+                    rotation: Quat.fromPitchYawRollDegrees(0, 180, 0),
+                    position: { x: 0, y: 400 * ROOT_SCALE, z: 0 },
+                    text: extra.waypoint.name,
+                    faceCamera: true,
+                    textColor: { red: 255, green: 255, blue: 255 },
+                    backgroundColor: { red: 0, green: 0, blue: 0 },
+                });
+                entity.addChild(label);
             }
+
+            entity.__extra__ = extra;
+
             mappedEntities.push(entity);
 
             rootObject.addChild(entity);
@@ -168,7 +192,7 @@ Map = function(data) {
         for (var i = 0; i < waypointEntities.length; ++i) {
             var entity = waypointEntities[i];
             print("Checkit for hit", entity.__extra__.waypoint.name);
-            var result = raySphereIntersection(pickRay.origin, pickRay.direction, entity.worldPosition, 0.1);//entity.worldScale);
+            var result = raySphereIntersection(pickRay.origin, pickRay.direction, entity.worldPosition, 20 * ROOT_SCALE);//entity.worldScale);
             if (result) {
                 print("Pressed entity: ", entity.id);
                 print("Pressed waypoint: ", entity.__extra__.waypoint.name);
