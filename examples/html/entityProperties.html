@@ -5,9 +5,89 @@
     <script src="jquery-2.1.4.min.js"></script>
     <script src="colpick.js"></script>
     <script>
-        var PI = 3.14159265358979;
-        var DEGREES_TO_RADIANS = PI / 180.0;
-        var RADIANS_TO_DEGREES = 180.0 / PI;
+        const PI = 3.14159265358979;
+        const DEGREES_TO_RADIANS = PI / 180.0;
+        const RADIANS_TO_DEGREES = 180.0 / PI;
+
+
+        const TYPE_COLOR = "Color";
+        const TYPE_VEC3 = "Vec3";
+        const TYPE_QUAT = "Quat";
+        const TYPE_TEXT = "Text";
+        const TYPE_TEXTAREA = "TextArea";
+        const TYPE_URL = "Url";
+        const TYPE_ENUM = "Enum";
+
+        const PROPERTY_TYPE_OVERRIDES = {
+            // ...
+            color: TYPE_COLOR;
+        };
+
+        const LAYOUT = [
+            [
+                "Core",
+                ["User Data", TYPE_TEXTAREA],
+                ["Position", TYPE_VEC3],
+                ["Registration", TYPE_VEC3],
+                ["Dimensions", TYPE_VEC3],
+                ["Rotation", TYPE_QUAT],
+            ],
+            [
+                "Physical Properties",
+                ["Linear Velocity", "", TYPE_VEC3],
+            ],
+            [
+                "PolyVox",
+                ["Voxel Volume Size", "", TYPE_VEC3],
+                ["Surface Extractor", "", TYPE_ENUM, ["marching cubes", "cubic", "edged cubic", "edged marching cubes"],
+                ["X-Axis Texture URL", "", TYPE_URL],
+                ["Y-Axis Texture URL", "", TYPE_URL],
+                ["Z-Axis Texture URL", "", TYPE_URL],
+            ],
+        ];
+
+        PropertyElement = function(name, type, typeExtra) {
+            this.name = name;
+            this.type = type;
+            this.element = element;
+        };
+
+        var propertyToElementMap = { };
+
+        function detectPropertyType(name, value) {
+            // Special case certain property names
+            if (name in PROPERTY_TYPE_OVERRIDES) {
+                return PROPERTY_TYPE_OVERRIDES[name];
+            }
+
+            // Detect type based on value
+            if ("red" in value) {
+                return TYPE_COLOR;
+            } else if ("w" in value) {
+                return TYPE_QUAT;
+            } else if ("x" in value) {
+                return TYPE_VEC3;
+            }
+        }
+
+        // Setup properties
+        for (var i = 0; i < LAYOUT.length; ++i) {
+            var section = LAYOUT[i];
+            var sectionName = section[0];
+
+            // Create section element
+
+            for (var j = 1; j < section.length; ++j) {
+                var propertyInfo = section[j];
+                var propertyLabel = propertyInfo[0];
+                var propertyName = propertyInfo[1];
+                var propertyType = propertyInfo.splice(2);
+
+                // Create DOM element
+
+                // Add element to body
+            }
+        }
 
         function enableChildren(el, selector) {
             els = el.querySelectorAll(selector);
@@ -202,173 +282,51 @@
             var elName = document.getElementById("property-name");
             var elLocked = document.getElementById("property-locked");
             var elVisible = document.getElementById("property-visible");
-            var elPositionX = document.getElementById("property-pos-x");
-            var elPositionY = document.getElementById("property-pos-y");
-            var elPositionZ = document.getElementById("property-pos-z");
-            var elMoveSelectionToGrid = document.getElementById("move-selection-to-grid");
-            var elMoveAllToGrid = document.getElementById("move-all-to-grid");
 
-            var elDimensionsX = document.getElementById("property-dim-x");
-            var elDimensionsY = document.getElementById("property-dim-y");
-            var elDimensionsZ = document.getElementById("property-dim-z");
-            var elResetToNaturalDimensions = document.getElementById("reset-to-natural-dimensions");
-            var elRescaleDimensionsPct = document.getElementById("dimension-rescale-pct");
-            var elRescaleDimensionsButton  = document.getElementById("dimension-rescale-button");
+            if (window.EventBridge !== undefined) {
+                EventBridge.scriptEventReceived.connect(function(data) {
+                    data = JSON.parse(data);
+                    if (data.type == "update") {
+                        if (data.selections.length == 0) {
+                            elType.innerHTML = "<i>No Selection</i>";
+                            elID.innerHTML = "";
+                            disableChildren(document.getElementById("properties-list"), 'input');
+                        } else if (data.selections.length > 1) {
+                            var selections = data.selections;
 
-            var elRegistrationX = document.getElementById("property-reg-x");
-            var elRegistrationY = document.getElementById("property-reg-y");
-            var elRegistrationZ = document.getElementById("property-reg-z");
+                            var ids = [];
+                            var types = {};
 
-            var elRotationX = document.getElementById("property-rot-x");
-            var elRotationY = document.getElementById("property-rot-y");
-            var elRotationZ = document.getElementById("property-rot-z");
+                            for (var i = 0; i < selections.length; i++) {
+                                ids.push(selections[i].id);
+                                var type = selections[i].properties.type;
+                                if (types[type] === undefined) {
+                                    types[type] = 0;
+                                }
+                                types[type]++;
+                            }
+                            elID.innerHTML = ids.join("<br>");
 
-            var elLinearVelocityX = document.getElementById("property-lvel-x");
-            var elLinearVelocityY = document.getElementById("property-lvel-y");
-            var elLinearVelocityZ = document.getElementById("property-lvel-z");
-            var elLinearDamping = document.getElementById("property-ldamping");
+                            var typeStrs = [];
+                            for (type in types) {
+                                typeStrs.push(type + " (" + types[type] + ")");
+                            }
+                            elType.innerHTML = typeStrs.join(", ");
 
-            var elAngularVelocityX = document.getElementById("property-avel-x");
-            var elAngularVelocityY = document.getElementById("property-avel-y");
-            var elAngularVelocityZ = document.getElementById("property-avel-z");
-            var elAngularDamping = document.getElementById("property-adamping");
+                            disableChildren(document.getElementById("properties-list"), 'input');
+                        } else {
+                            function updateProperty(name, value) {
+                                // Get element for property
+                                var el = propertyToElementMap[name];
+                                if (el) {
 
-            var elRestitution = document.getElementById("property-restitution");
-            var elFriction = document.getElementById("property-friction");
+                                }
+                            }
 
-            var elGravityX = document.getElementById("property-grav-x");
-            var elGravityY = document.getElementById("property-grav-y");
-            var elGravityZ = document.getElementById("property-grav-z");
-
-            var elAccelerationX = document.getElementById("property-lacc-x");
-            var elAccelerationY = document.getElementById("property-lacc-y");
-            var elAccelerationZ = document.getElementById("property-lacc-z");
-
-            var elDensity = document.getElementById("property-density");
-            var elIgnoreForCollisions = document.getElementById("property-ignore-for-collisions");
-            var elCollisionsWillMove = document.getElementById("property-collisions-will-move");
-            var elCollisionSoundURL = document.getElementById("property-collision-sound-url");
-            var elLifetime = document.getElementById("property-lifetime");
-            var elScriptURL = document.getElementById("property-script-url");
-            var elScriptTimestamp = document.getElementById("property-script-timestamp");
-            var elReloadScriptButton = document.getElementById("reload-script-button");
-            var elUserData = document.getElementById("property-user-data");
-
-            var elColorSection = document.getElementById("color-section");
-            var elColor = document.getElementById("property-color");
-            var elColorRed = document.getElementById("property-color-red");
-            var elColorGreen = document.getElementById("property-color-green");
-            var elColorBlue = document.getElementById("property-color-blue");
-
-            var elLightSections = document.querySelectorAll(".light-section");
-            allSections.push(elLightSections);
-            var elLightSpotLight = document.getElementById("property-light-spot-light");
-            var elLightColor = document.getElementById("property-light-color");
-            var elLightColorRed = document.getElementById("property-light-color-red");
-            var elLightColorGreen = document.getElementById("property-light-color-green");
-            var elLightColorBlue = document.getElementById("property-light-color-blue");
-
-            var elLightIntensity = document.getElementById("property-light-intensity");
-            var elLightExponent = document.getElementById("property-light-exponent");
-            var elLightCutoff = document.getElementById("property-light-cutoff");
-
-            var elModelSections = document.querySelectorAll(".model-section");
-            allSections.push(elModelSections);
-            var elModelURL = document.getElementById("property-model-url");
-            var elShapeType = document.getElementById("property-shape-type");
-            var elCompoundShapeURL = document.getElementById("property-compound-shape-url");
-            var elModelAnimationURL = document.getElementById("property-model-animation-url");
-            var elModelAnimationPlaying = document.getElementById("property-model-animation-playing");
-            var elModelAnimationFPS = document.getElementById("property-model-animation-fps");
-            var elModelAnimationFrame = document.getElementById("property-model-animation-frame");
-            var elModelAnimationSettings = document.getElementById("property-model-animation-settings");
-            var elModelTextures = document.getElementById("property-model-textures");
-            var elModelOriginalTextures = document.getElementById("property-model-original-textures");
-
-            var elWebSections = document.querySelectorAll(".web-section");
-            allSections.push(elWebSections);
-            var elWebSourceURL = document.getElementById("property-web-source-url");
-
-            var elParticleSections = document.querySelectorAll(".particle-section");
-            allSections.push(elParticleSections);
-            var elParticleMaxParticles = document.getElementById("property-particle-maxparticles");
-            var elParticleLifeSpan = document.getElementById("property-particle-lifespan");
-            var elParticleEmitRate = document.getElementById("property-particle-emit-rate");
-            var elParticleEmitDirectionX = document.getElementById("property-particle-emit-direction-x");
-            var elParticleEmitDirectionY = document.getElementById("property-particle-emit-direction-y");
-            var elParticleEmitDirectionZ = document.getElementById("property-particle-emit-direction-z");
-            var elParticleEmitStrength = document.getElementById("property-particle-emit-strength");
-            var elParticleLocalGravity = document.getElementById("property-particle-localgravity");
-            var elParticleRadius = document.getElementById("property-particle-radius");
-
-            var elTextSections = document.querySelectorAll(".text-section");
-            allSections.push(elTextSections);
-            var elTextText = document.getElementById("property-text-text");
-            var elTextLineHeight = document.getElementById("property-text-line-height");
-            var elTextTextColor = document.getElementById("property-text-text-color");
-            var elTextTextColorRed = document.getElementById("property-text-text-color-red");
-            var elTextTextColorGreen = document.getElementById("property-text-text-color-green");
-            var elTextTextColorBlue = document.getElementById("property-text-text-color-blue");
-            var elTextBackgroundColor = document.getElementById("property-text-background-color");
-            var elTextBackgroundColorRed = document.getElementById("property-text-background-color-red");
-            var elTextBackgroundColorGreen = document.getElementById("property-text-background-color-green");
-            var elTextBackgroundColorBlue = document.getElementById("property-text-background-color-blue");
-
-            var elZoneSections = document.querySelectorAll(".zone-section");
-            allSections.push(elZoneSections);
-            var elZoneStageSunModelEnabled = document.getElementById("property-zone-stage-sun-model-enabled");
-            var elZoneKeyLightColor = document.getElementById("property-zone-key-light-color");
-            var elZoneKeyLightColorRed = document.getElementById("property-zone-key-light-color-red");
-            var elZoneKeyLightColorGreen = document.getElementById("property-zone-key-light-color-green");
-            var elZoneKeyLightColorBlue = document.getElementById("property-zone-key-light-color-blue");
-            var elZoneKeyLightIntensity = document.getElementById("property-zone-key-intensity");
-            var elZoneKeyLightAmbientIntensity = document.getElementById("property-zone-key-ambient-intensity");
-            var elZoneKeyLightDirectionX = document.getElementById("property-zone-key-light-direction-x");
-            var elZoneKeyLightDirectionY = document.getElementById("property-zone-key-light-direction-y");
-            var elZoneKeyLightDirectionZ = document.getElementById("property-zone-key-light-direction-z");
-
-            var elZoneStageLatitude = document.getElementById("property-zone-stage-latitude");
-            var elZoneStageLongitude = document.getElementById("property-zone-stage-longitude");
-            var elZoneStageAltitude = document.getElementById("property-zone-stage-altitude");
-            var elZoneStageAutomaticHourDay = document.getElementById("property-zone-stage-automatic-hour-day");
-            var elZoneStageDay = document.getElementById("property-zone-stage-day");
-            var elZoneStageHour = document.getElementById("property-zone-stage-hour");
-
-            var elZoneBackgroundMode = document.getElementById("property-zone-background-mode");
-
-            var elZoneSkyboxColor = document.getElementById("property-zone-skybox-color");
-            var elZoneSkyboxColorRed = document.getElementById("property-zone-skybox-color-red");
-            var elZoneSkyboxColorGreen = document.getElementById("property-zone-skybox-color-green");
-            var elZoneSkyboxColorBlue = document.getElementById("property-zone-skybox-color-blue");
-            var elZoneSkyboxURL = document.getElementById("property-zone-skybox-url");
-
-            var elZoneAtmosphereCenterX = document.getElementById("property-zone-atmosphere-center-x");
-            var elZoneAtmosphereCenterY = document.getElementById("property-zone-atmosphere-center-y");
-            var elZoneAtmosphereCenterZ = document.getElementById("property-zone-atmosphere-center-z");
-            var elCenterAtmosphereToZone = document.getElementById("center-atmosphere-in-zone");
-
-            var elZoneAtmosphereInnerRadius = document.getElementById("property-zone-atmosphere-inner-radius");
-            var elZoneAtmosphereOuterRadius = document.getElementById("property-zone-atmosphere-outer-radius");
-            var elZoneAtmosphereMieScattering = document.getElementById("property-zone-atmosphere-mie-scattering");
-            var elZoneAtmosphereRayleighScattering = document.getElementById("property-zone-atmosphere-rayleigh-scattering");
-            var elZoneAtmosphereScatteringWavelengthsX = document.getElementById("property-zone-atmosphere-scattering-wavelengths-x");
-            var elZoneAtmosphereScatteringWavelengthsY = document.getElementById("property-zone-atmosphere-scattering-wavelengths-y");
-            var elZoneAtmosphereScatteringWavelengthsZ = document.getElementById("property-zone-atmosphere-scattering-wavelengths-z");
-            var elZoneAtmosphereHasStars = document.getElementById("property-zone-atmosphere-has-stars");
-
-            var elPolyVoxSections = document.querySelectorAll(".poly-vox-section");
-            allSections.push(elPolyVoxSections);
-            var elVoxelVolumeSizeX = document.getElementById("property-voxel-volume-size-x");
-            var elVoxelVolumeSizeY = document.getElementById("property-voxel-volume-size-y");
-            var elVoxelVolumeSizeZ = document.getElementById("property-voxel-volume-size-z");
-            var elVoxelSurfaceStyle = document.getElementById("property-voxel-surface-style");
-            var elXTextureURL = document.getElementById("property-x-texture-url");
-            var elYTextureURL = document.getElementById("property-y-texture-url");
-            var elZTextureURL = document.getElementById("property-z-texture-url");
-
-            var elHyperlinkHref = document.getElementById("property-hyperlink-href");
-            var elHyperlinkDescription = document.getElementById("property-hyperlink-description");
-
+                        }
+                    }
+                }
+            }
 
 
             if (window.EventBridge !== undefined) {
@@ -988,619 +946,619 @@
             </span>
         </div>
 
-        <div class="property">
-            <div class="label">User Data</div>
-            <div class="value">
-                <textarea id="property-user-data"></textarea>
-            </div>
-        </div>
-
-
-        <div class="section-header">
-            <label>Hyperlink</label>
-        </div>
-
-        <div class="property">
-            <div class="label">Href</div>
-            <div class="value">
-                <input id="property-hyperlink-href" class="url"></input>
-            </div>
-        </div>
-        <div class="property">
-            <div class="label">Description</div>
-            <div class="value">
-                <input id="property-hyperlink-description" class="url"></input>
-            </div>
-        </div>
-
-
-        <div class="section-header">
-            <label>Spacial Properites</label>
-        </div>
-
-        <div class="property">
-            <div class="label">Position</div>
-            <div class="value">
-                <div class="input-area">X <br><input class="coord" type='number' id="property-pos-x"></input></div>
-                <div class="input-area">Y <br><input class="coord" type='number' id="property-pos-y"></input></div>
-                <div class="input-area">Z <br><input class="coord" type='number' id="property-pos-z"></input></div>
-                <div>
-                    <input type="button" id="move-selection-to-grid" value="Selection to Grid">
-                    <input type="button" id="move-all-to-grid" value="All to Grid">
-                </div>
-            </div>
-        </div>
-
-        <div class="property">
-            <div class="label">Registration</div>
-            <div class="value">
-                <div class="input-area">X <input class="coord" type='number' id="property-reg-x"></input></div>
-                <div class="input-area">Y <input class="coord" type='number' id="property-reg-y"></input></div>
-                <div class="input-area">Z <input class="coord" type='number' id="property-reg-z"></input></div>
-            </div>
-        </div>
-
-        <div class="property">
-            <div class="label">Dimensions</div>
-            <div class="value">
-                <div class="input-area">X <input class="coord" type='number' id="property-dim-x"></input></div>
-                <div class="input-area">Y <input class="coord" type='number' id="property-dim-y"></input></div>
-                <div class="input-area">Z <input class="coord" type='number' id="property-dim-z"></input></div>
-                <div>
-                    <input type="button" id="reset-to-natural-dimensions" value="Reset to Natural Dimensions">
-                </div>
-                <div class="input-area">
-                    <input class="" type='number' id="dimension-rescale-pct" value=100></input>%
-                </div>
-                <span>
-                    <input type="button" id="dimension-rescale-button" value="Rescale"></input>
-                </span>
-            </div>
-        </div>
-
-        <div class="poly-vox-section property">
-            <div class="label">Voxel Volume Size</div>
-            <div class="value">
-              <div class="input-area">X <br> <input class="coord" type='number' id="property-voxel-volume-size-x"></input></div>
-              <div class="input-area">Y <br><input class="coord" type='number' id="property-voxel-volume-size-y"></input></div>
-              <div class="input-area">Z <br><input class="coord" type='number' id="property-voxel-volume-size-z"></input></div>
-            </div>
-
-            <div class="label">Surface Extractor</div>
-            <div class="value">
-              <select name="SelectVoxelSurfaceStyle" id="property-voxel-surface-style">
-                <option value='0'>marching cubes</option>
-                <option value='1'>cubic</option>
-                <option value='2'>edged cubic</option>
-                <option value='3'>edged marching cubes</option>
-              </select>
-            </div>
-
-            <div class="label">X-axis Texture URL</div>
-            <div class="value">
-              <input type="text" id="property-x-texture-url" class="url"></input>
-            </div>
-
-            <div class="label">Y-axis Texture URL</div>
-            <div class="value">
-              <input type="text" id="property-y-texture-url" class="url"></input>
-            </div>
-
-            <div class="label">Z-axis Texture URL</div>
-            <div class="value">
-              <input type="text" id="property-z-texture-url" class="url"></input>
-            </div>
-        </div>
-
-        <div class="property">
-            <div class="label">Rotation</div>
-            <div class="value">
-                <div class="input-area">Pitch <input class="coord" type='number' id="property-rot-x"></input></div>
-                <div class="input-area">Yaw <input class="coord" type='number' id="property-rot-y"></input></div>
-                <div class="input-area">Roll <input class="coord" type='number' id="property-rot-z"></input></div>
-            </div>
-        </div>
-
-
-        <div class="section-header">
-            <label>Physical Properites</label>
-        </div>
-
-        <div class="property">
-            <div class="label">Linear Velocity</div>
-            <div class="value">
-                <div class="input-area">X <input class="coord" type='number' id="property-lvel-x"></input></div>
-                <div class="input-area">Y <input class="coord" type='number' id="property-lvel-y"></input></div>
-                <div class="input-area">Z <input class="coord" type='number' id="property-lvel-z"></input></div>
-            </div>
-        </div>
-        <div class="property">
-            <div class="label">Linear Damping</div>
-            <div class="value">
-                <input class="coord" type='number' id="property-ldamping"></input>
-            </div>
-        </div>
-        <div class="property">
-            <div class="label">Angular Velocity</div>
-            <div class="value">
-                <div class="input-area">Pitch <input class="coord" type='number' id="property-avel-x"></input></div>
-                <div class="input-area">Yaw <input class="coord" type='number' id="property-avel-y"></input></div>
-                <div class="input-area">Roll <input class="coord" type='number' id="property-avel-z"></input></div>
-            </div>
-        </div>
-        <div class="property">
-            <div class="label">Angular Damping</div>
-            <div class="value">
-                <input class="coord" type='number' id="property-adamping"></input>
-            </div>
-        </div>
-        <div class="property">
-            <div class="label">Restitution</div>
-            <div class="value">
-                <input class="coord" type='number' id="property-restitution"></input>
-            </div>
-        </div>
-        <div class="property">
-            <div class="label">Friction</div>
-            <div class="value">
-                <input class="coord" type='number' id="property-friction"></input>
-            </div>
-        </div>
-
-        <div class="property">
-            <div class="label">Gravity</div>
-            <div class="value">
-                <div class="input-area">X <input class="coord" type='number' id="property-grav-x"></input></div>
-                <div class="input-area">Y <input class="coord" type='number' id="property-grav-y"></input></div>
-                <div class="input-area">Z <input class="coord" type='number' id="property-grav-z"></input></div>
-            </div>
-        </div>
-
-        <div class="property">
-            <div class="label">Acceleration</div>
-            <div class="value">
-                <div class="input-area">X <input class="coord" type='number' id="property-lacc-x"></input></div>
-                <div class="input-area">Y <input class="coord" type='number' id="property-lacc-y"></input></div>
-                <div class="input-area">Z <input class="coord" type='number' id="property-lacc-z"></input></div>
-            </div>
-        </div>
-
-        <div class="property">
-            <div class="label">Density</div>
-            <div>
-                <input type='number' id="property-density"></input>
-            </div>
-        </div>
-
-        <div id="color-section" class="property">
-            <div class="label">Color</div>
-            <div class="value">
-                <div id="property-color" class='color-picker'></div>
-                <div class="input-area">R <input class="coord" type='number' id="property-color-red"></input></div>
-                <div class="input-area">G <input class="coord" type='number' id="property-color-green"></input></div>
-                <div class="input-area">B <input class="coord" type='number' id="property-color-blue"></input></div>
-            </div>
-        </div>
-
-
-        <div class="section-header">
-            <label>Behavior</label>
-        </div>
-
-        <div class="property">
-            <span class="label">Ignore For Collisions</span>
-            <span class="value">
-                <input type='checkbox' id="property-ignore-for-collisions"></input>
-            </span>
-        </div>
-
-        <div class="property">
-            <span class="label">Collisions Will Move</span>
-            <span class="value">
-                <input type='checkbox' id="property-collisions-will-move"></input>
-            </span>
-        </div>
-
-        <div class="property">
-            <div class="label">Collision Sound URL</div>
-            <div class="value">
-                <input id="property-collision-sound-url" class="url"></input>
-            </div>
-        </div>
-
-        <div class="property">
-            <div class="label">Lifetime</div>
-            <div class="value">
-                <input type='number' id="property-lifetime"></input>
-            </div>
-        </div>
-
-        <div class="property">
-            <div class="label">Script URL
-                <input type="hidden" id="property-script-timestamp" class="value"></input>
-                <input type="button" id="reload-script-button" value="Reload"></input>
-            </div>
-            <div class="value">
-                <input id="property-script-url" class="url"></input>
-            </div>
-        </div>
-
-
-        <div class="section-header model-section zone-section">
-            <label>Model</label>
-        </div>
-
-        <div class="model-section property">
-            <div class="label">Model URL</div>
-            <div class="value">
-                <input type="text" id="property-model-url" class="url"></input>
-            </div>
-        </div>
-
-        <div class="model-section zone-section property">
-            <div class="label">Shape Type</div>
-            <div class="value">
-                <select name="SelectShapeType" id="property-shape-type" name="SelectShapeType">
-                    <option value='none'>none</option>
-                    <option value='box'>box</option>
-                    <option value='sphere'>sphere</option>
-                    <option value='compound'>compound</option>
-                </select>
-            </div>
-        </div>
-        <div class="model-section zone-section property">
-            <div class="label">Compound Shape URL</div>
-            <div class="value">
-                <input type="text" id="property-compound-shape-url" class="url"></input>
-            </div>
-        </div>
-        <div class="model-section property">
-            <div class="label">Animation URL</div>
-            <div class="value">
-                <input type="text" id="property-model-animation-url" class="url"></input>
-            </div>
-        </div>
-        <div class="model-section property">
-            <span class="label">Animation Playing</span>
-            <span class="value">
-                <input type='checkbox' id="property-model-animation-playing">
-            </span>
-        </div>
-        <div class="model-section property">
-            <div class="label">Animation FPS</div>
-            <div class="value">
-                <input class="coord" type='number' id="property-model-animation-fps"></input>
-            </div>
-        </div>
-        <div class="model-section property">
-            <div class="label">Animation Frame</div>
-            <div class="value">
-                <input class="coord" type='number' id="property-model-animation-frame"></input>
-            </div>
-        </div>
-        <div class="model-section property">
-            <div class="label">Animation Settings</div>
-            <div class="value">
-                <textarea id="property-model-animation-settings"></textarea>
-            </div>
-        </div>
-        <div class="model-section property">
-            <div class="label">Textures</div>
-            <div class="value">
-                <textarea id="property-model-textures" value='asdfasdf'></textarea>
-            </div>
-        </div>
-        <div class="model-section property">
-            <div class="label">Original Textures</div>
-            <div class="value">
-                <textarea id="property-model-original-textures" readonly value='asdfasdf'></textarea>
-            </div>
-        </div>
-
-
-        <div class="section-header web-section">
-            <label>Web</label>
-        </div>
-
-        <div class="web-section property">
-            <div class="label">Source URL</div>
-            <div class="value">
-                <input type="text" id="property-web-source-url" class="url"></input>
-            </div>
-        </div>
-
-
-        <div class="section-header particle-section">
-            <label>Particle</label>
-        </div>
-
-        <div class="particle-section property">
-            <div class="label">Max Particles</div>
-            <div class="value">
-                <input type='number' id="property-particle-maxparticles" min="0" max="2048" step="1"></input>
-            </div>
-        </div>
-        <div class="particle-section property">
-            <div class="label">Particle Life Span</div>
-            <div class="value">
-                <input type='number' id="property-particle-lifespan" min="0" step="0.1"></input>
-            </div>
-        </div>
-        <div class="particle-section property">
-            <div class="label">Particle Emission Rate</div>
-            <div class="value">
-                <input type='number' id="property-particle-emit-rate" min="0" step="0.5"></input>
-            </div>
-        </div>
-        <div class="particle-section property">
-            <div class="label">Particle Emission Direction</div>
-            <div class="value">
-                <div class="input-area">X <input class="coord" type='number' id="property-particle-emit-direction-x"></input></div>
-                <div class="input-area">Y <input class="coord" type='number' id="property-particle-emit-direction-y"></input></div>
-                <div class="input-area">Z <input class="coord" type='number' id="property-particle-emit-direction-z"></input></div>
-            </div>
-        </div>
-        <div class="particle-section property">
-            <div class="label">Particle Emission Strength</div>
-            <div class="value">
-                <input type='number' id="property-particle-emit-strength" min="0" step="0.1"></input>
-            </div>
-        </div>
-        <div class="particle-section property">
-            <div class="label">Particle Local Gravity</div>
-            <div class="value">
-                <input class="coord" type='number' id="property-particle-localgravity" step="0.05"></input>
-            </div>
-        </div>
-        <div class="particle-section property">
-            <div class="label">Particle Radius</div>
-            <div class="value">
-                <input  class="coord" type='number' id="property-particle-radius" min="0" step="0.005"></input>
-            </div>
-        </div>
-
-
-        <div class="section-header text-section">
-            <label>Text</label>
-        </div>
-
-        <div class="text-section property">
-            <div class="label">Text Content</div>
-            <div class="value">
-                <input type="text" id="property-text-text"></input>
-            </div>
-        </div>
-        <div class="text-section property">
-            <div class="label">Line Height</div>
-            <div class="value">
-                <input class="coord" type='number' id="property-text-line-height" min="0" step="0.005"></input>
-            </div>
-        </div>
-        <div class="text-section property">
-            <div class="label">Text Color</div>
-            <div class="value">
-                <div class='color-picker' id="property-text-text-color"></div>
-                <div class="input-area">R <input class="coord" type='number' id="property-text-text-color-red"></input></div>
-                <div class="input-area">G <input class="coord" type='number' id="property-text-text-color-green"></input></div>
-                <div class="input-area">B <input class="coord" type='number' id="property-text-text-color-blue"></input></div>
-            </div>
-        </div>
-        <div class="text-section property">
-            <div class="label">Background Color</div>
-            <div class="value">
-                <div class='color-picker' id="property-text-background-color"></div>
-                <div class="input-area">R <input class="coord" type='number' id="property-text-background-color-red"></input></div>
-                <div class="input-area">G <input class="coord" type='number' id="property-text-background-color-green"></input></div>
-                <div class="input-area">B <input class="coord" type='number' id="property-text-background-color-blue"></input></div>
-            </div>
-        </div>
-
-
-        <div class="section-header light-section">
-            <label>Light</label>
-        </div>
-        
-        <div class="light-section property">
-            <span class="label">Spot Light</span>
-            <span class="value">
-                <input type='checkbox' id="property-light-spot-light">
-            </span>
-        </div>
-        <div class="light-section property">
-            <div class="label">Color</div>
-            <div class="value">
-                <div class='color-picker' id="property-light-color"></div>
-                <div class="input-area">R <input class="coord" type='number' id="property-light-color-red"></input></div>
-                <div class="input-area">G <input class="coord" type='number' id="property-light-color-green"></input></div>
-                <div class="input-area">B <input class="coord" type='number' id="property-light-color-blue"></input></div>
-            </div>
-        </div>
-        <div class="light-section property">
-            <div class="label">Intensity</div>
-            <div class="value">
-                <input class="coord" type='number' id="property-light-intensity"></input>
-            </div>
-        </div>
-        <div class="light-section property">
-            <div class="label">Spot Light Exponent</div>
-            <div class="value">
-                <input class="coord" type='number' id="property-light-exponent"></input>
-            </div>
-        </div>
-        <div class="light-section property">
-            <div class="label">Spot Light Cutoff (degrees)</div>
-            <div class="value">
-                <input class="coord" type='number' id="property-light-cutoff"></input>
-            </div>
-        </div>
-
-
-        <div class="section-header zone-section">
-            <label>Zone</label>
-        </div>
-
-        <div class="zone-section property">
-            <span class="label">Stage Sun Model Enabled</span>
-            <span class="value">
-                <input type='checkbox' id="property-zone-stage-sun-model-enabled">
-            </span>
-        </div>
-
-        <div class="zone-section property">
-            <div class="label">Key Light Color</div>
-            <div class="value">
-                <div class='color-picker' id="property-zone-key-light-color"></div>
-                <div class="input-area">R <input class="coord" type='number' id="property-zone-key-light-color-red" min="0" max="255" step="1"></input></div>
-                <div class="input-area">G <input class="coord" type='number' id="property-zone-key-light-color-green" min="0" max="255" step="1"></input></div>
-                <div class="input-area">B <input class="coord" type='number' id="property-zone-key-light-color-blue" min="0" max="255" step="1"></input></div>
-            </div>
-        </div>
-        <div class="zone-section property">
-            <div class="label">Key Light Intensity</div>
-            <div class="value">
-                <input class="coord" type='number' id="property-zone-key-intensity" min="0" max="10" step="0.1"></input>
-            </div>
-        </div>
-        <div class="zone-section property">
-            <div class="label">Key Light Ambient Intensity</div>
-            <div class="value">
-                <input class="coord" type='number' id="property-zone-key-ambient-intensity" min="0" max="10" step="0.1"></input>
-            </div>
-        </div>
-        <div class="zone-section property">
-            <div class="label">Key Light Direction</div>
-            <div class="value">
-                <div class="input-area">Pitch <input class="coord" type='number' id="property-zone-key-light-direction-x"></input></div>
-                <div class="input-area">Yaw <input class="coord" type='number' id="property-zone-key-light-direction-y"></input></div>
-                <div class="input-area">Roll <input class="coord" type='number' id="property-zone-key-light-direction-z"></input></div>
-            </div>
-        </div>
-
-        <div class="zone-section property">
-            <div class="label">Stage Latitude</div>
-            <div class="value">
-                <input class="coord" type='number' id="property-zone-stage-latitude" min="-90" max="90" step="1"></input>
-            </div>
-        </div>
-        <div class="zone-section property">
-            <div class="label">Stage Longitude</div>
-            <div class="value">
-                <input class="coord" type='number' id="property-zone-stage-longitude" min="-180" max="180" step="1"></input>
-            </div>
-        </div>
-        <div class="zone-section property">
-            <div class="label">Stage Altitude</div>
-            <div class="value">
-                <input class="coord" type='number' id="property-zone-stage-altitude" step="1"></input>
-            </div>
-        </div>
-
-        <div class="zone-section property">
-            <span class="label">Automatically calculate stage hour and day from location and clock.</span>
-            <span class="value">
-                <input type='checkbox' id="property-zone-stage-automatic-hour-day">
-            </span>
-        </div>
-
-        <div class="zone-section property">
-            <div class="label">Stage Day</div>
-            <div class="value">
-                <input class="coord" type='number' id="property-zone-stage-day" min="0" max="365" step="1"></input>
-            </div>
-        </div>
-        <div class="zone-section property">
-            <div class="label">Stage Hour</div>
-            <div class="value">
-                <input class="coord" type='number' id="property-zone-stage-hour" min="0" max="24" step="0.5"></input>
-            </div>
-        </div>
-
-        <div class="zone-section property">
-            <div class="label">Background Mode</div>
-            <div class="value">
-                <select name="SelectBackgroundMode" id="property-zone-background-mode" name="SelectBackgroundMode">
-                    <option value='inherit'>Nothing</option>
-                    <option value='skybox'>Skybox</option>
-                    <option value='atmosphere'>Atmosphere</option>
-                </select> 
-            </div>
-        </div>
-
-
-        <div class="sub-section-header zone-section skybox-section">
-            <label>Skybox</label>
-        </div>
-
-        <div class="zone-section skybox-section property">
-            <div class="label">Skybox Color</div>
-            <div class="value">
-                <div class='color-picker' id="property-zone-skybox-color"></div>
-                <div class="input-area">R <input class="coord" type='number' id="property-zone-skybox-color-red"></input></div>
-                <div class="input-area">G <input class="coord" type='number' id="property-zone-skybox-color-green"></input></div>
-                <div class="input-area">B <input class="coord" type='number' id="property-zone-skybox-color-blue"></input></div>
-            </div>
-        </div>
-        <div class="zone-section skybox-section property">
-            <div class="label">Skybox URL</div>
-            <div class="value">
-                <input type="text" id="property-zone-skybox-url" class="url"></input>
-            </div>
-        </div>
-
-
-        <div class="sub-section-header zone-section atmosphere-section">
-            <label>Atmosphere</label>
-        </div>
-
-        <div class="zone-section atmosphere-section property">
-            <div class="label">Atmosphere Center</div>
-            <div class="value">
-                <div class="input-area">X <br><input class="coord" type='number' id="property-zone-atmosphere-center-x"></input></div>
-                <div class="input-area">Y <br><input class="coord" type='number' id="property-zone-atmosphere-center-y"></input></div>
-                <div class="input-area">Z <br><input class="coord" type='number' id="property-zone-atmosphere-center-z"></input></div>
-                <div>
-                    <input type="button" id="center-atmosphere-in-zone" value="Center to Zone">
-                </div>
-            </div>
-        </div>
-        <div class="zone-section atmosphere-section property">
-            <div class="label">Atmosphere Inner Radius</div>
-            <div class="value">
-                <input class="coord" type='number' id="property-zone-atmosphere-inner-radius" step="1"></input>
-            </div>
-        </div>
-        <div class="zone-section atmosphere-section property">
-            <div class="label">Atmosphere Outer Radius</div>
-            <div class="value">
-                <input class="coord" type='number' id="property-zone-atmosphere-outer-radius" step="1"></input>
-            </div>
-        </div>
-        <div class="zone-section atmosphere-section property">
-            <div class="label">Atmosphere Mie Scattering</div>
-            <div class="value">
-                <input class="coord no-spin" type='number' id="property-zone-atmosphere-mie-scattering" min="0" max="0.5" step="any"></input>
-            </div>
-        </div>
-        <div class="zone-section atmosphere-section property">
-            <div class="label">Atmosphere Rayleigh Scattering</div>
-            <div class="value">
-                <input class="coord no-spin" type='number' id="property-zone-atmosphere-rayleigh-scattering" min="0" max="0.5" step="any"></input>
-            </div>
-        </div>
-        <div class="zone-section atmosphere-section property">
-            <div class="label">Atmosphere Scattering Wavelenghts</div>
-            <div class="value">
-                <div class="input-area">X <br><input class="coord no-spin" type='number' id="property-zone-atmosphere-scattering-wavelengths-x" min="0" max="1" step="any"></input></div>
-                <div class="input-area">Y <br><input class="coord no-spin" type='number' id="property-zone-atmosphere-scattering-wavelengths-y" min="0" max="1" step="any"></input></div>
-                <div class="input-area">Z <br><input class="coord no-spin" type='number' id="property-zone-atmosphere-scattering-wavelengths-z" min="0" max="1" step="any"></input></div>
-            </div>
-        </div>
-        <div class="zone-section atmosphere-section property" style="display:none">
-            <span class="label">Atmosphere Has Stars</span>
-            <span class="value">
-                <input type='checkbox' id="property-zone-atmosphere-has-stars">
-            </span>
-        </div>
-    </div>
+    <!--     <div class="property"> -->
+    <!--         <div class="label">User Data</div> -->
+    <!--         <div class="value"> -->
+    <!--             <textarea id="property&#45;user&#45;data"></textarea> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--  -->
+    <!--     <div class="section&#45;header"> -->
+    <!--         <label>Hyperlink</label> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="property"> -->
+    <!--         <div class="label">Href</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input id="property&#45;hyperlink&#45;href" class="url"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="property"> -->
+    <!--         <div class="label">Description</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input id="property&#45;hyperlink&#45;description" class="url"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--  -->
+    <!--     <div class="section&#45;header"> -->
+    <!--         <label>Spacial Properites</label> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="property"> -->
+    <!--         <div class="label">Position</div> -->
+    <!--         <div class="value"> -->
+    <!--             <div class="input&#45;area">X <br><input class="coord" type='number' id="property&#45;pos&#45;x"></input></div> -->
+    <!--             <div class="input&#45;area">Y <br><input class="coord" type='number' id="property&#45;pos&#45;y"></input></div> -->
+    <!--             <div class="input&#45;area">Z <br><input class="coord" type='number' id="property&#45;pos&#45;z"></input></div> -->
+    <!--             <div> -->
+    <!--                 <input type="button" id="move&#45;selection&#45;to&#45;grid" value="Selection to Grid"> -->
+    <!--                 <input type="button" id="move&#45;all&#45;to&#45;grid" value="All to Grid"> -->
+    <!--             </div> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="property"> -->
+    <!--         <div class="label">Registration</div> -->
+    <!--         <div class="value"> -->
+    <!--             <div class="input&#45;area">X <input class="coord" type='number' id="property&#45;reg&#45;x"></input></div> -->
+    <!--             <div class="input&#45;area">Y <input class="coord" type='number' id="property&#45;reg&#45;y"></input></div> -->
+    <!--             <div class="input&#45;area">Z <input class="coord" type='number' id="property&#45;reg&#45;z"></input></div> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="property"> -->
+    <!--         <div class="label">Dimensions</div> -->
+    <!--         <div class="value"> -->
+    <!--             <div class="input&#45;area">X <input class="coord" type='number' id="property&#45;dim&#45;x"></input></div> -->
+    <!--             <div class="input&#45;area">Y <input class="coord" type='number' id="property&#45;dim&#45;y"></input></div> -->
+    <!--             <div class="input&#45;area">Z <input class="coord" type='number' id="property&#45;dim&#45;z"></input></div> -->
+    <!--             <div> -->
+    <!--                 <input type="button" id="reset&#45;to&#45;natural&#45;dimensions" value="Reset to Natural Dimensions"> -->
+    <!--             </div> -->
+    <!--             <div class="input&#45;area"> -->
+    <!--                 <input class="" type='number' id="dimension&#45;rescale&#45;pct" value=100></input>% -->
+    <!--             </div> -->
+    <!--             <span> -->
+    <!--                 <input type="button" id="dimension&#45;rescale&#45;button" value="Rescale"></input> -->
+    <!--             </span> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="poly&#45;vox&#45;section property"> -->
+    <!--         <div class="label">Voxel Volume Size</div> -->
+    <!--         <div class="value"> -->
+    <!--           <div class="input&#45;area">X <br> <input class="coord" type='number' id="property&#45;voxel&#45;volume&#45;size&#45;x"></input></div> -->
+    <!--           <div class="input&#45;area">Y <br><input class="coord" type='number' id="property&#45;voxel&#45;volume&#45;size&#45;y"></input></div> -->
+    <!--           <div class="input&#45;area">Z <br><input class="coord" type='number' id="property&#45;voxel&#45;volume&#45;size&#45;z"></input></div> -->
+    <!--         </div> -->
+    <!--  -->
+    <!--         <div class="label">Surface Extractor</div> -->
+    <!--         <div class="value"> -->
+    <!--           <select name="SelectVoxelSurfaceStyle" id="property&#45;voxel&#45;surface&#45;style"> -->
+    <!--             <option value='0'>marching cubes</option> -->
+    <!--             <option value='1'>cubic</option> -->
+    <!--             <option value='2'>edged cubic</option> -->
+    <!--             <option value='3'>edged marching cubes</option> -->
+    <!--           </select> -->
+    <!--         </div> -->
+    <!--  -->
+    <!--         <div class="label">X&#45;axis Texture URL</div> -->
+    <!--         <div class="value"> -->
+    <!--           <input type="text" id="property&#45;x&#45;texture&#45;url" class="url"></input> -->
+    <!--         </div> -->
+    <!--  -->
+    <!--         <div class="label">Y&#45;axis Texture URL</div> -->
+    <!--         <div class="value"> -->
+    <!--           <input type="text" id="property&#45;y&#45;texture&#45;url" class="url"></input> -->
+    <!--         </div> -->
+    <!--  -->
+    <!--         <div class="label">Z&#45;axis Texture URL</div> -->
+    <!--         <div class="value"> -->
+    <!--           <input type="text" id="property&#45;z&#45;texture&#45;url" class="url"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="property"> -->
+    <!--         <div class="label">Rotation</div> -->
+    <!--         <div class="value"> -->
+    <!--             <div class="input&#45;area">Pitch <input class="coord" type='number' id="property&#45;rot&#45;x"></input></div> -->
+    <!--             <div class="input&#45;area">Yaw <input class="coord" type='number' id="property&#45;rot&#45;y"></input></div> -->
+    <!--             <div class="input&#45;area">Roll <input class="coord" type='number' id="property&#45;rot&#45;z"></input></div> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--  -->
+    <!--     <div class="section&#45;header"> -->
+    <!--         <label>Physical Properites</label> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="property"> -->
+    <!--         <div class="label">Linear Velocity</div> -->
+    <!--         <div class="value"> -->
+    <!--             <div class="input&#45;area">X <input class="coord" type='number' id="property&#45;lvel&#45;x"></input></div> -->
+    <!--             <div class="input&#45;area">Y <input class="coord" type='number' id="property&#45;lvel&#45;y"></input></div> -->
+    <!--             <div class="input&#45;area">Z <input class="coord" type='number' id="property&#45;lvel&#45;z"></input></div> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="property"> -->
+    <!--         <div class="label">Linear Damping</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input class="coord" type='number' id="property&#45;ldamping"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="property"> -->
+    <!--         <div class="label">Angular Velocity</div> -->
+    <!--         <div class="value"> -->
+    <!--             <div class="input&#45;area">Pitch <input class="coord" type='number' id="property&#45;avel&#45;x"></input></div> -->
+    <!--             <div class="input&#45;area">Yaw <input class="coord" type='number' id="property&#45;avel&#45;y"></input></div> -->
+    <!--             <div class="input&#45;area">Roll <input class="coord" type='number' id="property&#45;avel&#45;z"></input></div> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="property"> -->
+    <!--         <div class="label">Angular Damping</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input class="coord" type='number' id="property&#45;adamping"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="property"> -->
+    <!--         <div class="label">Restitution</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input class="coord" type='number' id="property&#45;restitution"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="property"> -->
+    <!--         <div class="label">Friction</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input class="coord" type='number' id="property&#45;friction"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="property"> -->
+    <!--         <div class="label">Gravity</div> -->
+    <!--         <div class="value"> -->
+    <!--             <div class="input&#45;area">X <input class="coord" type='number' id="property&#45;grav&#45;x"></input></div> -->
+    <!--             <div class="input&#45;area">Y <input class="coord" type='number' id="property&#45;grav&#45;y"></input></div> -->
+    <!--             <div class="input&#45;area">Z <input class="coord" type='number' id="property&#45;grav&#45;z"></input></div> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="property"> -->
+    <!--         <div class="label">Acceleration</div> -->
+    <!--         <div class="value"> -->
+    <!--             <div class="input&#45;area">X <input class="coord" type='number' id="property&#45;lacc&#45;x"></input></div> -->
+    <!--             <div class="input&#45;area">Y <input class="coord" type='number' id="property&#45;lacc&#45;y"></input></div> -->
+    <!--             <div class="input&#45;area">Z <input class="coord" type='number' id="property&#45;lacc&#45;z"></input></div> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="property"> -->
+    <!--         <div class="label">Density</div> -->
+    <!--         <div> -->
+    <!--             <input type='number' id="property&#45;density"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div id="color&#45;section" class="property"> -->
+    <!--         <div class="label">Color</div> -->
+    <!--         <div class="value"> -->
+    <!--             <div id="property&#45;color" class='color&#45;picker'></div> -->
+    <!--             <div class="input&#45;area">R <input class="coord" type='number' id="property&#45;color&#45;red"></input></div> -->
+    <!--             <div class="input&#45;area">G <input class="coord" type='number' id="property&#45;color&#45;green"></input></div> -->
+    <!--             <div class="input&#45;area">B <input class="coord" type='number' id="property&#45;color&#45;blue"></input></div> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--  -->
+    <!--     <div class="section&#45;header"> -->
+    <!--         <label>Behavior</label> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="property"> -->
+    <!--         <span class="label">Ignore For Collisions</span> -->
+    <!--         <span class="value"> -->
+    <!--             <input type='checkbox' id="property&#45;ignore&#45;for&#45;collisions"></input> -->
+    <!--         </span> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="property"> -->
+    <!--         <span class="label">Collisions Will Move</span> -->
+    <!--         <span class="value"> -->
+    <!--             <input type='checkbox' id="property&#45;collisions&#45;will&#45;move"></input> -->
+    <!--         </span> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="property"> -->
+    <!--         <div class="label">Collision Sound URL</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input id="property&#45;collision&#45;sound&#45;url" class="url"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="property"> -->
+    <!--         <div class="label">Lifetime</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input type='number' id="property&#45;lifetime"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="property"> -->
+    <!--         <div class="label">Script URL -->
+    <!--             <input type="hidden" id="property&#45;script&#45;timestamp" class="value"></input> -->
+    <!--             <input type="button" id="reload&#45;script&#45;button" value="Reload"></input> -->
+    <!--         </div> -->
+    <!--         <div class="value"> -->
+    <!--             <input id="property&#45;script&#45;url" class="url"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--  -->
+    <!--     <div class="section&#45;header model&#45;section zone&#45;section"> -->
+    <!--         <label>Model</label> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="model&#45;section property"> -->
+    <!--         <div class="label">Model URL</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input type="text" id="property&#45;model&#45;url" class="url"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="model&#45;section zone&#45;section property"> -->
+    <!--         <div class="label">Shape Type</div> -->
+    <!--         <div class="value"> -->
+    <!--             <select name="SelectShapeType" id="property&#45;shape&#45;type" name="SelectShapeType"> -->
+    <!--                 <option value='none'>none</option> -->
+    <!--                 <option value='box'>box</option> -->
+    <!--                 <option value='sphere'>sphere</option> -->
+    <!--                 <option value='compound'>compound</option> -->
+    <!--             </select> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="model&#45;section zone&#45;section property"> -->
+    <!--         <div class="label">Compound Shape URL</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input type="text" id="property&#45;compound&#45;shape&#45;url" class="url"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="model&#45;section property"> -->
+    <!--         <div class="label">Animation URL</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input type="text" id="property&#45;model&#45;animation&#45;url" class="url"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="model&#45;section property"> -->
+    <!--         <span class="label">Animation Playing</span> -->
+    <!--         <span class="value"> -->
+    <!--             <input type='checkbox' id="property&#45;model&#45;animation&#45;playing"> -->
+    <!--         </span> -->
+    <!--     </div> -->
+    <!--     <div class="model&#45;section property"> -->
+    <!--         <div class="label">Animation FPS</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input class="coord" type='number' id="property&#45;model&#45;animation&#45;fps"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="model&#45;section property"> -->
+    <!--         <div class="label">Animation Frame</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input class="coord" type='number' id="property&#45;model&#45;animation&#45;frame"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="model&#45;section property"> -->
+    <!--         <div class="label">Animation Settings</div> -->
+    <!--         <div class="value"> -->
+    <!--             <textarea id="property&#45;model&#45;animation&#45;settings"></textarea> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="model&#45;section property"> -->
+    <!--         <div class="label">Textures</div> -->
+    <!--         <div class="value"> -->
+    <!--             <textarea id="property&#45;model&#45;textures" value='asdfasdf'></textarea> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="model&#45;section property"> -->
+    <!--         <div class="label">Original Textures</div> -->
+    <!--         <div class="value"> -->
+    <!--             <textarea id="property&#45;model&#45;original&#45;textures" readonly value='asdfasdf'></textarea> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--  -->
+    <!--     <div class="section&#45;header web&#45;section"> -->
+    <!--         <label>Web</label> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="web&#45;section property"> -->
+    <!--         <div class="label">Source URL</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input type="text" id="property&#45;web&#45;source&#45;url" class="url"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--  -->
+    <!--     <div class="section&#45;header particle&#45;section"> -->
+    <!--         <label>Particle</label> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="particle&#45;section property"> -->
+    <!--         <div class="label">Max Particles</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input type='number' id="property&#45;particle&#45;maxparticles" min="0" max="2048" step="1"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="particle&#45;section property"> -->
+    <!--         <div class="label">Particle Life Span</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input type='number' id="property&#45;particle&#45;lifespan" min="0" step="0.1"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="particle&#45;section property"> -->
+    <!--         <div class="label">Particle Emission Rate</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input type='number' id="property&#45;particle&#45;emit&#45;rate" min="0" step="0.5"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="particle&#45;section property"> -->
+    <!--         <div class="label">Particle Emission Direction</div> -->
+    <!--         <div class="value"> -->
+    <!--             <div class="input&#45;area">X <input class="coord" type='number' id="property&#45;particle&#45;emit&#45;direction&#45;x"></input></div> -->
+    <!--             <div class="input&#45;area">Y <input class="coord" type='number' id="property&#45;particle&#45;emit&#45;direction&#45;y"></input></div> -->
+    <!--             <div class="input&#45;area">Z <input class="coord" type='number' id="property&#45;particle&#45;emit&#45;direction&#45;z"></input></div> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="particle&#45;section property"> -->
+    <!--         <div class="label">Particle Emission Strength</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input type='number' id="property&#45;particle&#45;emit&#45;strength" min="0" step="0.1"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="particle&#45;section property"> -->
+    <!--         <div class="label">Particle Local Gravity</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input class="coord" type='number' id="property&#45;particle&#45;localgravity" step="0.05"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="particle&#45;section property"> -->
+    <!--         <div class="label">Particle Radius</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input  class="coord" type='number' id="property&#45;particle&#45;radius" min="0" step="0.005"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--  -->
+    <!--     <div class="section&#45;header text&#45;section"> -->
+    <!--         <label>Text</label> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="text&#45;section property"> -->
+    <!--         <div class="label">Text Content</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input type="text" id="property&#45;text&#45;text"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="text&#45;section property"> -->
+    <!--         <div class="label">Line Height</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input class="coord" type='number' id="property&#45;text&#45;line&#45;height" min="0" step="0.005"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="text&#45;section property"> -->
+    <!--         <div class="label">Text Color</div> -->
+    <!--         <div class="value"> -->
+    <!--             <div class='color&#45;picker' id="property&#45;text&#45;text&#45;color"></div> -->
+    <!--             <div class="input&#45;area">R <input class="coord" type='number' id="property&#45;text&#45;text&#45;color&#45;red"></input></div> -->
+    <!--             <div class="input&#45;area">G <input class="coord" type='number' id="property&#45;text&#45;text&#45;color&#45;green"></input></div> -->
+    <!--             <div class="input&#45;area">B <input class="coord" type='number' id="property&#45;text&#45;text&#45;color&#45;blue"></input></div> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="text&#45;section property"> -->
+    <!--         <div class="label">Background Color</div> -->
+    <!--         <div class="value"> -->
+    <!--             <div class='color&#45;picker' id="property&#45;text&#45;background&#45;color"></div> -->
+    <!--             <div class="input&#45;area">R <input class="coord" type='number' id="property&#45;text&#45;background&#45;color&#45;red"></input></div> -->
+    <!--             <div class="input&#45;area">G <input class="coord" type='number' id="property&#45;text&#45;background&#45;color&#45;green"></input></div> -->
+    <!--             <div class="input&#45;area">B <input class="coord" type='number' id="property&#45;text&#45;background&#45;color&#45;blue"></input></div> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--  -->
+    <!--     <div class="section&#45;header light&#45;section"> -->
+    <!--         <label>Light</label> -->
+    <!--     </div> -->
+    <!--      -->
+    <!--     <div class="light&#45;section property"> -->
+    <!--         <span class="label">Spot Light</span> -->
+    <!--         <span class="value"> -->
+    <!--             <input type='checkbox' id="property&#45;light&#45;spot&#45;light"> -->
+    <!--         </span> -->
+    <!--     </div> -->
+    <!--     <div class="light&#45;section property"> -->
+    <!--         <div class="label">Color</div> -->
+    <!--         <div class="value"> -->
+    <!--             <div class='color&#45;picker' id="property&#45;light&#45;color"></div> -->
+    <!--             <div class="input&#45;area">R <input class="coord" type='number' id="property&#45;light&#45;color&#45;red"></input></div> -->
+    <!--             <div class="input&#45;area">G <input class="coord" type='number' id="property&#45;light&#45;color&#45;green"></input></div> -->
+    <!--             <div class="input&#45;area">B <input class="coord" type='number' id="property&#45;light&#45;color&#45;blue"></input></div> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="light&#45;section property"> -->
+    <!--         <div class="label">Intensity</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input class="coord" type='number' id="property&#45;light&#45;intensity"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="light&#45;section property"> -->
+    <!--         <div class="label">Spot Light Exponent</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input class="coord" type='number' id="property&#45;light&#45;exponent"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="light&#45;section property"> -->
+    <!--         <div class="label">Spot Light Cutoff (degrees)</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input class="coord" type='number' id="property&#45;light&#45;cutoff"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--  -->
+    <!--     <div class="section&#45;header zone&#45;section"> -->
+    <!--         <label>Zone</label> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="zone&#45;section property"> -->
+    <!--         <span class="label">Stage Sun Model Enabled</span> -->
+    <!--         <span class="value"> -->
+    <!--             <input type='checkbox' id="property&#45;zone&#45;stage&#45;sun&#45;model&#45;enabled"> -->
+    <!--         </span> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="zone&#45;section property"> -->
+    <!--         <div class="label">Key Light Color</div> -->
+    <!--         <div class="value"> -->
+    <!--             <div class='color&#45;picker' id="property&#45;zone&#45;key&#45;light&#45;color"></div> -->
+    <!--             <div class="input&#45;area">R <input class="coord" type='number' id="property&#45;zone&#45;key&#45;light&#45;color&#45;red" min="0" max="255" step="1"></input></div> -->
+    <!--             <div class="input&#45;area">G <input class="coord" type='number' id="property&#45;zone&#45;key&#45;light&#45;color&#45;green" min="0" max="255" step="1"></input></div> -->
+    <!--             <div class="input&#45;area">B <input class="coord" type='number' id="property&#45;zone&#45;key&#45;light&#45;color&#45;blue" min="0" max="255" step="1"></input></div> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="zone&#45;section property"> -->
+    <!--         <div class="label">Key Light Intensity</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input class="coord" type='number' id="property&#45;zone&#45;key&#45;intensity" min="0" max="10" step="0.1"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="zone&#45;section property"> -->
+    <!--         <div class="label">Key Light Ambient Intensity</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input class="coord" type='number' id="property&#45;zone&#45;key&#45;ambient&#45;intensity" min="0" max="10" step="0.1"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="zone&#45;section property"> -->
+    <!--         <div class="label">Key Light Direction</div> -->
+    <!--         <div class="value"> -->
+    <!--             <div class="input&#45;area">Pitch <input class="coord" type='number' id="property&#45;zone&#45;key&#45;light&#45;direction&#45;x"></input></div> -->
+    <!--             <div class="input&#45;area">Yaw <input class="coord" type='number' id="property&#45;zone&#45;key&#45;light&#45;direction&#45;y"></input></div> -->
+    <!--             <div class="input&#45;area">Roll <input class="coord" type='number' id="property&#45;zone&#45;key&#45;light&#45;direction&#45;z"></input></div> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="zone&#45;section property"> -->
+    <!--         <div class="label">Stage Latitude</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input class="coord" type='number' id="property&#45;zone&#45;stage&#45;latitude" min="&#45;90" max="90" step="1"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="zone&#45;section property"> -->
+    <!--         <div class="label">Stage Longitude</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input class="coord" type='number' id="property&#45;zone&#45;stage&#45;longitude" min="&#45;180" max="180" step="1"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="zone&#45;section property"> -->
+    <!--         <div class="label">Stage Altitude</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input class="coord" type='number' id="property&#45;zone&#45;stage&#45;altitude" step="1"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="zone&#45;section property"> -->
+    <!--         <span class="label">Automatically calculate stage hour and day from location and clock.</span> -->
+    <!--         <span class="value"> -->
+    <!--             <input type='checkbox' id="property&#45;zone&#45;stage&#45;automatic&#45;hour&#45;day"> -->
+    <!--         </span> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="zone&#45;section property"> -->
+    <!--         <div class="label">Stage Day</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input class="coord" type='number' id="property&#45;zone&#45;stage&#45;day" min="0" max="365" step="1"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="zone&#45;section property"> -->
+    <!--         <div class="label">Stage Hour</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input class="coord" type='number' id="property&#45;zone&#45;stage&#45;hour" min="0" max="24" step="0.5"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="zone&#45;section property"> -->
+    <!--         <div class="label">Background Mode</div> -->
+    <!--         <div class="value"> -->
+    <!--             <select name="SelectBackgroundMode" id="property&#45;zone&#45;background&#45;mode" name="SelectBackgroundMode"> -->
+    <!--                 <option value='inherit'>Nothing</option> -->
+    <!--                 <option value='skybox'>Skybox</option> -->
+    <!--                 <option value='atmosphere'>Atmosphere</option> -->
+    <!--             </select>  -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--  -->
+    <!--     <div class="sub&#45;section&#45;header zone&#45;section skybox&#45;section"> -->
+    <!--         <label>Skybox</label> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="zone&#45;section skybox&#45;section property"> -->
+    <!--         <div class="label">Skybox Color</div> -->
+    <!--         <div class="value"> -->
+    <!--             <div class='color&#45;picker' id="property&#45;zone&#45;skybox&#45;color"></div> -->
+    <!--             <div class="input&#45;area">R <input class="coord" type='number' id="property&#45;zone&#45;skybox&#45;color&#45;red"></input></div> -->
+    <!--             <div class="input&#45;area">G <input class="coord" type='number' id="property&#45;zone&#45;skybox&#45;color&#45;green"></input></div> -->
+    <!--             <div class="input&#45;area">B <input class="coord" type='number' id="property&#45;zone&#45;skybox&#45;color&#45;blue"></input></div> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="zone&#45;section skybox&#45;section property"> -->
+    <!--         <div class="label">Skybox URL</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input type="text" id="property&#45;zone&#45;skybox&#45;url" class="url"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--  -->
+    <!--     <div class="sub&#45;section&#45;header zone&#45;section atmosphere&#45;section"> -->
+    <!--         <label>Atmosphere</label> -->
+    <!--     </div> -->
+    <!--  -->
+    <!--     <div class="zone&#45;section atmosphere&#45;section property"> -->
+    <!--         <div class="label">Atmosphere Center</div> -->
+    <!--         <div class="value"> -->
+    <!--             <div class="input&#45;area">X <br><input class="coord" type='number' id="property&#45;zone&#45;atmosphere&#45;center&#45;x"></input></div> -->
+    <!--             <div class="input&#45;area">Y <br><input class="coord" type='number' id="property&#45;zone&#45;atmosphere&#45;center&#45;y"></input></div> -->
+    <!--             <div class="input&#45;area">Z <br><input class="coord" type='number' id="property&#45;zone&#45;atmosphere&#45;center&#45;z"></input></div> -->
+    <!--             <div> -->
+    <!--                 <input type="button" id="center&#45;atmosphere&#45;in&#45;zone" value="Center to Zone"> -->
+    <!--             </div> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="zone&#45;section atmosphere&#45;section property"> -->
+    <!--         <div class="label">Atmosphere Inner Radius</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input class="coord" type='number' id="property&#45;zone&#45;atmosphere&#45;inner&#45;radius" step="1"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="zone&#45;section atmosphere&#45;section property"> -->
+    <!--         <div class="label">Atmosphere Outer Radius</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input class="coord" type='number' id="property&#45;zone&#45;atmosphere&#45;outer&#45;radius" step="1"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="zone&#45;section atmosphere&#45;section property"> -->
+    <!--         <div class="label">Atmosphere Mie Scattering</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input class="coord no&#45;spin" type='number' id="property&#45;zone&#45;atmosphere&#45;mie&#45;scattering" min="0" max="0.5" step="any"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="zone&#45;section atmosphere&#45;section property"> -->
+    <!--         <div class="label">Atmosphere Rayleigh Scattering</div> -->
+    <!--         <div class="value"> -->
+    <!--             <input class="coord no&#45;spin" type='number' id="property&#45;zone&#45;atmosphere&#45;rayleigh&#45;scattering" min="0" max="0.5" step="any"></input> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="zone&#45;section atmosphere&#45;section property"> -->
+    <!--         <div class="label">Atmosphere Scattering Wavelenghts</div> -->
+    <!--         <div class="value"> -->
+    <!--             <div class="input&#45;area">X <br><input class="coord no&#45;spin" type='number' id="property&#45;zone&#45;atmosphere&#45;scattering&#45;wavelengths&#45;x" min="0" max="1" step="any"></input></div> -->
+    <!--             <div class="input&#45;area">Y <br><input class="coord no&#45;spin" type='number' id="property&#45;zone&#45;atmosphere&#45;scattering&#45;wavelengths&#45;y" min="0" max="1" step="any"></input></div> -->
+    <!--             <div class="input&#45;area">Z <br><input class="coord no&#45;spin" type='number' id="property&#45;zone&#45;atmosphere&#45;scattering&#45;wavelengths&#45;z" min="0" max="1" step="any"></input></div> -->
+    <!--         </div> -->
+    <!--     </div> -->
+    <!--     <div class="zone&#45;section atmosphere&#45;section property" style="display:none"> -->
+    <!--         <span class="label">Atmosphere Has Stars</span> -->
+    <!--         <span class="value"> -->
+    <!--             <input type='checkbox' id="property&#45;zone&#45;atmosphere&#45;has&#45;stars"> -->
+    <!--         </span> -->
+    <!--     </div> -->
+    <!-- </div> -->
 </body>
 </html>
