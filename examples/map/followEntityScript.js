@@ -19,7 +19,10 @@
                 var dPos = Vec3.subtract(properties.position, lastPosition);
                 lastPosition = properties.position;
 
-                MyAvatar.position = Vec3.sum(MyAvatar.position, dPos);
+                var curDPos = Vec3.subtract(properties.position, lastPosition);
+                if (Vec3.distance(properties.position, MyAvatar.position) > 5.0) {
+                    MyAvatar.position = Vec3.sum(MyAvatar.position, dPos);
+                }
             }
             timeSinceLastChecked = 0;
         }
