@@ -114,7 +114,7 @@ Map = function(data) {
 
     var followObject = entityManager.add("Box", {
         name: "Follow Object",
-        scriptURL: Script.resolvePath("followEntityScript.js"),
+        script: Script.resolvePath("followEntityScript.js"),
         position: MyAvatar.position,
         dimensions: { x: 0.01, y: 0.01, z: 0.01 },
         visible: false,
