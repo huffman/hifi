@@ -46,9 +46,9 @@ Map = function(data) {
     var ROOT_POSITION = Vec3.sum(MyAvatar.position, ROOT_OFFSET);
 
     var ROOT_SCALE = 0.0005;
-    if (location.hostname == "sandbox") {
-        ROOT_SCALE *= 4;
-    }
+    // if (location.hostname == "sandbox") {
+    //     ROOT_SCALE *= 4;
+    // }
 
     var animatingEntities = [];
 
