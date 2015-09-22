@@ -47,6 +47,9 @@ Map = function(data) {
 
     var ROOT_SCALE = 0.0005;
 
+    var animatingEntities = [];
+
+
     // Create object in objectManager
     var rootObject = entityManager.addBare();
     var position = ROOT_POSITION;
@@ -109,6 +112,13 @@ Map = function(data) {
     };
     Vec3.print("center", center);
 
+    var followObject = entityManager.add("Box", {
+        name: "Follow Object",
+        scriptURL: "file:////Users/huffman/dev/hifi/examples/map/followEntityScript.js",
+        position: MyAvatar.position,
+        visible: false,
+    });
+
     var trackedEntities = [];
     var waypointEntities = [];
     for (var i = 0; i < entities.length; ++i) {
@@ -128,11 +138,12 @@ Map = function(data) {
 
             if (mapData.waypoint) {
                 print("Waypoint: ", mapData.waypoint.name);
-                // properties.type = "Model";
-                // properties.modelURL = "atp:ca49a13938376b3eb68d7b2b9189afb3f580c07b6950ea9e65b5260787204145.fbx";
+                properties.type = "Model";
+                properties.modelURL = "https://hifi-public.s3.amazonaws.com/ozan/props/waypointer_pin/waypointer_pin.fbx";
+                properties.position.y += 40 * ROOT_SCALE;
                 extra.waypoint = mapData.waypoint;
                 extra.waypoint.position = position;
-                properties.dimensions = { x: 40, y: 40, z: 40 };
+                properties.dimensions = { x: 280 * 0.2, y: 280 * 0.49, z: 280 * 0.2 };
             }
 
             var entity = entityManager.add(properties.type, properties);
@@ -145,20 +156,20 @@ Map = function(data) {
             if (mapData.waypoint) {
                 waypointEntities.push(entity);
 
-                print("Adding label");
-                // Add text to display above waypoint
-                var label = entityManager.add("Text", {
-                    name: "Waypoint Label (" + extra.waypoint.name + ")",
-                    // dimensions: { x: 0.1, y: 0.05, z: 0.01 },
-                    dimensions: { x: 40, y: 20.0, z: 0.1 },
-                    rotation: Quat.fromPitchYawRollDegrees(0, 180, 0),
-                    position: { x: 0, y: 400 * ROOT_SCALE, z: 0 },
-                    text: extra.waypoint.name,
-                    faceCamera: true,
-                    textColor: { red: 255, green: 255, blue: 255 },
-                    backgroundColor: { red: 0, green: 0, blue: 0 },
-                });
-                entity.addChild(label);
+                // print("Adding label");
+                // // Add text to display above waypoint
+                // var label = entityManager.add("Text", {
+                //     name: "Waypoint Label (" + extra.waypoint.name + ")",
+                //     // dimensions: { x: 0.1, y: 0.05, z: 0.01 },
+                //     dimensions: { x: 40, y: 20.0, z: 0.1 },
+                //     rotation: Quat.fromPitchYawRollDegrees(0, 180, 0),
+                //     position: { x: 0, y: 400 * ROOT_SCALE, z: 0 },
+                //     text: extra.waypoint.name,
+                //     faceCamera: true,
+                //     textColor: { red: 255, green: 255, blue: 255 },
+                //     backgroundColor: { red: 0, green: 0, blue: 0 },
+                // });
+                // entity.addChild(label);
             }
 
             entity.__extra__ = extra;
@@ -172,11 +183,11 @@ Map = function(data) {
         }
     }
 
-    var avatarArrowEntity = entityManager.add("Model", {
+    var avatarArrowEntity = entityManager.add("Box", {
         name: "You Are Here",
-        modelURL: "atp:ce4f0c4e491e40b73d28f2646da4f676fe9ea364cf5f1bf5615522ef6acfd80e.fbx",
         position: Vec3.multiply(Vec3.subtract(MyAvatar.position, center), ROOT_SCALE),
-        dimensions: { x: 30, y: 100, z: 100 },
+        dimensions: { x: 200, y: 1, z: 200 },
+        userData: '{ "ProceduralEntity": { "shaderUrl": "' + Script.resolvePath("loc.fs") + '" } }'
     });
     rootObject.addChild(avatarArrowEntity);
 
@@ -184,20 +195,20 @@ Map = function(data) {
         return visible;
     }
 
-    Controller.mousePressEvent.connect(mousePressEvent);
-    function mousePressEvent(event) {
+    Controller.mousePressEvent.connect(function(event) {
         // Entities.setZonesArePickable(false);
 
         var pickRay = Camera.computePickRay(event.x, event.y);
         for (var i = 0; i < waypointEntities.length; ++i) {
             var entity = waypointEntities[i];
             print("Checkit for hit", entity.__extra__.waypoint.name);
-            var result = raySphereIntersection(pickRay.origin, pickRay.direction, entity.worldPosition, 20 * ROOT_SCALE);//entity.worldScale);
+            var result = raySphereIntersection(pickRay.origin, pickRay.direction, entity.worldPosition, 40 * ROOT_SCALE);//entity.worldScale);
             if (result) {
                 print("Pressed entity: ", entity.id);
                 print("Pressed waypoint: ", entity.__extra__.waypoint.name);
                 print("Teleporting...");
                 MyAvatar.position = entity.__extra__.waypoint.position;
+                followObject.position = entity.__extra__.waypoint.position; 
                 break;
             }
         }
@@ -215,7 +226,36 @@ Map = function(data) {
         // }
 
         // Entities.setZonesArePickable(true);
-    };
+    });
+
+    var hovering = [];
+    Controller.mouseMoveEvent.connect(function(event) {
+        var pickRay = Camera.computePickRay(event.x, event.y);
+        for (var i = 0; i < waypointEntities.length; ++i) {
+            var entity = waypointEntities[i];
+            var result = raySphereIntersection(pickRay.origin, pickRay.direction, entity.worldPosition, 40 * ROOT_SCALE);//entity.worldScale);
+            if (result) {
+                if (!entity.__animation__) {
+                    // print("Hovering: ", entity.__extra__.waypoint.name);
+                    entity.__animation__ = {
+                        from: entity.position,
+                        to: Vec3.sum(entity.position, { x: 0, y: 0.015, z: 0 }),
+                        t: 0.0,
+                        dir: 1,
+                    };
+                } else {
+                    entity.__animation__.dir = 1;
+                }
+            } else if (entity.__animation__) {
+                var anim = entity.__animation__;
+                anim.dir = -1;
+            }
+        }
+    });
+
+    function easeOutCubic(t) {
+        return t * (-(t - 2));
+    }
 
     var time = 0;
     Script.update.connect(function(dt) {
@@ -229,21 +269,51 @@ Map = function(data) {
             properties.position = Vec3.multiply(properties.position, ROOT_SCALE);
             entity.position = properties.position;
         }
-
         
         var position = Vec3.subtract(MyAvatar.position, center)
-        position.y += 60 + (Math.sin(time) * 10);
+        // position.y += 60 + (Math.sin(time) * 10);
         position = Vec3.multiply(position, ROOT_SCALE);
         avatarArrowEntity.position = position;
-        // Vec3.print("Position:", avatarArrowEntity.position);
 
         // rootObject.position = Vec3.sum(position, { x: 0, y: Math.sin(time) / 30, z: 0 });
         var ROOT_OFFSET = Vec3.multiply(1, Quat.getFront(MyAvatar.orientation));
         var ROOT_POSITION = Vec3.sum(MyAvatar.position, ROOT_OFFSET);
         // position = ROOT_POSITION;
         rootObject.position = ROOT_POSITION;
+
+        // Update animations
+        for (var i = 0; i < waypointEntities.length; ++i) {
+            var entity = waypointEntities[i];
+
+            var animation = entity.__animation__;
+            if (animation) {
+                if (animation.dir == 1) {
+                    animation.t = Math.min(1.0, animation.t + (2 * dt * animation.dir));
+                    entity.position = lerp(animation.from, animation.to, easeOutCubic(animation.t));
+
+                    if (animation.t == 1.0 ) {
+                        // delete entity.__animation__;
+                    }
+                } else {
+                    animation.t = Math.max(0.0, animation.t + (2 * dt * animation.dir));
+                    entity.position = lerp(animation.from, animation.to, easeOutCubic(animation.t));
+                    if (animation.t == 0.0 ) {
+                        delete entity.__animation__;
+                    }
+                }
+            }
+        }
+
         entityManager.update();
     });
+
+    function lerp(a, b, t) {
+        return {
+            x: a.x + (t * (b.x - a.x)),
+            y: a.y + (t * (b.y - a.y)),
+            z: a.z + (t * (b.z - a.z)),
+        }
+    }
 
     function setVisible(newValue) {
         if (visible != newValue) {
