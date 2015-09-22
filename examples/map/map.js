@@ -132,6 +132,7 @@ Map = function(data) {
             print("Creating copy of", properties.name);
             properties.name += " (COPY)";
             properties.userData = "";
+            properties.locked = false;
             properties.visible = true;
             var position = properties.position;
             properties.position = Vec3.subtract(properties.position, center);
