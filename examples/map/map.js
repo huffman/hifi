@@ -112,6 +112,7 @@ Map = function(data) {
     };
     Vec3.print("center", center);
 
+    print(Script.resolvePath("followEntityScript.js"));
     var followObject = entityManager.add("Box", {
         name: "Follow Object",
         script: Script.resolvePath("followEntityScript.js"),
