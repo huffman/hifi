@@ -47,8 +47,7 @@ Map = function(data) {
 
     var ROOT_SCALE = 0.0005;
     if (location.hostname == "sandbox") {
-    var ROOT_SCALE *= 3;
-
+        var ROOT_SCALE *= 30;
     }
 
     var animatingEntities = [];
