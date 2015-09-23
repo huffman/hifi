@@ -39,7 +39,7 @@ function parseJSON(userData) {
 }
 
 
-Map = function(data) {
+Map = function() {
     var visible = false;
 
     var ROOT_OFFSET = Vec3.multiply(1, Quat.getFront(MyAvatar.orientation));
@@ -67,12 +67,12 @@ Map = function(data) {
     var minCorner = {
         x: 4294967295,
         y: 4294967295,
-        z: 4294967295,
+        z: 4294967295
     };
     var maxCorner = {
         x: -4294967295,
         y: -4294967295,
-        z: -4294967295,
+        z: -4294967295
     };
 
     for (var i = 0; i < entities.length; ++i) {
@@ -356,57 +356,4 @@ Controller.keyPressEvent.connect(function(event) {
 });
 
 
-
-
-
-var mapData = {
-    config: {
-        // World dimensions that the minimap maps to
-        worldDimensions: {
-            x: 10.0,
-            y: 10.0,
-            z: 10.0,
-        },
-        // The center of the map should map to this location in the center of the area
-        worldCenter: {
-            x: 5.0,
-            y: 5.0,
-            z: 5.0,
-        },
-        // Map dimensions
-        mapDimensions: {
-            x: 10.0,
-            y: 10.0,
-            z: 10.0,
-        },
-
-        // Can this be automated? Tag entities that should be included? Store in UserData?
-        objects: [
-            {
-                type: "Model",
-                modelURL: "https://hifi-public.s3.amazonaws.com/ozan/sets/huffman_set/huffman_set.fbx",
-            },
-        ],
-    },
-    waypoints: [
-        {
-            name: "Forest's Edge",
-            position: {
-            },
-        },
-    ],
-};
-
-
-// entityManager = new OverlayManager();
-// entityManager = new EntityManager();
-//
-// var rootEntity = entityManager.addBare();
-//
-// var time = 0;
-//
-//
-// rootEntity.scale = 0.1;
-// Script.include("sfData.js");
-// rootEntity.addChild(entity);
 entityManager.update();
