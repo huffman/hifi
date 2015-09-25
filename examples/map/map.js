@@ -270,10 +270,12 @@ Map = function() {
         for (var i = 0; i < trackedEntities.length; ++i) {
             entity = trackedEntities[i];
             var entityID = entity.__extra__.trackingEntityID;
+            // print("Updating tracked entity: ", entityID);
             var properties = Entities.getEntityProperties(entityID);
             properties.position = Vec3.subtract(properties.position, center);
             properties.position = Vec3.multiply(properties.position, ROOT_SCALE);
             entity.position = properties.position;
+            entity.rotation = properties.rotation;
         }
         
         var position = Vec3.subtract(MyAvatar.position, center)
@@ -341,13 +343,13 @@ Map = function() {
 };
 
 var map = null;
-map = Map(mapData);
+map = Map();
 
 // On press key
 Controller.keyPressEvent.connect(function(event) {
     if (event.text == "m") {
         if (!map) {
-            map = Map(mapData);
+            map = Map();
         }
 
         map.show();
