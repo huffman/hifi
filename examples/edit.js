@@ -11,8 +11,11 @@
 //  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
 //
 
-HIFI_PUBLIC_BUCKET = "http://s3.amazonaws.com/hifi-public/";
+var HIFI_PUBLIC_BUCKET = "http://s3.amazonaws.com/hifi-public/";
 
+// Globals imported via Script.include(...)
+var Script, SelectionDisplay, SelectionManager, EntityPropertyDialogBox, LightOverlayManager, CameraManager, Grid,
+    GridTool;
 Script.include([
     "libraries/stringHelpers.js",
     "libraries/dataViewHelpers.js",
@@ -90,10 +93,6 @@ var SETTING_SHOW_ZONES_IN_EDIT_MODE = "showZonesInEditMode";
 
 var INSUFFICIENT_PERMISSIONS_ERROR_MSG = "You do not have the necessary permissions to edit on this domain."
 var INSUFFICIENT_PERMISSIONS_IMPORT_ERROR_MSG = "You do not have the necessary permissions to place items on this domain."
-
-var modelURLs = [
-       "Insert the URL to your FBX"
-    ];
 
 var mode = 0;
 var isActive = false;
@@ -485,7 +484,7 @@ var toolBar = (function () {
         if (newModelButtonDown) {
             var clickedOverlay = Overlays.getOverlayAtPoint({ x: event.x, y: event.y });
             if (newModelButton === toolBar.clicked(clickedOverlay)) {
-                url = Window.prompt("Model URL", modelURLs[Math.floor(Math.random() * modelURLs.length)]);
+                url = Window.prompt("Model URL", "");
                 if (url !== null && url !== "") {
                     addModel(url);
                 }

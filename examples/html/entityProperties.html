@@ -17,6 +17,7 @@
             const TYPE_TEXTAREA = "TextArea";
             const TYPE_URL = "Url";
             const TYPE_ENUM = "Enum";
+            const TYPE_NUMBER = "Number";
 
             const PROPERTY_TYPE_OVERRIDES = {
                 "color": TYPE_COLOR
@@ -40,9 +41,9 @@
                     ["Angular Velocity", "angularVelocity", TYPE_VEC3],
                     ["Gravity", "gravity", TYPE_VEC3],
                     ["Acceleration", "acceleration", TYPE_VEC3],
-                    ["Restitution", "restitution", TYPE_VEC3],
-                    ["Friction", "friction", TYPE_VEC3],
-                    ["Density", "density", TYPE_VEC3],
+                    ["Restitution", "restitution", TYPE_NUMBER],
+                    ["Friction", "friction", TYPE_NUMBER],
+                    ["Density", "density", TYPE_NUMBER],
                     ["Ignore for Collisions", "ignoreForCollisions", TYPE_BOOL],
                     ["Collisions Will Move", "collisionsWillMove", TYPE_BOOL],
                     ["Lifetime", "lifetime", TYPE_NUMBER],
@@ -61,6 +62,9 @@
                     ["Y-Axis Texture URL", "", TYPE_URL],
                     ["Z-Axis Texture URL", "", TYPE_URL],
                 ],
+                [
+                    "Particle System",
+                ]
             ];
 
             function PropertyElement(name, type) {
@@ -70,6 +74,8 @@
             }
             PropertyElement.prototype.setValue = function(newValue) {
                 print("setValue not implemented for ", this.name, this.type);
+            };
+            PropertyElement.prototype.valueChanged = function(newValue) {
             };
             PropertyElement.prototype.onValueChanged = function(newValue) {
             };
@@ -81,13 +87,13 @@
             PropertyElement.prototype.setVisible = function(visible) {
                 var display = visible ? 'block' : 'none';
                 for (var i = 0; i < this.elements.length; ++i) {
-                    $el.css('display', display);
+                    this.elements[i].css('display', display);
                 }
             };
             PropertyElement.prototype.setEnabled = function(enabled) {
                 var disabled = enabled ? '' : 'disabled';
                 for (var i = 0; i < this.elements.length; ++i) {
-                    $el.attr('disabled', disabled);
+                    this.elements[i].attr('disabled', disabled);
                 }
             };
 
@@ -107,8 +113,8 @@
 
                 this.$url = $('<input>').addClass('url');
                 this.elements = [this.$url];
-                this.$url.change(funciton() {
-                    onValueChanged(this.$url.text());
+                this.$url.change(function() {
+                    this.valueChanged(this.$url.text());
                 });
             }
             URLPropertyElement.prototype = Object.create(PropertyElement.prototype);
@@ -124,13 +130,25 @@
                 var options = args[0];
                 this.$dropdown = $('<select>');
                 for (var i = 0; i < options.length; ++i) {
-                    console.log(options[i]);
+                    //console.log(options[i]);
                     this.$dropdown.append($('<option>').val(options[i]).text(options[i]));
                 }
                 this.elements = [this.$dropdown];
             }
             EnumPropertyElement.prototype = Object.create(PropertyElement.prototype);
             EnumPropertyElement.prototype.setValue = function(newValue) {
+            };
+
+            function NumberPropertyElement(name) {
+                PropertyElement.call(this, name, TYPE_NUMBER);
+
+                this.$number = $('<input class="coord" type="number">');
+
+                this.elements = [this.$number];
+            }
+            NumberPropertyElement.prototype = Object.create(PropertyElement.prototype);
+            NumberPropertyElement.prototype.setValue = function(newValue) {
+                this.$number.text(newValue.toFixed(2));
             };
 
             function Vec3PropertyElement(name) {
@@ -144,6 +162,10 @@
             }
             Vec3PropertyElement.prototype = Object.create(PropertyElement.prototype);
             Vec3PropertyElement.prototype.setValue = function(newValue) {
+                //console.log(this.name, newValue);
+                this.$inputX.find("input").val(newValue.x.toFixed(2));
+                this.$inputY.find("input").val(newValue.y.toFixed(2));
+                this.$inputZ.find("input").val(newValue.z.toFixed(2));
             };
             // Quat is an alias for Vec3 - we will be receiving euler angles from the client.
             QuatPropertyElement = Vec3PropertyElement;
@@ -156,6 +178,17 @@
             }
             TextPropertyElement.prototype = Object.create(PropertyElement.prototype);
             TextPropertyElement.prototype.setValue = function(newValue) {
+                this.$text.val(newValue);
+            };
+
+            function TextAreaPropertyElement(name) {
+                PropertyElement.call(this, name, TYPE_TEXT);
+
+                this.$text = $('<textarea>');
+                this.elements = [this.$text];
+            }
+            TextAreaPropertyElement.prototype = Object.create(PropertyElement.prototype);
+            TextAreaPropertyElement.prototype.setValue = function(newValue) {
                 this.$text.val(newValue);
             };
 
@@ -182,9 +215,9 @@
             }
             ColorPropertyElement.prototype = Object.create(PropertyElement.prototype);
             ColorPropertyElement.prototype.setValue = function(newValue) {
-                this.$rInput.val(newValue.red);
-                this.$gInput.val(newValue.green);
-                this.$bInput.val(newValue.blue);
+                this.$rInput.find("input").val(newValue.red);
+                this.$gInput.find("input").val(newValue.green);
+                this.$bInput.find("input").val(newValue.blue);
                 this.$colorPicker.css('background-color', 'rgb(' + newValue.red + ',' + newValue.green + ',' + newValue.blue + ')');
             };
 
@@ -211,22 +244,24 @@
             typeToClassMap[TYPE_COLOR] = ColorPropertyElement;
             typeToClassMap[TYPE_BOOL] = BoolPropertyElement;
             typeToClassMap[TYPE_TEXT] = TextPropertyElement;
+            typeToClassMap[TYPE_TEXTAREA] = TextAreaPropertyElement;
             typeToClassMap[TYPE_VEC3] = Vec3PropertyElement;
             typeToClassMap[TYPE_QUAT] = QuatPropertyElement;
             typeToClassMap[TYPE_URL] = URLPropertyElement;
             typeToClassMap[TYPE_ENUM] = EnumPropertyElement;
+            typeToClassMap[TYPE_NUMBER] = NumberPropertyElement;
 
             var propertyElements = [];
             function createPropertyElement(name, type, args) {
                 var el;
-                console.log(name, type, args);
+                //console.log(name, type, args);
                 var ctor = typeToClassMap[type];
                 if (ctor) {
-                    console.log(name, type, args, ctor);
+                    //console.log(name, type, args, ctor);
                     el = new ctor(name, args);
                     propertyElements.push(el);
                 } else {
-                    console.log('fail', type)
+                    //console.log('fail', type)
                 }
                 return el;
             }
@@ -249,13 +284,29 @@
                 );
             }
 
+            function updateProperties(properties) {
+                var $id = $('#property-id');
+                var $type = $('#property-type');
+                $id.text(properties.id);
+                $type.text(properties.type);
+
+                var len = propertyElements.length;
+                //console.log('len ' + len);
+                for (var i = 0; i < len; ++i) {
+                    var el = propertyElements[i];
+                    var value = properties[el.name];
+                    if (value) {
+                        el.setVisible(true);
+                        el.setValue(value);
+                    } else {
+                        el.setVisible(false);
+                    }
+                }
+            }
+
             function loaded() {
-                var allSections = [];
-                var elID = document.getElementById("property-id");
-                var elType = document.getElementById("property-type");
-                var elName = document.getElementById("property-name");
-                var elLocked = document.getElementById("property-locked");
-                var elVisible = document.getElementById("property-visible");
+                var $id = $('#property-id');
+                var $type = $('#property-type');
 
                 // Setup properties
                 var $propertiesList = $('#properties-list');
@@ -264,8 +315,7 @@
                     var sectionName = section[0];
 
                     // Create section element
-                    var $section = $('<div>').addClass('section-header')
-                                             .append($('label').val(sectionName));
+                    var $section = $('<div class="section-header">').append($('<label>').text(sectionName));
                     $propertiesList.append($section);
 
                     for (var j = 1; j < section.length; ++j) {
@@ -279,24 +329,33 @@
                         var propertyElement = createPropertyElement(propertyName, propertyType, propertyArgs);
 
                         var $container = $('<div class="property">');
-                        $container.append($('<span class="label">').text(propertyLabel));
+                        $container.append($('<div class="label">').text(propertyLabel));
 
                         // Add element to body
                         if (propertyElement) {
                             propertyElement.appendToElement($container);
                         }
-                        $propertiesList.append($container);
+
+                        $section.append($container);
+                        $propertiesList.append($section);
                     }
                 }
 
+                var p = JSON.parse('{"id":"{2c40f124-58d7-44c1-913a-b025c3f75e24}","type":"Box","created":"2015-09-25T16:46:22Z","age":1647.8382568359375,"ageAsText":"0 hours 27 minutes 27 seconds","position":{"x":0.6832643747329712,"y":0.7502224445343018,"z":-2.570009231567383},"dimensions":{"x":0.20000000298023224,"y":0.20000000298023224,"z":0.20000000298023224},"naturalDimensions":{"x":1,"y":1,"z":1},"naturalPosition":{"x":0,"y":0,"z":0},"rotation":{"x":0,"y":0,"z":0},"velocity":{"x":0,"y":0,"z":0},"gravity":{"x":0,"y":0,"z":0},"acceleration":{"x":0,"y":0,"z":0},"damping":0.39346998929977417,"restitution":0.5,"friction":0.5,"density":1000,"lifetime":-1,"script":"","scriptTimestamp":0,"registrationPoint":{"x":0.5,"y":0.5,"z":0.5},"angularVelocity":{"x":0,"y":0,"z":0},"angularDamping":0.39346998929977417,"visible":1,"ignoreForCollisions":0,"collisionsWillMove":0,"href":"","description":"","actionData":"","locked":0,"userData":"","marketplaceID":"","name":"","collisionSoundURL":"","color":{"red":255,"green":0,"blue":0},"sittingPoints":{"length":0},"boundingBox":{"brn":{"x":0.5832643508911133,"y":0.6502224206924438,"z":-2.670009136199951},"tfl":{"x":0.7832643985748291,"y":0.8502224683761597,"z":-2.4700093269348145},"center":{"x":0.6832643747329712,"y":0.7502224445343018,"z":-2.570009231567383},"dimensions":{"x":0.20000004768371582,"y":0.20000004768371582,"z":0.19999980926513672}},"originalTextures":""}');
+                updateProperties({
+                    type: "blah",
+                    name: "Ryan",
+                });
+                updateProperties(p);
 
                 if (window.EventBridge !== undefined) {
                     EventBridge.scriptEventReceived.connect(function(data) {
                         data = JSON.parse(data);
                         if (data.type == "update") {
                             if (data.selections.length == 0) {
-                                elType.innerHTML = "<i>No Selection</i>";
-                                elID.innerHTML = "";
+                                $type.text = "<i>No Selection</i>";
+                                $id.text = "";
+                                $('#properties-list input').attr('disabled', 'disabled');
                                 disableChildren(document.getElementById("properties-list"), 'input');
                             } else if (data.selections.length > 1) {
                                 var selections = data.selections;
@@ -312,60 +371,16 @@
                                     }
                                     types[type]++;
                                 }
-                                elID.innerHTML = ids.join("<br>");
+                                //elID.innerHTML = ids.join("<br>");
+                                $id.text(ids.join('<br>'));
 
                                 var typeStrs = [];
                                 for (type in types) {
                                     typeStrs.push(type + " (" + types[type] + ")");
                                 }
-                                elType.innerHTML = typeStrs.join(", ");
+                                $type.text(typeStrs.join(', '));
 
-                                disableChildren(document.getElementById("properties-list"), 'input');
-                            } else {
-                                function updateProperty(name, value) {
-                                    // Get element for property
-                                    var el = propertyToElementMap[name];
-                                    if (el) {
-
-                                    }
-                                }
-
-                            }
-                        }
-                    });
-                }
-
-                if (window.EventBridge !== undefined) {
-                    EventBridge.scriptEventReceived.connect(function(data) {
-                        data = JSON.parse(data);
-                        if (data.type == "update") {
-                            if (data.selections.length == 0) {
-                                elType.innerHTML = "<i>No Selection</i>";
-                                elID.innerHTML = "";
-                                disableChildren(document.getElementById("properties-list"), 'input');
-                            } else if (data.selections.length > 1) {
-                                var selections = data.selections;
-
-                                var ids = [];
-                                var types = {};
-
-                                for (var i = 0; i < selections.length; i++) {
-                                    ids.push(selections[i].id);
-                                    var type = selections[i].properties.type;
-                                    if (types[type] === undefined) {
-                                        types[type] = 0;
-                                    }
-                                    types[type]++;
-                                }
-                                elID.innerHTML = ids.join("<br>");
-
-                                var typeStrs = [];
-                                for (type in types) {
-                                    typeStrs.push(type + " (" + types[type] + ")");
-                                }
-                                elType.innerHTML = typeStrs.join(", ");
-
-                                disableChildren(document.getElementById("properties-list"), 'input');
+                                $('#properties-list input').attr('disabled', 'disabled');
                             } else {
                                 var activeElement = document.activeElement;
 
@@ -377,23 +392,10 @@
                                     var  selected = false;
                                 }
 
-                                var properties = data.selections[0].properties;
+                                var properties = data.selections[0].console;
+                                //properties.log(JSON.stringify(properties));
 
-                                $('#property-id').text(properties.id);
-                                $('#property-type').text(properties.type);
-
-                                var len = propertyElements.length;
-                                for (var i = 0; i < len; ++i) {
-                                    var el = propertyElements[i];
-                                    var value = properties[el.name];
-                                    if (value) {
-                                        el.setVisible(true);
-                                        el.setValue(value);
-                                    } else {
-                                        el.setVisible(false);
-                                    }
-                                }
-
+                                updateProperties(properties);
                                 return;
 
                                 elLocked.checked = properties.locked;
@@ -414,44 +416,45 @@
                     });
                 }
 
-                return;
-                elMoveSelectionToGrid.addEventListener("click", function() {
-                    EventBridge.emitWebEvent(JSON.stringify({
-                        type: "action",
-                        action: "moveSelectionToGrid",
-                    }));
-                });
-                elMoveAllToGrid.addEventListener("click", function() {
-                    EventBridge.emitWebEvent(JSON.stringify({
-                        type: "action",
-                        action: "moveAllToGrid",
-                    }));
-                });
-                elResetToNaturalDimensions.addEventListener("click", function() {
-                    EventBridge.emitWebEvent(JSON.stringify({
-                        type: "action",
-                        action: "resetToNaturalDimensions",
-                    }));
-                });
-                elRescaleDimensionsButton.addEventListener("click", function() {
-                    EventBridge.emitWebEvent(JSON.stringify({
-                        type: "action",
-                        action: "rescaleDimensions",
-                        percentage: parseInt(elRescaleDimensionsPct.value),
-                    }));
-                });
-                elReloadScriptButton.addEventListener("click", function() {
-                    EventBridge.emitWebEvent(JSON.stringify({
-                        type: "action",
-                        action: "reloadScript"
-                    }));
-                });
-                elCenterAtmosphereToZone.addEventListener("click", function() {
-                    EventBridge.emitWebEvent(JSON.stringify({
-                        type: "action",
-                        action: "centerAtmosphereToZone",
-                    }));
-                });
+                if (false) {
+                    elMoveSelectionToGrid.addEventListener("click", function() {
+                        EventBridge.emitWebEvent(JSON.stringify({
+                            type: "action",
+                            action: "moveSelectionToGrid",
+                        }));
+                    });
+                    elMoveAllToGrid.addEventListener("click", function() {
+                        EventBridge.emitWebEvent(JSON.stringify({
+                            type: "action",
+                            action: "moveAllToGrid",
+                        }));
+                    });
+                    elResetToNaturalDimensions.addEventListener("click", function() {
+                        EventBridge.emitWebEvent(JSON.stringify({
+                            type: "action",
+                            action: "resetToNaturalDimensions",
+                        }));
+                    });
+                    elRescaleDimensionsButton.addEventListener("click", function() {
+                        EventBridge.emitWebEvent(JSON.stringify({
+                            type: "action",
+                            action: "rescaleDimensions",
+                            percentage: parseInt(elRescaleDimensionsPct.value),
+                        }));
+                    });
+                    elReloadScriptButton.addEventListener("click", function() {
+                        EventBridge.emitWebEvent(JSON.stringify({
+                            type: "action",
+                            action: "reloadScript"
+                        }));
+                    });
+                    elCenterAtmosphereToZone.addEventListener("click", function() {
+                        EventBridge.emitWebEvent(JSON.stringify({
+                            type: "action",
+                            action: "centerAtmosphereToZone",
+                        }));
+                    });
+                }
 
                 window.onblur = function() {
                     // Fake a change event
@@ -499,11 +502,12 @@
             </div>
             <div id="id" class="property">
                 <span class="label" style="float: left; margin-right: 6px">
-                    <label>ID: <label>
+                    <label>ID: </label>
                 </span>
                 <div class="value">
                     <span id="property-id" class="selectable"></span>
                 </div>
             </div>
+        </div>
     </body>
 </html>
