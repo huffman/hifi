@@ -1,1564 +1,509 @@
 <html>
-<head>
-    <link rel="stylesheet" type="text/css" href="style.css">
-    <link rel="stylesheet" type="text/css" href="css/colpick.css">
-    <script src="jquery-2.1.4.min.js"></script>
-    <script src="colpick.js"></script>
-    <script>
-        const PI = 3.14159265358979;
-        const DEGREES_TO_RADIANS = PI / 180.0;
-        const RADIANS_TO_DEGREES = 180.0 / PI;
+    <head>
+        <link rel="stylesheet" type="text/css" href="style.css">
+        <link rel="stylesheet" type="text/css" href="css/colpick.css">
+        <script src="jquery-2.1.4.min.js"></script>
+        <script src="colpick.js"></script>
+        <script>
+            const PI = 3.14159265358979;
+            const DEGREES_TO_RADIANS = PI / 180.0;
+            const RADIANS_TO_DEGREES = 180.0 / PI;
 
+            const TYPE_COLOR = "Color";
+            const TYPE_BOOL = "Bool";
+            const TYPE_VEC3 = "Vec3";
+            const TYPE_QUAT = "Quat";
+            const TYPE_TEXT = "Text";
+            const TYPE_TEXTAREA = "TextArea";
+            const TYPE_URL = "Url";
+            const TYPE_ENUM = "Enum";
 
-        const TYPE_COLOR = "Color";
-        const TYPE_VEC3 = "Vec3";
-        const TYPE_QUAT = "Quat";
-        const TYPE_TEXT = "Text";
-        const TYPE_TEXTAREA = "TextArea";
-        const TYPE_URL = "Url";
-        const TYPE_ENUM = "Enum";
-
-        const PROPERTY_TYPE_OVERRIDES = {
-            // ...
-            color: TYPE_COLOR;
-        };
-
-        const LAYOUT = [
-            [
-                "Core",
-                ["User Data", TYPE_TEXTAREA],
-                ["Position", TYPE_VEC3],
-                ["Registration", TYPE_VEC3],
-                ["Dimensions", TYPE_VEC3],
-                ["Rotation", TYPE_QUAT],
-            ],
-            [
-                "Physical Properties",
-                ["Linear Velocity", "", TYPE_VEC3],
-            ],
-            [
-                "PolyVox",
-                ["Voxel Volume Size", "", TYPE_VEC3],
-                ["Surface Extractor", "", TYPE_ENUM, ["marching cubes", "cubic", "edged cubic", "edged marching cubes"],
-                ["X-Axis Texture URL", "", TYPE_URL],
-                ["Y-Axis Texture URL", "", TYPE_URL],
-                ["Z-Axis Texture URL", "", TYPE_URL],
-            ],
-        ];
-
-        PropertyElement = function(name, type, typeExtra) {
-            this.name = name;
-            this.type = type;
-            this.element = element;
-        };
-
-        var propertyToElementMap = { };
-
-        function detectPropertyType(name, value) {
-            // Special case certain property names
-            if (name in PROPERTY_TYPE_OVERRIDES) {
-                return PROPERTY_TYPE_OVERRIDES[name];
-            }
-
-            // Detect type based on value
-            if ("red" in value) {
-                return TYPE_COLOR;
-            } else if ("w" in value) {
-                return TYPE_QUAT;
-            } else if ("x" in value) {
-                return TYPE_VEC3;
-            }
-        }
-
-        // Setup properties
-        for (var i = 0; i < LAYOUT.length; ++i) {
-            var section = LAYOUT[i];
-            var sectionName = section[0];
-
-            // Create section element
-
-            for (var j = 1; j < section.length; ++j) {
-                var propertyInfo = section[j];
-                var propertyLabel = propertyInfo[0];
-                var propertyName = propertyInfo[1];
-                var propertyType = propertyInfo.splice(2);
-
-                // Create DOM element
-
-                // Add element to body
-            }
-        }
-
-        function enableChildren(el, selector) {
-            els = el.querySelectorAll(selector);
-            for (var i = 0; i < els.length; i++) {
-                els[i].removeAttribute('disabled');
-            }
-        }
-        function disableChildren(el, selector) {
-            els = el.querySelectorAll(selector);
-            for (var i = 0; i < els.length; i++) {
-                els[i].setAttribute('disabled', 'disabled');
-            }
-        }
-
-        function showElements(els, show) {
-            for (var i = 0; i < els.length; i++) {
-                els[i].style.display = (show) ? 'block' : 'none';
-            }
-        }
-
-        function createEmitCheckedPropertyUpdateFunction(propertyName) {
-            return function() {
-                EventBridge.emitWebEvent(
-                    '{ "type":"update", "properties":{"' + propertyName + '":' + this.checked + '}}'
-                );
+            const PROPERTY_TYPE_OVERRIDES = {
+                "color": TYPE_COLOR
             };
-        }
-        function createEmitGroupCheckedPropertyUpdateFunction(group, propertyName) {
-            return function() {
+
+            const LAYOUT = [
+                [
+                    "Core",
+                    ["Name", "name", TYPE_TEXT],
+                    ["Locked", "locked", TYPE_BOOL],
+                    ["Visible", "visible", TYPE_BOOL],
+                    ["User Data", "userData", TYPE_TEXTAREA],
+                ],
+                [
+                    "Physical Properties",
+                    ["Position", "position", TYPE_VEC3],
+                    ["Dimensions", "dimensions", TYPE_VEC3],
+                    ["Registration", "registrationPoint", TYPE_VEC3],
+                    ["Rotation", "rotation", TYPE_QUAT],
+                    ["Linear Velocity", "velocity", TYPE_VEC3],
+                    ["Angular Velocity", "angularVelocity", TYPE_VEC3],
+                    ["Gravity", "gravity", TYPE_VEC3],
+                    ["Acceleration", "acceleration", TYPE_VEC3],
+                    ["Restitution", "restitution", TYPE_VEC3],
+                    ["Friction", "friction", TYPE_VEC3],
+                    ["Density", "density", TYPE_VEC3],
+                    ["Ignore for Collisions", "ignoreForCollisions", TYPE_BOOL],
+                    ["Collisions Will Move", "collisionsWillMove", TYPE_BOOL],
+                    ["Lifetime", "lifetime", TYPE_NUMBER],
+                ],
+                [
+                    "Scripts",
+                    ["Script URL", "script", TYPE_URL],
+                    ["Script Timestamp", "scriptTimestamp", TYPE_NUMBER],
+                    ["Color", "color", TYPE_COLOR],
+                ],
+                [
+                    "PolyVox",
+                    ["Voxel Volume Size", "", TYPE_VEC3],
+                    ["Surface Extractor", "", TYPE_ENUM, ["marching cubes", "cubic", "edged cubic", "edged marching cubes"]],
+                    ["X-Axis Texture URL", "", TYPE_URL],
+                    ["Y-Axis Texture URL", "", TYPE_URL],
+                    ["Z-Axis Texture URL", "", TYPE_URL],
+                ],
+            ];
+
+            function PropertyElement(name, type) {
+                this.name = name;
+                this.type = type;
+                this.elements = [];
+            }
+            PropertyElement.prototype.setValue = function(newValue) {
+                print("setValue not implemented for ", this.name, this.type);
+            };
+            PropertyElement.prototype.onValueChanged = function(newValue) {
+            };
+            PropertyElement.prototype.appendToElement = function($el) {
+                for (var i = 0; i < this.elements.length; ++i) {
+                    $el.append(this.elements[i]);
+                }
+            };
+            PropertyElement.prototype.setVisible = function(visible) {
+                var display = visible ? 'block' : 'none';
+                for (var i = 0; i < this.elements.length; ++i) {
+                    $el.css('display', display);
+                }
+            };
+            PropertyElement.prototype.setEnabled = function(enabled) {
+                var disabled = enabled ? '' : 'disabled';
+                for (var i = 0; i < this.elements.length; ++i) {
+                    $el.attr('disabled', disabled);
+                }
+            };
+
+            function BoolPropertyElement(name) {
+                PropertyElement.call(this, name, TYPE_BOOL);
+
+                this.$checkbox = $('<input>').attr('type', 'checkbox');
+                this.elements = [this.$checkbox];
+            }
+            BoolPropertyElement.prototype = Object.create(PropertyElement.prototype);
+            BoolPropertyElement.prototype.setValue = function(newValue) {
+                this.$checkbox.prop('checked', newValue === true);
+            };
+
+            function URLPropertyElement(name) {
+                PropertyElement.call(this, name, TYPE_BOOL);
+
+                this.$url = $('<input>').addClass('url');
+                this.elements = [this.$url];
+                this.$url.change(funciton() {
+                    onValueChanged(this.$url.text());
+                });
+            }
+            URLPropertyElement.prototype = Object.create(PropertyElement.prototype);
+            URLPropertyElement.prototype.setValue = function(newValue) {
+                this.$url.text(newValue);
+            };
+
+            function EnumPropertyElement(name, args) {
+                PropertyElement.call(this, name, TYPE_BOOL);
+
+                console.log('enum', name, args);
+
+                var options = args[0];
+                this.$dropdown = $('<select>');
+                for (var i = 0; i < options.length; ++i) {
+                    console.log(options[i]);
+                    this.$dropdown.append($('<option>').val(options[i]).text(options[i]));
+                }
+                this.elements = [this.$dropdown];
+            }
+            EnumPropertyElement.prototype = Object.create(PropertyElement.prototype);
+            EnumPropertyElement.prototype.setValue = function(newValue) {
+            };
+
+            function Vec3PropertyElement(name) {
+                PropertyElement.call(this, name, TYPE_BOOL);
+
+                this.$inputX = $('<div class="input-area">X <br><input class="coord" type="number"></input></div>');
+                this.$inputY = $('<div class="input-area">Y <br><input class="coord" type="number"></input></div>');
+                this.$inputZ = $('<div class="input-area">Z <br><input class="coord" type="number"></input></div>');
+
+                this.elements = [this.$inputX, this.$inputY, this.$inputZ];
+            }
+            Vec3PropertyElement.prototype = Object.create(PropertyElement.prototype);
+            Vec3PropertyElement.prototype.setValue = function(newValue) {
+            };
+            // Quat is an alias for Vec3 - we will be receiving euler angles from the client.
+            QuatPropertyElement = Vec3PropertyElement;
+
+            function TextPropertyElement(name) {
+                PropertyElement.call(this, name, TYPE_TEXT);
+
+                this.$text = $('<input type="text">');
+                this.elements = [this.$text];
+            }
+            TextPropertyElement.prototype = Object.create(PropertyElement.prototype);
+            TextPropertyElement.prototype.setValue = function(newValue) {
+                this.$text.val(newValue);
+            };
+
+            function ColorPropertyElement(name) {
+                PropertyElement.call(this, name, TYPE_COLOR);
+
+                this.$colorPicker = $('<div>').addClass('color-picker');
+                this.$rInput = $('<div class="input-area">R <input class="coord" type="number"></input></div>');
+                this.$gInput = $('<div class="input-area">G <input class="coord" type="number"></input></div>');
+                this.$bInput = $('<div class="input-area">B <input class="coord" type="number"></input></div>');
+
+                this.$colorPicker.colpick({
+                    colorScheme:'dark',
+                    layout:'hex',
+                    color:'000000',
+                    onSubmit: function(hsb, hex, rgb, el) {
+                        $(el).css('background-color', '#'+hex);
+                        $(el).colpickHide();
+                        //emitColorPropertyUpdate('color', rgb.r, rgb.g, rgb.b, 'skybox');
+                    }
+                });
+
+                this.elements = [this.$colorPicker, this.$rInput, this.$gInput, this.$bInput];
+            }
+            ColorPropertyElement.prototype = Object.create(PropertyElement.prototype);
+            ColorPropertyElement.prototype.setValue = function(newValue) {
+                this.$rInput.val(newValue.red);
+                this.$gInput.val(newValue.green);
+                this.$bInput.val(newValue.blue);
+                this.$colorPicker.css('background-color', 'rgb(' + newValue.red + ',' + newValue.green + ',' + newValue.blue + ')');
+            };
+
+            var propertyToElementMap = {
+            };
+
+            function detectPropertyType(name, value) {
+                // Special case certain property names
+                if (name in PROPERTY_TYPE_OVERRIDES) {
+                    return PROPERTY_TYPE_OVERRIDES[name];
+                }
+
+                // Detect type based on value
+                if ("red" in value) {
+                    return TYPE_COLOR;
+                } else if ("w" in value) {
+                    return TYPE_QUAT;
+                } else if ("x" in value) {
+                    return TYPE_VEC3;
+                }
+            }
+
+            var typeToClassMap = {};
+            typeToClassMap[TYPE_COLOR] = ColorPropertyElement;
+            typeToClassMap[TYPE_BOOL] = BoolPropertyElement;
+            typeToClassMap[TYPE_TEXT] = TextPropertyElement;
+            typeToClassMap[TYPE_VEC3] = Vec3PropertyElement;
+            typeToClassMap[TYPE_QUAT] = QuatPropertyElement;
+            typeToClassMap[TYPE_URL] = URLPropertyElement;
+            typeToClassMap[TYPE_ENUM] = EnumPropertyElement;
+
+            var propertyElements = [];
+            function createPropertyElement(name, type, args) {
+                var el;
+                console.log(name, type, args);
+                var ctor = typeToClassMap[type];
+                if (ctor) {
+                    console.log(name, type, args, ctor);
+                    el = new ctor(name, args);
+                    propertyElements.push(el);
+                } else {
+                    console.log('fail', type)
+                }
+                return el;
+            }
+
+            function emitUpdate(name, group, value) {
                 var properties = {};
-                properties[group] = {};
-                properties[group][propertyName] = this.checked;
+
+                if (group) {
+                    properties[group] = {};
+                    properties[group][name] = value;
+                } else {
+                    properties[name] = value;
+                }
+
                 EventBridge.emitWebEvent(
                     JSON.stringify({
                         type: "update",
                         properties: properties
                     })
                 );
-            };
-        }
-
-        function createEmitNumberPropertyUpdateFunction(propertyName) {
-            return function() {
-                EventBridge.emitWebEvent(
-                    '{ "type":"update", "properties":{"' + propertyName + '":' + this.value + '}}'
-                );
-            };
-        }
-        function createEmitGroupNumberPropertyUpdateFunction(group, propertyName) {
-            return function() {
-                var properties = {};
-                properties[group] = {};
-                properties[group][propertyName] = this.value;
-                EventBridge.emitWebEvent(
-                    JSON.stringify({
-                        type: "update",
-                        properties: properties,
-                    })
-                );
-            };
-        }
-
-
-        function createEmitTextPropertyUpdateFunction(propertyName) {
-            return function() {
-                var properties = {};
-                properties[propertyName] = this.value;
-                EventBridge.emitWebEvent(
-                    JSON.stringify({
-                        type: "update",
-                        properties: properties,
-                    })
-                );
-            };
-        }
-
-        function createEmitGroupTextPropertyUpdateFunction(group,propertyName) {
-            return function() {
-                var properties = {};
-                properties[group] = {};
-                properties[group][propertyName] = this.value;
-                EventBridge.emitWebEvent(
-                    JSON.stringify({
-                        type: "update",
-                        properties: properties,
-                    })
-                );
-            };
-        }
-
-        function createEmitVec3PropertyUpdateFunction(property, elX, elY, elZ) {
-            return function() {
-                var data = {
-                     type: "update",
-                     properties: {
-                     }
-                };
-                data.properties[property] = {
-                     x: elX.value,
-                     y: elY.value,
-                     z: elZ.value,
-                };
-                EventBridge.emitWebEvent(JSON.stringify(data));
             }
-        };
 
-        function createEmitGroupVec3PropertyUpdateFunction(group, property, elX, elY, elZ) {
-            return function() {
-                var data = {
-                     type: "update",
-                     properties: {
-                     }
-                };
-                data.properties[group] = { };
-                data.properties[group][property] = {
-                     x: elX.value,
-                     y: elY.value,
-                     z: elZ.value,
-                };
-                EventBridge.emitWebEvent(JSON.stringify(data));
-            }
-        };
+            function loaded() {
+                var allSections = [];
+                var elID = document.getElementById("property-id");
+                var elType = document.getElementById("property-type");
+                var elName = document.getElementById("property-name");
+                var elLocked = document.getElementById("property-locked");
+                var elVisible = document.getElementById("property-visible");
 
-        function createEmitVec3PropertyUpdateFunctionWithMultiplier(property, elX, elY, elZ, multiplier) {
-            return function() {
-                var data = {
-                     type: "update",
-                     properties: {
-                     }
-                };
-                data.properties[property] = {
-                     x: elX.value * multiplier,
-                     y: elY.value * multiplier,
-                     z: elZ.value * multiplier,
-                };
-                EventBridge.emitWebEvent(JSON.stringify(data));
-            }
-        };
+                // Setup properties
+                var $propertiesList = $('#properties-list');
+                for (var i = 0; i < LAYOUT.length; ++i) {
+                    var section = LAYOUT[i];
+                    var sectionName = section[0];
 
-        function createEmitColorPropertyUpdateFunction(property, elRed, elGreen, elBlue) {
-            return function() {
-                emitColorPropertyUpdate(property, elRed.value, elGreen.value, elBlue.value);
-            }
-        };
+                    // Create section element
+                    var $section = $('<div>').addClass('section-header')
+                                             .append($('label').val(sectionName));
+                    $propertiesList.append($section);
 
-        function emitColorPropertyUpdate(property, red, green, blue, group) {
-                var data = {
-                     type: "update",
-                     properties: {
-                     }
-                };
-                if (group) {
-                    data.properties[group] = { };
-                    data.properties[group][property] = {
-                         red: red,
-                         green: green,
-                         blue: blue,
-                    };
-                } else {
-                    data.properties[property] = {
-                         red: red,
-                         green: green,
-                         blue: blue,
-                    };
-                }
-                EventBridge.emitWebEvent(JSON.stringify(data));
-        };
+                    for (var j = 1; j < section.length; ++j) {
+                        var propertyInfo = section[j];
+                        var propertyLabel = propertyInfo[0];
+                        var propertyName = propertyInfo[1];
+                        var propertyType = propertyInfo[2];
+                        var propertyArgs = propertyInfo.splice(3);
 
+                        // Create property element
+                        var propertyElement = createPropertyElement(propertyName, propertyType, propertyArgs);
 
-        function createEmitGroupColorPropertyUpdateFunction(group, property, elRed, elGreen, elBlue) {
-            return function() {
-                var data = {
-                     type: "update",
-                     properties: {
-                     }
-                };
-                data.properties[group] = { };
+                        var $container = $('<div class="property">');
+                        $container.append($('<span class="label">').text(propertyLabel));
 
-                data.properties[group][property] = {
-                     red: elRed.value,
-                     green: elGreen.value,
-                     blue: elBlue.value,
-                };
-                EventBridge.emitWebEvent(JSON.stringify(data));
-            }
-        };
-
-        function loaded() {
-            var allSections = [];
-            var elID = document.getElementById("property-id");
-            var elType = document.getElementById("property-type");
-            var elName = document.getElementById("property-name");
-            var elLocked = document.getElementById("property-locked");
-            var elVisible = document.getElementById("property-visible");
-
-            if (window.EventBridge !== undefined) {
-                EventBridge.scriptEventReceived.connect(function(data) {
-                    data = JSON.parse(data);
-                    if (data.type == "update") {
-                        if (data.selections.length == 0) {
-                            elType.innerHTML = "<i>No Selection</i>";
-                            elID.innerHTML = "";
-                            disableChildren(document.getElementById("properties-list"), 'input');
-                        } else if (data.selections.length > 1) {
-                            var selections = data.selections;
-
-                            var ids = [];
-                            var types = {};
-
-                            for (var i = 0; i < selections.length; i++) {
-                                ids.push(selections[i].id);
-                                var type = selections[i].properties.type;
-                                if (types[type] === undefined) {
-                                    types[type] = 0;
-                                }
-                                types[type]++;
-                            }
-                            elID.innerHTML = ids.join("<br>");
-
-                            var typeStrs = [];
-                            for (type in types) {
-                                typeStrs.push(type + " (" + types[type] + ")");
-                            }
-                            elType.innerHTML = typeStrs.join(", ");
-
-                            disableChildren(document.getElementById("properties-list"), 'input');
-                        } else {
-                            function updateProperty(name, value) {
-                                // Get element for property
-                                var el = propertyToElementMap[name];
-                                if (el) {
-
-                                }
-                            }
-
+                        // Add element to body
+                        if (propertyElement) {
+                            propertyElement.appendToElement($container);
                         }
+                        $propertiesList.append($container);
                     }
                 }
-            }
 
 
-            if (window.EventBridge !== undefined) {
-                EventBridge.scriptEventReceived.connect(function(data) {
-                    data = JSON.parse(data);
-                    if (data.type == "update") {
-                        if (data.selections.length == 0) {
-                            elType.innerHTML = "<i>No Selection</i>";
-                            elID.innerHTML = "";
-                            disableChildren(document.getElementById("properties-list"), 'input');
-                        } else if (data.selections.length > 1) {
-                            var selections = data.selections;
-
-                            var ids = [];
-                            var types = {};
-
-                            for (var i = 0; i < selections.length; i++) {
-                                ids.push(selections[i].id);
-                                var type = selections[i].properties.type;
-                                if (types[type] === undefined) {
-                                    types[type] = 0;
-                                }
-                                types[type]++;
-                            }
-                            elID.innerHTML = ids.join("<br>");
-
-                            var typeStrs = [];
-                            for (type in types) {
-                                typeStrs.push(type + " (" + types[type] + ")");
-                            }
-                            elType.innerHTML = typeStrs.join(", ");
-
-                            disableChildren(document.getElementById("properties-list"), 'input');
-                        } else {
-                            var activeElement = document.activeElement;
-
-                            try {
-                                var selected = (activeElement
-                                           && activeElement.selectionStart == 0
-                                           && activeElement.selectionEnd == activeElement.value.length);
-                            } catch (e) {
-                                var  selected = false;
-                            }
-
-                            var properties = data.selections[0].properties;
-
-                            elID.innerHTML = properties.id;
-
-                            elType.innerHTML = properties.type;
-
-                            elLocked.checked = properties.locked;
-
-                            if (properties.locked) {
+                if (window.EventBridge !== undefined) {
+                    EventBridge.scriptEventReceived.connect(function(data) {
+                        data = JSON.parse(data);
+                        if (data.type == "update") {
+                            if (data.selections.length == 0) {
+                                elType.innerHTML = "<i>No Selection</i>";
+                                elID.innerHTML = "";
                                 disableChildren(document.getElementById("properties-list"), 'input');
-                                elLocked.removeAttribute('disabled');
+                            } else if (data.selections.length > 1) {
+                                var selections = data.selections;
+
+                                var ids = [];
+                                var types = {};
+
+                                for (var i = 0; i < selections.length; i++) {
+                                    ids.push(selections[i].id);
+                                    var type = selections[i].properties.type;
+                                    if (types[type] === undefined) {
+                                        types[type] = 0;
+                                    }
+                                    types[type]++;
+                                }
+                                elID.innerHTML = ids.join("<br>");
+
+                                var typeStrs = [];
+                                for (type in types) {
+                                    typeStrs.push(type + " (" + types[type] + ")");
+                                }
+                                elType.innerHTML = typeStrs.join(", ");
+
+                                disableChildren(document.getElementById("properties-list"), 'input');
                             } else {
-                                enableChildren(document.getElementById("properties-list"), 'input');
-                            }
+                                function updateProperty(name, value) {
+                                    // Get element for property
+                                    var el = propertyToElementMap[name];
+                                    if (el) {
 
-                            elName.value = properties.name;
-
-                            elVisible.checked = properties.visible;
-
-                            elPositionX.value = properties.position.x.toFixed(2);
-                            elPositionY.value = properties.position.y.toFixed(2);
-                            elPositionZ.value = properties.position.z.toFixed(2);
-
-                            elDimensionsX.value = properties.dimensions.x.toFixed(2);
-                            elDimensionsY.value = properties.dimensions.y.toFixed(2);
-                            elDimensionsZ.value = properties.dimensions.z.toFixed(2);
-
-                            elRegistrationX.value = properties.registrationPoint.x.toFixed(2);
-                            elRegistrationY.value = properties.registrationPoint.y.toFixed(2);
-                            elRegistrationZ.value = properties.registrationPoint.z.toFixed(2);
-
-                            elRotationX.value = properties.rotation.x.toFixed(2);
-                            elRotationY.value = properties.rotation.y.toFixed(2);
-                            elRotationZ.value = properties.rotation.z.toFixed(2);
-
-                            elLinearVelocityX.value = properties.velocity.x.toFixed(2);
-                            elLinearVelocityY.value = properties.velocity.y.toFixed(2);
-                            elLinearVelocityZ.value = properties.velocity.z.toFixed(2);
-                            elLinearDamping.value = properties.damping.toFixed(2);
-
-                            elAngularVelocityX.value = (properties.angularVelocity.x * RADIANS_TO_DEGREES).toFixed(2);
-                            elAngularVelocityY.value = (properties.angularVelocity.y * RADIANS_TO_DEGREES).toFixed(2);
-                            elAngularVelocityZ.value = (properties.angularVelocity.z * RADIANS_TO_DEGREES).toFixed(2);
-                            elAngularDamping.value = properties.angularDamping.toFixed(2);
-
-                            elRestitution.value = properties.restitution.toFixed(2);
-                            elFriction.value = properties.friction.toFixed(2);
-
-                            elGravityX.value = properties.gravity.x.toFixed(2);
-                            elGravityY.value = properties.gravity.y.toFixed(2);
-                            elGravityZ.value = properties.gravity.z.toFixed(2);
-
-                            elAccelerationX.value = properties.acceleration.x.toFixed(2);
-                            elAccelerationY.value = properties.acceleration.y.toFixed(2);
-                            elAccelerationZ.value = properties.acceleration.z.toFixed(2);
-
-                            elDensity.value = properties.density.toFixed(2);
-                            elIgnoreForCollisions.checked = properties.ignoreForCollisions;
-                            elCollisionsWillMove.checked = properties.collisionsWillMove;
-                            elCollisionSoundURL.value = properties.collisionSoundURL;
-                            elLifetime.value = properties.lifetime;
-                            elScriptURL.value = properties.script;
-                            elScriptTimestamp.value = properties.scriptTimestamp;
-                            elUserData.value = properties.userData;
-
-                            elHyperlinkHref.value = properties.href;
-                            elHyperlinkDescription.value = properties.description;
-
-                            for (var i = 0; i < allSections.length; i++) {
-                                for (var j = 0; j < allSections[i].length; j++) {
-                                    allSections[i][j].style.display = 'none';
-                                }
-                            }
-
-                            if (properties.type == "Box" || properties.type == "Sphere" || properties.type == "ParticleEffect") {
-                                elColorSection.style.display = 'block';
-                                elColorRed.value = properties.color.red;
-                                elColorGreen.value = properties.color.green;
-                                elColorBlue.value = properties.color.blue;
-                                elColor.style.backgroundColor = "rgb(" + properties.color.red  + "," + properties.color.green + "," + properties.color.blue + ")";
-                            } else {
-                                elColorSection.style.display = 'none';
-                            }
-
-                            if (properties.type == "Model" || properties.type == "ParticleEffect") {
-                                for (var i = 0; i < elModelSections.length; i++) {
-                                    elModelSections[i].style.display = 'block';
+                                    }
                                 }
 
-                                elModelURL.value = properties.modelURL;
-                                elShapeType.value = properties.shapeType;
-                                elCompoundShapeURL.value = properties.compoundShapeURL;
-                                elModelAnimationURL.value = properties.animationURL;
-                                elModelAnimationPlaying.checked = properties.animationIsPlaying;
-                                elModelAnimationFPS.value = properties.animationFPS;
-                                elModelAnimationFrame.value = properties.animationFrameIndex;
-                                elModelAnimationSettings.value = properties.animationSettings;
-                                elModelTextures.value = properties.textures;
-                                elModelOriginalTextures.value = properties.originalTextures;  
-                            } else if (properties.type == "Web") {
-                                for (var i = 0; i < elWebSections.length; i++) {
-                                    elWebSections[i].style.display = 'block';
-                                }
-
-                                elWebSourceURL.value = properties.sourceUrl;
-                            } else if (properties.type == "Text") {
-                                for (var i = 0; i < elTextSections.length; i++) {
-                                    elTextSections[i].style.display = 'block';
-                                }
-
-                                elTextText.value = properties.text;
-                                elTextLineHeight.value = properties.lineHeight.toFixed(4);
-                                elTextTextColor.style.backgroundColor = "rgb(" + properties.textColor.red  + "," + properties.textColor.green + "," + properties.textColor.blue + ")";
-                                elTextTextColorRed.value = properties.textColor.red;
-                                elTextTextColorGreen.value = properties.textColor.green;
-                                elTextTextColorBlue.value = properties.textColor.blue;
-                                elTextBackgroundColorRed.value = properties.backgroundColor.red;
-                                elTextBackgroundColorGreen.value = properties.backgroundColor.green;
-                                elTextBackgroundColorBlue.value = properties.backgroundColor.blue;
-                            } else if (properties.type == "Light") {
-                                for (var i = 0; i < elLightSections.length; i++) {
-                                    elLightSections[i].style.display = 'block';
-                                }
-
-                                elLightSpotLight.checked = properties.isSpotlight;
-
-                                elLightColor.style.backgroundColor = "rgb(" + properties.color.red  + "," + properties.color.green + "," + properties.color.blue + ")";
-                                elLightColorRed.value = properties.color.red;
-                                elLightColorGreen.value = properties.color.green;
-                                elLightColorBlue.value = properties.color.blue;
-
-                                elLightIntensity.value = properties.intensity;
-                                elLightExponent.value = properties.exponent;
-                                elLightCutoff.value = properties.cutoff;
-                            } else if (properties.type == "Zone") {
-                                for (var i = 0; i < elZoneSections.length; i++) {
-                                    elZoneSections[i].style.display = 'block';
-                                }
-
-                                elZoneStageSunModelEnabled.checked = properties.stage.sunModelEnabled;
-                                elZoneKeyLightColor.style.backgroundColor = "rgb(" + properties.keyLightColor.red  + "," + properties.keyLightColor.green + "," + properties.keyLightColor.blue + ")";
-                                elZoneKeyLightColorRed.value = properties.keyLightColor.red;
-                                elZoneKeyLightColorGreen.value = properties.keyLightColor.green;
-                                elZoneKeyLightColorBlue.value = properties.keyLightColor.blue;
-                                elZoneKeyLightIntensity.value = properties.keyLightIntensity.toFixed(2);
-                                elZoneKeyLightAmbientIntensity.value = properties.keyLightAmbientIntensity.toFixed(2);
-                                elZoneKeyLightDirectionX.value = properties.keyLightDirection.x.toFixed(2);
-                                elZoneKeyLightDirectionY.value = properties.keyLightDirection.y.toFixed(2);
-                                elZoneKeyLightDirectionZ.value = properties.keyLightDirection.z.toFixed(2);
-
-                                elZoneStageLatitude.value = properties.stage.latitude.toFixed(2);
-                                elZoneStageLongitude.value = properties.stage.longitude.toFixed(2);
-                                elZoneStageAltitude.value = properties.stage.altitude.toFixed(2);
-                                elZoneStageAutomaticHourDay.checked = properties.stage.automaticHourDay;
-                                elZoneStageDay.value = properties.stage.day;
-                                elZoneStageHour.value = properties.stage.hour;
-                                elShapeType.value = properties.shapeType;
-                                elCompoundShapeURL.value = properties.compoundShapeURL;
-
-                                elZoneBackgroundMode.value = properties.backgroundMode;
-
-                                elZoneSkyboxColor.style.backgroundColor = "rgb(" + properties.skybox.color.red  + "," + properties.skybox.color.green + "," + properties.skybox.color.blue + ")";
-                                elZoneSkyboxColorRed.value = properties.skybox.color.red;
-                                elZoneSkyboxColorGreen.value = properties.skybox.color.green;
-                                elZoneSkyboxColorBlue.value = properties.skybox.color.blue;
-                                elZoneSkyboxURL.value = properties.skybox.url;
-
-                                elZoneAtmosphereCenterX.value = properties.atmosphere.center.x;
-                                elZoneAtmosphereCenterY.value = properties.atmosphere.center.y;
-                                elZoneAtmosphereCenterZ.value = properties.atmosphere.center.z;
-                                elZoneAtmosphereInnerRadius.value = properties.atmosphere.innerRadius;
-                                elZoneAtmosphereOuterRadius.value = properties.atmosphere.outerRadius;
-                                elZoneAtmosphereMieScattering.value = properties.atmosphere.mieScattering;
-                                elZoneAtmosphereRayleighScattering.value = properties.atmosphere.rayleighScattering;
-                                elZoneAtmosphereScatteringWavelengthsX.value = properties.atmosphere.scatteringWavelengths.x;
-                                elZoneAtmosphereScatteringWavelengthsY.value = properties.atmosphere.scatteringWavelengths.y;
-                                elZoneAtmosphereScatteringWavelengthsZ.value = properties.atmosphere.scatteringWavelengths.z;
-                                elZoneAtmosphereHasStars.checked = properties.atmosphere.hasStars;
-
-                                showElements(document.getElementsByClassName('skybox-section'), elZoneBackgroundMode.value == 'skybox');
-                                showElements(document.getElementsByClassName('atmosphere-section'), elZoneBackgroundMode.value == 'atmosphere');
-                            } else if (properties.type == "ParticleEffect") {
-                                for (var i = 0; i < elParticleSections.length; i++) {
-                                    elParticleSections[i].style.display = 'block';
-                                }
-
-                                elParticleMaxParticles.value = properties.maxParticles;
-                                elParticleLifeSpan.value = properties.lifespan.toFixed(2);
-                                elParticleEmitRate.value = properties.emitRate.toFixed(1);
-                                elParticleEmitDirectionX.value = properties.emitDirection.x.toFixed(2);
-                                elParticleEmitDirectionY.value = properties.emitDirection.y.toFixed(2);
-                                elParticleEmitDirectionZ.value = properties.emitDirection.z.toFixed(2);
-                                elParticleEmitStrength.value = properties.emitStrength.toFixed(2);
-                                elParticleLocalGravity.value = properties.localGravity.toFixed(2);
-                                elParticleRadius.value = properties.particleRadius.toFixed(3);
-                            } else if (properties.type == "PolyVox") {
-                                for (var i = 0; i < elPolyVoxSections.length; i++) {
-                                    elPolyVoxSections[i].style.display = 'block';
-                                }
-
-                                elVoxelVolumeSizeX.value = properties.voxelVolumeSize.x.toFixed(2);
-                                elVoxelVolumeSizeY.value = properties.voxelVolumeSize.y.toFixed(2);
-                                elVoxelVolumeSizeZ.value = properties.voxelVolumeSize.z.toFixed(2);
-                                elVoxelSurfaceStyle.value = properties.voxelSurfaceStyle;
-                                elXTextureURL.value = properties.xTextureURL;
-                                elYTextureURL.value = properties.yTextureURL;
-                                elZTextureURL.value = properties.zTextureURL;
-                            }
-
-                            if (selected) {
-                                activeElement.focus();
-                                activeElement.select();
                             }
                         }
-                    }
+                    });
+                }
+
+                if (window.EventBridge !== undefined) {
+                    EventBridge.scriptEventReceived.connect(function(data) {
+                        data = JSON.parse(data);
+                        if (data.type == "update") {
+                            if (data.selections.length == 0) {
+                                elType.innerHTML = "<i>No Selection</i>";
+                                elID.innerHTML = "";
+                                disableChildren(document.getElementById("properties-list"), 'input');
+                            } else if (data.selections.length > 1) {
+                                var selections = data.selections;
+
+                                var ids = [];
+                                var types = {};
+
+                                for (var i = 0; i < selections.length; i++) {
+                                    ids.push(selections[i].id);
+                                    var type = selections[i].properties.type;
+                                    if (types[type] === undefined) {
+                                        types[type] = 0;
+                                    }
+                                    types[type]++;
+                                }
+                                elID.innerHTML = ids.join("<br>");
+
+                                var typeStrs = [];
+                                for (type in types) {
+                                    typeStrs.push(type + " (" + types[type] + ")");
+                                }
+                                elType.innerHTML = typeStrs.join(", ");
+
+                                disableChildren(document.getElementById("properties-list"), 'input');
+                            } else {
+                                var activeElement = document.activeElement;
+
+                                try {
+                                    var selected = (activeElement
+                                        && activeElement.selectionStart == 0
+                                        && activeElement.selectionEnd == activeElement.value.length);
+                                } catch (e) {
+                                    var  selected = false;
+                                }
+
+                                var properties = data.selections[0].properties;
+
+                                $('#property-id').text(properties.id);
+                                $('#property-type').text(properties.type);
+
+                                var len = propertyElements.length;
+                                for (var i = 0; i < len; ++i) {
+                                    var el = propertyElements[i];
+                                    var value = properties[el.name];
+                                    if (value) {
+                                        el.setVisible(true);
+                                        el.setValue(value);
+                                    } else {
+                                        el.setVisible(false);
+                                    }
+                                }
+
+                                return;
+
+                                elLocked.checked = properties.locked;
+
+                                if (properties.locked) {
+                                    disableChildren(document.getElementById("properties-list"), 'input');
+                                    elLocked.removeAttribute('disabled');
+                                } else {
+                                    enableChildren(document.getElementById("properties-list"), 'input');
+                                }
+
+                                if (selected) {
+                                    activeElement.focus();
+                                    activeElement.select();
+                                }
+                            }
+                        }
+                    });
+                }
+
+                return;
+                elMoveSelectionToGrid.addEventListener("click", function() {
+                    EventBridge.emitWebEvent(JSON.stringify({
+                        type: "action",
+                        action: "moveSelectionToGrid",
+                    }));
                 });
+                elMoveAllToGrid.addEventListener("click", function() {
+                    EventBridge.emitWebEvent(JSON.stringify({
+                        type: "action",
+                        action: "moveAllToGrid",
+                    }));
+                });
+                elResetToNaturalDimensions.addEventListener("click", function() {
+                    EventBridge.emitWebEvent(JSON.stringify({
+                        type: "action",
+                        action: "resetToNaturalDimensions",
+                    }));
+                });
+                elRescaleDimensionsButton.addEventListener("click", function() {
+                    EventBridge.emitWebEvent(JSON.stringify({
+                        type: "action",
+                        action: "rescaleDimensions",
+                        percentage: parseInt(elRescaleDimensionsPct.value),
+                    }));
+                });
+                elReloadScriptButton.addEventListener("click", function() {
+                    EventBridge.emitWebEvent(JSON.stringify({
+                        type: "action",
+                        action: "reloadScript"
+                    }));
+                });
+                elCenterAtmosphereToZone.addEventListener("click", function() {
+                    EventBridge.emitWebEvent(JSON.stringify({
+                        type: "action",
+                        action: "centerAtmosphereToZone",
+                    }));
+                });
+
+                window.onblur = function() {
+                    // Fake a change event
+                    var ev = document.createEvent("HTMLEvents");
+                    ev.initEvent("change", true, true);
+                    document.activeElement.dispatchEvent(ev);
+                }
+
+                // For input and textarea elements, select all of the text on focus
+                // WebKit-based browsers, such as is used with QWebView, have a quirk
+                // where the mouseup event comes after the focus event, causing the
+                // text to be deselected immediately after selecting all of the text.
+                // To make this work we block the first mouseup event after the elements
+                // received focus.  If we block all mouseup events the user will not
+                // be able to click within the selected text.
+                // We also check to see if the value has changed to make sure we aren't
+                // blocking a mouse-up event when clicking on an input spinner.
+                var els = document.querySelectorAll("input, textarea");
+                for (var i = 0; i < els.length; i++) {
+                    var clicked = false;
+                    var originalText;
+                    els[i].onfocus = function() {
+                        originalText = this.value;
+                        this.select();
+                        clicked = false;
+                    };
+                    els[i].onmouseup = function(e) {
+                        if (!clicked && originalText == this.value) {
+                            e.preventDefault();
+                        }
+                        clicked = true;
+                    };
+                }
             }
 
-            elLocked.addEventListener('change', createEmitCheckedPropertyUpdateFunction('locked'));
-            elName.addEventListener('change', createEmitTextPropertyUpdateFunction('name'));
-            elHyperlinkHref.addEventListener('change', createEmitTextPropertyUpdateFunction('href'));
-            elHyperlinkDescription.addEventListener('change', createEmitTextPropertyUpdateFunction('description'));
-            elVisible.addEventListener('change', createEmitCheckedPropertyUpdateFunction('visible'));
+        </script>
+    </head>
 
-            var positionChangeFunction = createEmitVec3PropertyUpdateFunction(
-                'position', elPositionX, elPositionY, elPositionZ);
-            elPositionX.addEventListener('change', positionChangeFunction);
-            elPositionY.addEventListener('change', positionChangeFunction);
-            elPositionZ.addEventListener('change', positionChangeFunction);
-
-            var dimensionsChangeFunction = createEmitVec3PropertyUpdateFunction(
-                'dimensions', elDimensionsX, elDimensionsY, elDimensionsZ);
-            elDimensionsX.addEventListener('change', dimensionsChangeFunction);
-            elDimensionsY.addEventListener('change', dimensionsChangeFunction);
-            elDimensionsZ.addEventListener('change', dimensionsChangeFunction);
-
-            var registrationChangeFunction = createEmitVec3PropertyUpdateFunction(
-                'registrationPoint', elRegistrationX, elRegistrationY, elRegistrationZ);
-            elRegistrationX.addEventListener('change', registrationChangeFunction);
-            elRegistrationY.addEventListener('change', registrationChangeFunction);
-            elRegistrationZ.addEventListener('change', registrationChangeFunction);
-
-            var rotationChangeFunction = createEmitVec3PropertyUpdateFunction(
-                'rotation', elRotationX, elRotationY, elRotationZ);
-            elRotationX.addEventListener('change', rotationChangeFunction);
-            elRotationY.addEventListener('change', rotationChangeFunction);
-            elRotationZ.addEventListener('change', rotationChangeFunction);
-
-            var velocityChangeFunction = createEmitVec3PropertyUpdateFunction(
-                'velocity', elLinearVelocityX, elLinearVelocityY, elLinearVelocityZ);
-            elLinearVelocityX.addEventListener('change', velocityChangeFunction);
-            elLinearVelocityY.addEventListener('change', velocityChangeFunction);
-            elLinearVelocityZ.addEventListener('change', velocityChangeFunction);
-            elLinearDamping.addEventListener('change', createEmitNumberPropertyUpdateFunction('damping'));
-
-            var angularVelocityChangeFunction = createEmitVec3PropertyUpdateFunctionWithMultiplier(
-                'angularVelocity', elAngularVelocityX, elAngularVelocityY, elAngularVelocityZ, DEGREES_TO_RADIANS);
-            elAngularVelocityX.addEventListener('change', angularVelocityChangeFunction);
-            elAngularVelocityY.addEventListener('change', angularVelocityChangeFunction);
-            elAngularVelocityZ.addEventListener('change', angularVelocityChangeFunction);
-            elAngularDamping.addEventListener('change', createEmitNumberPropertyUpdateFunction('angularDamping'));
-
-            elRestitution.addEventListener('change', createEmitNumberPropertyUpdateFunction('restitution'));
-            elFriction.addEventListener('change', createEmitNumberPropertyUpdateFunction('friction'));
-
-            var gravityChangeFunction = createEmitVec3PropertyUpdateFunction(
-                'gravity', elGravityX, elGravityY, elGravityZ);
-            elGravityX.addEventListener('change', gravityChangeFunction);
-            elGravityY.addEventListener('change', gravityChangeFunction);
-            elGravityZ.addEventListener('change', gravityChangeFunction);
-
-            var accelerationChangeFunction = createEmitVec3PropertyUpdateFunction(
-                'acceleration', elAccelerationX, elAccelerationY, elAccelerationZ);
-            elAccelerationX.addEventListener('change', accelerationChangeFunction);
-            elAccelerationY.addEventListener('change', accelerationChangeFunction);
-            elAccelerationZ.addEventListener('change', accelerationChangeFunction);
-
-            elDensity.addEventListener('change', createEmitNumberPropertyUpdateFunction('density'));
-            elIgnoreForCollisions.addEventListener('change', createEmitCheckedPropertyUpdateFunction('ignoreForCollisions'));
-            elCollisionsWillMove.addEventListener('change', createEmitCheckedPropertyUpdateFunction('collisionsWillMove'));
-            elCollisionSoundURL.addEventListener('change', createEmitTextPropertyUpdateFunction('collisionSoundURL'));
-
-            elLifetime.addEventListener('change', createEmitNumberPropertyUpdateFunction('lifetime'));
-            elScriptURL.addEventListener('change', createEmitTextPropertyUpdateFunction('script'));
-            elScriptTimestamp.addEventListener('change', createEmitNumberPropertyUpdateFunction('scriptTimestamp'));
-            elUserData.addEventListener('change', createEmitTextPropertyUpdateFunction('userData'));
-
-            var colorChangeFunction = createEmitColorPropertyUpdateFunction(
-                'color', elColorRed, elColorGreen, elColorBlue);
-            elColorRed.addEventListener('change', colorChangeFunction);
-            elColorGreen.addEventListener('change', colorChangeFunction);
-            elColorBlue.addEventListener('change', colorChangeFunction);
-            $('#property-color').colpick({
-                colorScheme:'dark',
-                layout:'hex',
-                color:'000000',
-                onSubmit: function(hsb, hex, rgb, el) {
-                    $(el).css('background-color', '#'+hex);
-                    $(el).colpickHide();
-                    emitColorPropertyUpdate('color', rgb.r, rgb.g, rgb.b);
-                }
-            })
-
-            elLightSpotLight.addEventListener('change', createEmitCheckedPropertyUpdateFunction('isSpotlight'));
-
-            var lightColorChangeFunction = createEmitColorPropertyUpdateFunction(
-                'color', elLightColorRed, elLightColorGreen, elLightColorBlue);
-            elLightColorRed.addEventListener('change', lightColorChangeFunction);
-            elLightColorGreen.addEventListener('change', lightColorChangeFunction);
-            elLightColorBlue.addEventListener('change', lightColorChangeFunction);
-            $('#property-light-color').colpick({
-                colorScheme:'dark',
-                layout:'hex',
-                color:'000000',
-                onSubmit: function(hsb, hex, rgb, el) {
-                    $(el).css('background-color', '#'+hex);
-                    $(el).colpickHide();
-                    emitColorPropertyUpdate('color', rgb.r, rgb.g, rgb.b);
-                }
-            })
-
-            elLightIntensity.addEventListener('change', createEmitNumberPropertyUpdateFunction('intensity'));
-            elLightExponent.addEventListener('change', createEmitNumberPropertyUpdateFunction('exponent'));
-            elLightCutoff.addEventListener('change', createEmitNumberPropertyUpdateFunction('cutoff'));
-
-            elWebSourceURL.addEventListener('change', createEmitTextPropertyUpdateFunction('sourceUrl'));
-
-            elParticleMaxParticles.addEventListener('change', createEmitNumberPropertyUpdateFunction('maxParticles'));
-            elParticleLifeSpan.addEventListener('change', createEmitNumberPropertyUpdateFunction('lifespan'));
-            elParticleEmitRate.addEventListener('change', createEmitNumberPropertyUpdateFunction('emitRate'));
-            var particleEmitDirectionChangeFunction = createEmitVec3PropertyUpdateFunctionWithMultiplier(
-                'emitDirection', elParticleEmitDirectionX, elParticleEmitDirectionY, elParticleEmitDirectionZ, DEGREES_TO_RADIANS);
-            elParticleEmitDirectionX.addEventListener('change', particleEmitDirectionChangeFunction);
-            elParticleEmitDirectionY.addEventListener('change', particleEmitDirectionChangeFunction);
-            elParticleEmitDirectionZ.addEventListener('change', particleEmitDirectionChangeFunction);
-            elParticleEmitStrength.addEventListener('change', createEmitNumberPropertyUpdateFunction('emitStrength'));
-            elParticleLocalGravity.addEventListener('change', createEmitNumberPropertyUpdateFunction('localGravity'));
-            elParticleRadius.addEventListener('change', createEmitNumberPropertyUpdateFunction('particleRadius'));
-
-            elModelURL.addEventListener('change', createEmitTextPropertyUpdateFunction('modelURL'));
-            elShapeType.addEventListener('change', createEmitTextPropertyUpdateFunction('shapeType'));
-            elCompoundShapeURL.addEventListener('change', createEmitTextPropertyUpdateFunction('compoundShapeURL'));
-            elModelAnimationURL.addEventListener('change', createEmitTextPropertyUpdateFunction('animationURL'));
-            elModelAnimationPlaying.addEventListener('change', createEmitCheckedPropertyUpdateFunction('animationIsPlaying'));
-            elModelAnimationFPS.addEventListener('change', createEmitNumberPropertyUpdateFunction('animationFPS'));
-            elModelAnimationFrame.addEventListener('change', createEmitNumberPropertyUpdateFunction('animationFrameIndex'));
-            elModelAnimationSettings.addEventListener('change', createEmitTextPropertyUpdateFunction('animationSettings'));
-            elModelTextures.addEventListener('change', createEmitTextPropertyUpdateFunction('textures'));
-
-            elTextText.addEventListener('change', createEmitTextPropertyUpdateFunction('text'));
-            elTextLineHeight.addEventListener('change', createEmitNumberPropertyUpdateFunction('lineHeight'));
-
-            var textTextColorChangeFunction = createEmitColorPropertyUpdateFunction(
-                'textColor', elTextTextColorRed, elTextTextColorGreen, elTextTextColorBlue);
-            elTextTextColorRed.addEventListener('change', textTextColorChangeFunction);
-            elTextTextColorGreen.addEventListener('change', textTextColorChangeFunction);
-            elTextTextColorBlue.addEventListener('change', textTextColorChangeFunction);
-            $('#property-text-text-color').colpick({
-                colorScheme:'dark',
-                layout:'hex',
-                color:'000000',
-                onSubmit: function(hsb, hex, rgb, el) {
-                    $(el).css('background-color', '#'+hex);
-                    $(el).colpickHide();
-                    emitColorPropertyUpdate('textColor', rgb.r, rgb.g, rgb.b);
-                }
-            });
-
-            var textBackgroundColorChangeFunction = createEmitColorPropertyUpdateFunction(
-                'backgroundColor', elTextBackgroundColorRed, elTextBackgroundColorGreen, elTextBackgroundColorBlue);
-            elTextBackgroundColorRed.addEventListener('change', textBackgroundColorChangeFunction);
-            elTextBackgroundColorGreen.addEventListener('change', textBackgroundColorChangeFunction);
-            elTextBackgroundColorBlue.addEventListener('change', textBackgroundColorChangeFunction);
-            $('#property-text-background-color').colpick({
-                colorScheme:'dark',
-                layout:'hex',
-                color:'000000',
-                onSubmit: function(hsb, hex, rgb, el) {
-                    $(el).css('background-color', '#'+hex);
-                    $(el).colpickHide();
-                    emitColorPropertyUpdate('backgroundColor', rgb.r, rgb.g, rgb.b);
-                }
-            });
-
-            elZoneStageSunModelEnabled.addEventListener('change', createEmitGroupCheckedPropertyUpdateFunction('stage','sunModelEnabled'));
-            $('#property-zone-key-light-color').colpick({
-                colorScheme:'dark',
-                layout:'hex',
-                color:'000000',
-                onSubmit: function(hsb, hex, rgb, el) {
-                    $(el).css('background-color', '#'+hex);
-                    $(el).colpickHide();
-                    emitColorPropertyUpdate('keyLightColor', rgb.r, rgb.g, rgb.b);
-                }
-            });
-            var zoneKeyLightColorChangeFunction = createEmitColorPropertyUpdateFunction(
-                'keyLightColor', elZoneKeyLightColorRed, elZoneKeyLightColorGreen, elZoneKeyLightColorBlue);
-            elZoneKeyLightColorRed.addEventListener('change', zoneKeyLightColorChangeFunction);
-            elZoneKeyLightColorGreen.addEventListener('change', zoneKeyLightColorChangeFunction);
-            elZoneKeyLightColorBlue.addEventListener('change', zoneKeyLightColorChangeFunction);
-            elZoneKeyLightIntensity.addEventListener('change', createEmitNumberPropertyUpdateFunction('keyLightIntensity'));
-            elZoneKeyLightAmbientIntensity.addEventListener('change', createEmitNumberPropertyUpdateFunction('keyLightAmbientIntensity'));
-            var zoneKeyLightDirectionChangeFunction = createEmitVec3PropertyUpdateFunction(
-                'keyLightDirection', elZoneKeyLightDirectionX, elZoneKeyLightDirectionY, elZoneKeyLightDirectionZ);
-            elZoneKeyLightDirectionX.addEventListener('change', zoneKeyLightDirectionChangeFunction);
-            elZoneKeyLightDirectionY.addEventListener('change', zoneKeyLightDirectionChangeFunction);
-            elZoneKeyLightDirectionZ.addEventListener('change', zoneKeyLightDirectionChangeFunction);
-
-            elZoneStageLatitude.addEventListener('change', createEmitGroupNumberPropertyUpdateFunction('stage','latitude'));
-            elZoneStageLongitude.addEventListener('change', createEmitGroupNumberPropertyUpdateFunction('stage','longitude'));
-            elZoneStageAltitude.addEventListener('change', createEmitGroupNumberPropertyUpdateFunction('stage','altitude'));
-            elZoneStageAutomaticHourDay.addEventListener('change', createEmitGroupCheckedPropertyUpdateFunction('stage','automaticHourDay'));
-            elZoneStageDay.addEventListener('change', createEmitGroupNumberPropertyUpdateFunction('stage','day'));
-            elZoneStageHour.addEventListener('change', createEmitGroupNumberPropertyUpdateFunction('stage','hour'));
-
-
-            elZoneBackgroundMode.addEventListener('change', createEmitTextPropertyUpdateFunction('backgroundMode'));
-            var zoneSkyboxColorChangeFunction = createEmitGroupColorPropertyUpdateFunction('skybox','color',
-                elZoneSkyboxColorRed, elZoneSkyboxColorGreen, elZoneSkyboxColorBlue);
-            elZoneSkyboxColorRed.addEventListener('change', zoneSkyboxColorChangeFunction);
-            elZoneSkyboxColorGreen.addEventListener('change', zoneSkyboxColorChangeFunction);
-            elZoneSkyboxColorBlue.addEventListener('change', zoneSkyboxColorChangeFunction);
-            $('#property-zone-skybox-color').colpick({
-                colorScheme:'dark',
-                layout:'hex',
-                color:'000000',
-                onSubmit: function(hsb, hex, rgb, el) {
-                    $(el).css('background-color', '#'+hex);
-                    $(el).colpickHide();
-                    emitColorPropertyUpdate('color', rgb.r, rgb.g, rgb.b, 'skybox');
-                }
-            });
-
-            elZoneSkyboxURL.addEventListener('change', createEmitGroupTextPropertyUpdateFunction('skybox','url'));
-
-            var zoneAtmosphereCenterChangeFunction = createEmitGroupVec3PropertyUpdateFunction(
-                'atmosphere','center', elZoneAtmosphereCenterX, elZoneAtmosphereCenterY, elZoneAtmosphereCenterZ);
-            elZoneAtmosphereCenterX.addEventListener('change', zoneAtmosphereCenterChangeFunction);
-            elZoneAtmosphereCenterY.addEventListener('change', zoneAtmosphereCenterChangeFunction);
-            elZoneAtmosphereCenterZ.addEventListener('change', zoneAtmosphereCenterChangeFunction);
-
-
-            elZoneAtmosphereInnerRadius.addEventListener('change', createEmitGroupNumberPropertyUpdateFunction('atmosphere','innerRadius'));
-            elZoneAtmosphereOuterRadius.addEventListener('change', createEmitGroupNumberPropertyUpdateFunction('atmosphere','outerRadius'));
-            elZoneAtmosphereMieScattering.addEventListener('change', createEmitGroupNumberPropertyUpdateFunction('atmosphere','mieScattering'));
-            elZoneAtmosphereRayleighScattering.addEventListener('change', createEmitGroupNumberPropertyUpdateFunction('atmosphere','rayleighScattering'));
-            var zoneAtmosphereScatterWavelengthsChangeFunction = createEmitGroupVec3PropertyUpdateFunction(
-                'atmosphere','scatteringWavelengths', elZoneAtmosphereScatteringWavelengthsX, 
-                elZoneAtmosphereScatteringWavelengthsY, elZoneAtmosphereScatteringWavelengthsZ);
-            elZoneAtmosphereScatteringWavelengthsX.addEventListener('change', zoneAtmosphereScatterWavelengthsChangeFunction);
-            elZoneAtmosphereScatteringWavelengthsY.addEventListener('change', zoneAtmosphereScatterWavelengthsChangeFunction);
-            elZoneAtmosphereScatteringWavelengthsZ.addEventListener('change', zoneAtmosphereScatterWavelengthsChangeFunction);
-            elZoneAtmosphereHasStars.addEventListener('change', createEmitGroupCheckedPropertyUpdateFunction('atmosphere','hasStars'));
-
-            var voxelVolumeSizeChangeFunction = createEmitVec3PropertyUpdateFunction(
-                'voxelVolumeSize', elVoxelVolumeSizeX, elVoxelVolumeSizeY, elVoxelVolumeSizeZ);
-            elVoxelVolumeSizeX.addEventListener('change', voxelVolumeSizeChangeFunction);
-            elVoxelVolumeSizeY.addEventListener('change', voxelVolumeSizeChangeFunction);
-            elVoxelVolumeSizeZ.addEventListener('change', voxelVolumeSizeChangeFunction);
-            elVoxelSurfaceStyle.addEventListener('change', createEmitTextPropertyUpdateFunction('voxelSurfaceStyle'));
-            elXTextureURL.addEventListener('change', createEmitTextPropertyUpdateFunction('xTextureURL'));
-            elYTextureURL.addEventListener('change', createEmitTextPropertyUpdateFunction('yTextureURL'));
-            elZTextureURL.addEventListener('change', createEmitTextPropertyUpdateFunction('zTextureURL'));
-
-            elMoveSelectionToGrid.addEventListener("click", function() {
-                EventBridge.emitWebEvent(JSON.stringify({
-                    type: "action",
-                    action: "moveSelectionToGrid",
-                }));
-            });
-            elMoveAllToGrid.addEventListener("click", function() {
-                EventBridge.emitWebEvent(JSON.stringify({
-                    type: "action",
-                    action: "moveAllToGrid",
-                }));
-            });
-            elResetToNaturalDimensions.addEventListener("click", function() {
-                EventBridge.emitWebEvent(JSON.stringify({
-                    type: "action",
-                    action: "resetToNaturalDimensions",
-                }));
-            });
-            elRescaleDimensionsButton.addEventListener("click", function() {
-                EventBridge.emitWebEvent(JSON.stringify({
-                    type: "action",
-                    action: "rescaleDimensions",
-                    percentage: parseInt(elRescaleDimensionsPct.value),
-                }));
-            });
-            elReloadScriptButton.addEventListener("click", function() {
-                EventBridge.emitWebEvent(JSON.stringify({
-                    type: "action",
-                    action: "reloadScript"
-                }));
-            });
-            elCenterAtmosphereToZone.addEventListener("click", function() {
-                EventBridge.emitWebEvent(JSON.stringify({
-                    type: "action",
-                    action: "centerAtmosphereToZone",
-                }));
-            });
-
-            window.onblur = function() {
-                // Fake a change event
-                var ev = document.createEvent("HTMLEvents");
-                ev.initEvent("change", true, true);
-                document.activeElement.dispatchEvent(ev);
-            }
-
-            // For input and textarea elements, select all of the text on focus
-            // WebKit-based browsers, such as is used with QWebView, have a quirk
-            // where the mouseup event comes after the focus event, causing the
-            // text to be deselected immediately after selecting all of the text.
-            // To make this work we block the first mouseup event after the elements
-            // received focus.  If we block all mouseup events the user will not
-            // be able to click within the selected text.
-            // We also check to see if the value has changed to make sure we aren't
-            // blocking a mouse-up event when clicking on an input spinner.
-            var els = document.querySelectorAll("input, textarea");
-            for (var i = 0; i < els.length; i++) {
-                var clicked = false;
-                var originalText;
-                els[i].onfocus = function() {
-                    originalText = this.value;
-                    this.select();
-                    clicked = false;
-                };
-                els[i].onmouseup = function(e) {
-                    if (!clicked && originalText == this.value) {
-                        e.preventDefault();
-                    }
-                    clicked = true;
-                };
-            }
-        }
-
-    </script>
-</head>
-
-<body class="properties" onload='loaded();'>
-    <div id="properties-list">
-        <div id="type" class="property">
-            <div class="label">
-                <label>Type: </label><span id="property-type"></span>
+    <body class="properties" onload='loaded();'>
+        <div id="properties-list">
+            <div id="type" class="property">
+                <div class="label">
+                    <label>Type: </label><span id="property-type"></span>
+                </div>
             </div>
-        </div>
-        <div id="id" class="property">
-            <span class="label" style="float: left; margin-right: 6px">
-                <label>ID: <label>
-            </span>
-            <div class="value">
-                <span id="property-id" class="selectable"></span>
+            <div id="id" class="property">
+                <span class="label" style="float: left; margin-right: 6px">
+                    <label>ID: <label>
+                </span>
+                <div class="value">
+                    <span id="property-id" class="selectable"></span>
+                </div>
             </div>
-        </div>
-        <div class="property">
-            <span class="label" style="float: left; margin-right: 6px">Name</span>
-            <div class="value" style="overflow: hidden;">
-                <input type="text" id="property-name"></input>
-            </div>
-        </div>
-
-        <div class="property">
-            <span class="label">Locked</span>
-            <span class="value">
-                <input type='checkbox' id="property-locked">
-            </span>
-        </div>
-
-        <div class="property">
-            <span class="label">Visible</span>
-            <span class="value">
-                <input type='checkbox' id="property-visible">
-            </span>
-        </div>
-
-    <!--     <div class="property"> -->
-    <!--         <div class="label">User Data</div> -->
-    <!--         <div class="value"> -->
-    <!--             <textarea id="property&#45;user&#45;data"></textarea> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--  -->
-    <!--     <div class="section&#45;header"> -->
-    <!--         <label>Hyperlink</label> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="property"> -->
-    <!--         <div class="label">Href</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input id="property&#45;hyperlink&#45;href" class="url"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="property"> -->
-    <!--         <div class="label">Description</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input id="property&#45;hyperlink&#45;description" class="url"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--  -->
-    <!--     <div class="section&#45;header"> -->
-    <!--         <label>Spacial Properites</label> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="property"> -->
-    <!--         <div class="label">Position</div> -->
-    <!--         <div class="value"> -->
-    <!--             <div class="input&#45;area">X <br><input class="coord" type='number' id="property&#45;pos&#45;x"></input></div> -->
-    <!--             <div class="input&#45;area">Y <br><input class="coord" type='number' id="property&#45;pos&#45;y"></input></div> -->
-    <!--             <div class="input&#45;area">Z <br><input class="coord" type='number' id="property&#45;pos&#45;z"></input></div> -->
-    <!--             <div> -->
-    <!--                 <input type="button" id="move&#45;selection&#45;to&#45;grid" value="Selection to Grid"> -->
-    <!--                 <input type="button" id="move&#45;all&#45;to&#45;grid" value="All to Grid"> -->
-    <!--             </div> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="property"> -->
-    <!--         <div class="label">Registration</div> -->
-    <!--         <div class="value"> -->
-    <!--             <div class="input&#45;area">X <input class="coord" type='number' id="property&#45;reg&#45;x"></input></div> -->
-    <!--             <div class="input&#45;area">Y <input class="coord" type='number' id="property&#45;reg&#45;y"></input></div> -->
-    <!--             <div class="input&#45;area">Z <input class="coord" type='number' id="property&#45;reg&#45;z"></input></div> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="property"> -->
-    <!--         <div class="label">Dimensions</div> -->
-    <!--         <div class="value"> -->
-    <!--             <div class="input&#45;area">X <input class="coord" type='number' id="property&#45;dim&#45;x"></input></div> -->
-    <!--             <div class="input&#45;area">Y <input class="coord" type='number' id="property&#45;dim&#45;y"></input></div> -->
-    <!--             <div class="input&#45;area">Z <input class="coord" type='number' id="property&#45;dim&#45;z"></input></div> -->
-    <!--             <div> -->
-    <!--                 <input type="button" id="reset&#45;to&#45;natural&#45;dimensions" value="Reset to Natural Dimensions"> -->
-    <!--             </div> -->
-    <!--             <div class="input&#45;area"> -->
-    <!--                 <input class="" type='number' id="dimension&#45;rescale&#45;pct" value=100></input>% -->
-    <!--             </div> -->
-    <!--             <span> -->
-    <!--                 <input type="button" id="dimension&#45;rescale&#45;button" value="Rescale"></input> -->
-    <!--             </span> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="poly&#45;vox&#45;section property"> -->
-    <!--         <div class="label">Voxel Volume Size</div> -->
-    <!--         <div class="value"> -->
-    <!--           <div class="input&#45;area">X <br> <input class="coord" type='number' id="property&#45;voxel&#45;volume&#45;size&#45;x"></input></div> -->
-    <!--           <div class="input&#45;area">Y <br><input class="coord" type='number' id="property&#45;voxel&#45;volume&#45;size&#45;y"></input></div> -->
-    <!--           <div class="input&#45;area">Z <br><input class="coord" type='number' id="property&#45;voxel&#45;volume&#45;size&#45;z"></input></div> -->
-    <!--         </div> -->
-    <!--  -->
-    <!--         <div class="label">Surface Extractor</div> -->
-    <!--         <div class="value"> -->
-    <!--           <select name="SelectVoxelSurfaceStyle" id="property&#45;voxel&#45;surface&#45;style"> -->
-    <!--             <option value='0'>marching cubes</option> -->
-    <!--             <option value='1'>cubic</option> -->
-    <!--             <option value='2'>edged cubic</option> -->
-    <!--             <option value='3'>edged marching cubes</option> -->
-    <!--           </select> -->
-    <!--         </div> -->
-    <!--  -->
-    <!--         <div class="label">X&#45;axis Texture URL</div> -->
-    <!--         <div class="value"> -->
-    <!--           <input type="text" id="property&#45;x&#45;texture&#45;url" class="url"></input> -->
-    <!--         </div> -->
-    <!--  -->
-    <!--         <div class="label">Y&#45;axis Texture URL</div> -->
-    <!--         <div class="value"> -->
-    <!--           <input type="text" id="property&#45;y&#45;texture&#45;url" class="url"></input> -->
-    <!--         </div> -->
-    <!--  -->
-    <!--         <div class="label">Z&#45;axis Texture URL</div> -->
-    <!--         <div class="value"> -->
-    <!--           <input type="text" id="property&#45;z&#45;texture&#45;url" class="url"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="property"> -->
-    <!--         <div class="label">Rotation</div> -->
-    <!--         <div class="value"> -->
-    <!--             <div class="input&#45;area">Pitch <input class="coord" type='number' id="property&#45;rot&#45;x"></input></div> -->
-    <!--             <div class="input&#45;area">Yaw <input class="coord" type='number' id="property&#45;rot&#45;y"></input></div> -->
-    <!--             <div class="input&#45;area">Roll <input class="coord" type='number' id="property&#45;rot&#45;z"></input></div> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--  -->
-    <!--     <div class="section&#45;header"> -->
-    <!--         <label>Physical Properites</label> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="property"> -->
-    <!--         <div class="label">Linear Velocity</div> -->
-    <!--         <div class="value"> -->
-    <!--             <div class="input&#45;area">X <input class="coord" type='number' id="property&#45;lvel&#45;x"></input></div> -->
-    <!--             <div class="input&#45;area">Y <input class="coord" type='number' id="property&#45;lvel&#45;y"></input></div> -->
-    <!--             <div class="input&#45;area">Z <input class="coord" type='number' id="property&#45;lvel&#45;z"></input></div> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="property"> -->
-    <!--         <div class="label">Linear Damping</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input class="coord" type='number' id="property&#45;ldamping"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="property"> -->
-    <!--         <div class="label">Angular Velocity</div> -->
-    <!--         <div class="value"> -->
-    <!--             <div class="input&#45;area">Pitch <input class="coord" type='number' id="property&#45;avel&#45;x"></input></div> -->
-    <!--             <div class="input&#45;area">Yaw <input class="coord" type='number' id="property&#45;avel&#45;y"></input></div> -->
-    <!--             <div class="input&#45;area">Roll <input class="coord" type='number' id="property&#45;avel&#45;z"></input></div> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="property"> -->
-    <!--         <div class="label">Angular Damping</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input class="coord" type='number' id="property&#45;adamping"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="property"> -->
-    <!--         <div class="label">Restitution</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input class="coord" type='number' id="property&#45;restitution"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="property"> -->
-    <!--         <div class="label">Friction</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input class="coord" type='number' id="property&#45;friction"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="property"> -->
-    <!--         <div class="label">Gravity</div> -->
-    <!--         <div class="value"> -->
-    <!--             <div class="input&#45;area">X <input class="coord" type='number' id="property&#45;grav&#45;x"></input></div> -->
-    <!--             <div class="input&#45;area">Y <input class="coord" type='number' id="property&#45;grav&#45;y"></input></div> -->
-    <!--             <div class="input&#45;area">Z <input class="coord" type='number' id="property&#45;grav&#45;z"></input></div> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="property"> -->
-    <!--         <div class="label">Acceleration</div> -->
-    <!--         <div class="value"> -->
-    <!--             <div class="input&#45;area">X <input class="coord" type='number' id="property&#45;lacc&#45;x"></input></div> -->
-    <!--             <div class="input&#45;area">Y <input class="coord" type='number' id="property&#45;lacc&#45;y"></input></div> -->
-    <!--             <div class="input&#45;area">Z <input class="coord" type='number' id="property&#45;lacc&#45;z"></input></div> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="property"> -->
-    <!--         <div class="label">Density</div> -->
-    <!--         <div> -->
-    <!--             <input type='number' id="property&#45;density"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div id="color&#45;section" class="property"> -->
-    <!--         <div class="label">Color</div> -->
-    <!--         <div class="value"> -->
-    <!--             <div id="property&#45;color" class='color&#45;picker'></div> -->
-    <!--             <div class="input&#45;area">R <input class="coord" type='number' id="property&#45;color&#45;red"></input></div> -->
-    <!--             <div class="input&#45;area">G <input class="coord" type='number' id="property&#45;color&#45;green"></input></div> -->
-    <!--             <div class="input&#45;area">B <input class="coord" type='number' id="property&#45;color&#45;blue"></input></div> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--  -->
-    <!--     <div class="section&#45;header"> -->
-    <!--         <label>Behavior</label> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="property"> -->
-    <!--         <span class="label">Ignore For Collisions</span> -->
-    <!--         <span class="value"> -->
-    <!--             <input type='checkbox' id="property&#45;ignore&#45;for&#45;collisions"></input> -->
-    <!--         </span> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="property"> -->
-    <!--         <span class="label">Collisions Will Move</span> -->
-    <!--         <span class="value"> -->
-    <!--             <input type='checkbox' id="property&#45;collisions&#45;will&#45;move"></input> -->
-    <!--         </span> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="property"> -->
-    <!--         <div class="label">Collision Sound URL</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input id="property&#45;collision&#45;sound&#45;url" class="url"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="property"> -->
-    <!--         <div class="label">Lifetime</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input type='number' id="property&#45;lifetime"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="property"> -->
-    <!--         <div class="label">Script URL -->
-    <!--             <input type="hidden" id="property&#45;script&#45;timestamp" class="value"></input> -->
-    <!--             <input type="button" id="reload&#45;script&#45;button" value="Reload"></input> -->
-    <!--         </div> -->
-    <!--         <div class="value"> -->
-    <!--             <input id="property&#45;script&#45;url" class="url"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--  -->
-    <!--     <div class="section&#45;header model&#45;section zone&#45;section"> -->
-    <!--         <label>Model</label> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="model&#45;section property"> -->
-    <!--         <div class="label">Model URL</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input type="text" id="property&#45;model&#45;url" class="url"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="model&#45;section zone&#45;section property"> -->
-    <!--         <div class="label">Shape Type</div> -->
-    <!--         <div class="value"> -->
-    <!--             <select name="SelectShapeType" id="property&#45;shape&#45;type" name="SelectShapeType"> -->
-    <!--                 <option value='none'>none</option> -->
-    <!--                 <option value='box'>box</option> -->
-    <!--                 <option value='sphere'>sphere</option> -->
-    <!--                 <option value='compound'>compound</option> -->
-    <!--             </select> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="model&#45;section zone&#45;section property"> -->
-    <!--         <div class="label">Compound Shape URL</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input type="text" id="property&#45;compound&#45;shape&#45;url" class="url"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="model&#45;section property"> -->
-    <!--         <div class="label">Animation URL</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input type="text" id="property&#45;model&#45;animation&#45;url" class="url"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="model&#45;section property"> -->
-    <!--         <span class="label">Animation Playing</span> -->
-    <!--         <span class="value"> -->
-    <!--             <input type='checkbox' id="property&#45;model&#45;animation&#45;playing"> -->
-    <!--         </span> -->
-    <!--     </div> -->
-    <!--     <div class="model&#45;section property"> -->
-    <!--         <div class="label">Animation FPS</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input class="coord" type='number' id="property&#45;model&#45;animation&#45;fps"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="model&#45;section property"> -->
-    <!--         <div class="label">Animation Frame</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input class="coord" type='number' id="property&#45;model&#45;animation&#45;frame"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="model&#45;section property"> -->
-    <!--         <div class="label">Animation Settings</div> -->
-    <!--         <div class="value"> -->
-    <!--             <textarea id="property&#45;model&#45;animation&#45;settings"></textarea> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="model&#45;section property"> -->
-    <!--         <div class="label">Textures</div> -->
-    <!--         <div class="value"> -->
-    <!--             <textarea id="property&#45;model&#45;textures" value='asdfasdf'></textarea> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="model&#45;section property"> -->
-    <!--         <div class="label">Original Textures</div> -->
-    <!--         <div class="value"> -->
-    <!--             <textarea id="property&#45;model&#45;original&#45;textures" readonly value='asdfasdf'></textarea> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--  -->
-    <!--     <div class="section&#45;header web&#45;section"> -->
-    <!--         <label>Web</label> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="web&#45;section property"> -->
-    <!--         <div class="label">Source URL</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input type="text" id="property&#45;web&#45;source&#45;url" class="url"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--  -->
-    <!--     <div class="section&#45;header particle&#45;section"> -->
-    <!--         <label>Particle</label> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="particle&#45;section property"> -->
-    <!--         <div class="label">Max Particles</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input type='number' id="property&#45;particle&#45;maxparticles" min="0" max="2048" step="1"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="particle&#45;section property"> -->
-    <!--         <div class="label">Particle Life Span</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input type='number' id="property&#45;particle&#45;lifespan" min="0" step="0.1"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="particle&#45;section property"> -->
-    <!--         <div class="label">Particle Emission Rate</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input type='number' id="property&#45;particle&#45;emit&#45;rate" min="0" step="0.5"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="particle&#45;section property"> -->
-    <!--         <div class="label">Particle Emission Direction</div> -->
-    <!--         <div class="value"> -->
-    <!--             <div class="input&#45;area">X <input class="coord" type='number' id="property&#45;particle&#45;emit&#45;direction&#45;x"></input></div> -->
-    <!--             <div class="input&#45;area">Y <input class="coord" type='number' id="property&#45;particle&#45;emit&#45;direction&#45;y"></input></div> -->
-    <!--             <div class="input&#45;area">Z <input class="coord" type='number' id="property&#45;particle&#45;emit&#45;direction&#45;z"></input></div> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="particle&#45;section property"> -->
-    <!--         <div class="label">Particle Emission Strength</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input type='number' id="property&#45;particle&#45;emit&#45;strength" min="0" step="0.1"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="particle&#45;section property"> -->
-    <!--         <div class="label">Particle Local Gravity</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input class="coord" type='number' id="property&#45;particle&#45;localgravity" step="0.05"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="particle&#45;section property"> -->
-    <!--         <div class="label">Particle Radius</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input  class="coord" type='number' id="property&#45;particle&#45;radius" min="0" step="0.005"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--  -->
-    <!--     <div class="section&#45;header text&#45;section"> -->
-    <!--         <label>Text</label> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="text&#45;section property"> -->
-    <!--         <div class="label">Text Content</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input type="text" id="property&#45;text&#45;text"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="text&#45;section property"> -->
-    <!--         <div class="label">Line Height</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input class="coord" type='number' id="property&#45;text&#45;line&#45;height" min="0" step="0.005"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="text&#45;section property"> -->
-    <!--         <div class="label">Text Color</div> -->
-    <!--         <div class="value"> -->
-    <!--             <div class='color&#45;picker' id="property&#45;text&#45;text&#45;color"></div> -->
-    <!--             <div class="input&#45;area">R <input class="coord" type='number' id="property&#45;text&#45;text&#45;color&#45;red"></input></div> -->
-    <!--             <div class="input&#45;area">G <input class="coord" type='number' id="property&#45;text&#45;text&#45;color&#45;green"></input></div> -->
-    <!--             <div class="input&#45;area">B <input class="coord" type='number' id="property&#45;text&#45;text&#45;color&#45;blue"></input></div> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="text&#45;section property"> -->
-    <!--         <div class="label">Background Color</div> -->
-    <!--         <div class="value"> -->
-    <!--             <div class='color&#45;picker' id="property&#45;text&#45;background&#45;color"></div> -->
-    <!--             <div class="input&#45;area">R <input class="coord" type='number' id="property&#45;text&#45;background&#45;color&#45;red"></input></div> -->
-    <!--             <div class="input&#45;area">G <input class="coord" type='number' id="property&#45;text&#45;background&#45;color&#45;green"></input></div> -->
-    <!--             <div class="input&#45;area">B <input class="coord" type='number' id="property&#45;text&#45;background&#45;color&#45;blue"></input></div> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--  -->
-    <!--     <div class="section&#45;header light&#45;section"> -->
-    <!--         <label>Light</label> -->
-    <!--     </div> -->
-    <!--      -->
-    <!--     <div class="light&#45;section property"> -->
-    <!--         <span class="label">Spot Light</span> -->
-    <!--         <span class="value"> -->
-    <!--             <input type='checkbox' id="property&#45;light&#45;spot&#45;light"> -->
-    <!--         </span> -->
-    <!--     </div> -->
-    <!--     <div class="light&#45;section property"> -->
-    <!--         <div class="label">Color</div> -->
-    <!--         <div class="value"> -->
-    <!--             <div class='color&#45;picker' id="property&#45;light&#45;color"></div> -->
-    <!--             <div class="input&#45;area">R <input class="coord" type='number' id="property&#45;light&#45;color&#45;red"></input></div> -->
-    <!--             <div class="input&#45;area">G <input class="coord" type='number' id="property&#45;light&#45;color&#45;green"></input></div> -->
-    <!--             <div class="input&#45;area">B <input class="coord" type='number' id="property&#45;light&#45;color&#45;blue"></input></div> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="light&#45;section property"> -->
-    <!--         <div class="label">Intensity</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input class="coord" type='number' id="property&#45;light&#45;intensity"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="light&#45;section property"> -->
-    <!--         <div class="label">Spot Light Exponent</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input class="coord" type='number' id="property&#45;light&#45;exponent"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="light&#45;section property"> -->
-    <!--         <div class="label">Spot Light Cutoff (degrees)</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input class="coord" type='number' id="property&#45;light&#45;cutoff"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--  -->
-    <!--     <div class="section&#45;header zone&#45;section"> -->
-    <!--         <label>Zone</label> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="zone&#45;section property"> -->
-    <!--         <span class="label">Stage Sun Model Enabled</span> -->
-    <!--         <span class="value"> -->
-    <!--             <input type='checkbox' id="property&#45;zone&#45;stage&#45;sun&#45;model&#45;enabled"> -->
-    <!--         </span> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="zone&#45;section property"> -->
-    <!--         <div class="label">Key Light Color</div> -->
-    <!--         <div class="value"> -->
-    <!--             <div class='color&#45;picker' id="property&#45;zone&#45;key&#45;light&#45;color"></div> -->
-    <!--             <div class="input&#45;area">R <input class="coord" type='number' id="property&#45;zone&#45;key&#45;light&#45;color&#45;red" min="0" max="255" step="1"></input></div> -->
-    <!--             <div class="input&#45;area">G <input class="coord" type='number' id="property&#45;zone&#45;key&#45;light&#45;color&#45;green" min="0" max="255" step="1"></input></div> -->
-    <!--             <div class="input&#45;area">B <input class="coord" type='number' id="property&#45;zone&#45;key&#45;light&#45;color&#45;blue" min="0" max="255" step="1"></input></div> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="zone&#45;section property"> -->
-    <!--         <div class="label">Key Light Intensity</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input class="coord" type='number' id="property&#45;zone&#45;key&#45;intensity" min="0" max="10" step="0.1"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="zone&#45;section property"> -->
-    <!--         <div class="label">Key Light Ambient Intensity</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input class="coord" type='number' id="property&#45;zone&#45;key&#45;ambient&#45;intensity" min="0" max="10" step="0.1"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="zone&#45;section property"> -->
-    <!--         <div class="label">Key Light Direction</div> -->
-    <!--         <div class="value"> -->
-    <!--             <div class="input&#45;area">Pitch <input class="coord" type='number' id="property&#45;zone&#45;key&#45;light&#45;direction&#45;x"></input></div> -->
-    <!--             <div class="input&#45;area">Yaw <input class="coord" type='number' id="property&#45;zone&#45;key&#45;light&#45;direction&#45;y"></input></div> -->
-    <!--             <div class="input&#45;area">Roll <input class="coord" type='number' id="property&#45;zone&#45;key&#45;light&#45;direction&#45;z"></input></div> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="zone&#45;section property"> -->
-    <!--         <div class="label">Stage Latitude</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input class="coord" type='number' id="property&#45;zone&#45;stage&#45;latitude" min="&#45;90" max="90" step="1"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="zone&#45;section property"> -->
-    <!--         <div class="label">Stage Longitude</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input class="coord" type='number' id="property&#45;zone&#45;stage&#45;longitude" min="&#45;180" max="180" step="1"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="zone&#45;section property"> -->
-    <!--         <div class="label">Stage Altitude</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input class="coord" type='number' id="property&#45;zone&#45;stage&#45;altitude" step="1"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="zone&#45;section property"> -->
-    <!--         <span class="label">Automatically calculate stage hour and day from location and clock.</span> -->
-    <!--         <span class="value"> -->
-    <!--             <input type='checkbox' id="property&#45;zone&#45;stage&#45;automatic&#45;hour&#45;day"> -->
-    <!--         </span> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="zone&#45;section property"> -->
-    <!--         <div class="label">Stage Day</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input class="coord" type='number' id="property&#45;zone&#45;stage&#45;day" min="0" max="365" step="1"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="zone&#45;section property"> -->
-    <!--         <div class="label">Stage Hour</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input class="coord" type='number' id="property&#45;zone&#45;stage&#45;hour" min="0" max="24" step="0.5"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="zone&#45;section property"> -->
-    <!--         <div class="label">Background Mode</div> -->
-    <!--         <div class="value"> -->
-    <!--             <select name="SelectBackgroundMode" id="property&#45;zone&#45;background&#45;mode" name="SelectBackgroundMode"> -->
-    <!--                 <option value='inherit'>Nothing</option> -->
-    <!--                 <option value='skybox'>Skybox</option> -->
-    <!--                 <option value='atmosphere'>Atmosphere</option> -->
-    <!--             </select>  -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--  -->
-    <!--     <div class="sub&#45;section&#45;header zone&#45;section skybox&#45;section"> -->
-    <!--         <label>Skybox</label> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="zone&#45;section skybox&#45;section property"> -->
-    <!--         <div class="label">Skybox Color</div> -->
-    <!--         <div class="value"> -->
-    <!--             <div class='color&#45;picker' id="property&#45;zone&#45;skybox&#45;color"></div> -->
-    <!--             <div class="input&#45;area">R <input class="coord" type='number' id="property&#45;zone&#45;skybox&#45;color&#45;red"></input></div> -->
-    <!--             <div class="input&#45;area">G <input class="coord" type='number' id="property&#45;zone&#45;skybox&#45;color&#45;green"></input></div> -->
-    <!--             <div class="input&#45;area">B <input class="coord" type='number' id="property&#45;zone&#45;skybox&#45;color&#45;blue"></input></div> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="zone&#45;section skybox&#45;section property"> -->
-    <!--         <div class="label">Skybox URL</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input type="text" id="property&#45;zone&#45;skybox&#45;url" class="url"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--  -->
-    <!--     <div class="sub&#45;section&#45;header zone&#45;section atmosphere&#45;section"> -->
-    <!--         <label>Atmosphere</label> -->
-    <!--     </div> -->
-    <!--  -->
-    <!--     <div class="zone&#45;section atmosphere&#45;section property"> -->
-    <!--         <div class="label">Atmosphere Center</div> -->
-    <!--         <div class="value"> -->
-    <!--             <div class="input&#45;area">X <br><input class="coord" type='number' id="property&#45;zone&#45;atmosphere&#45;center&#45;x"></input></div> -->
-    <!--             <div class="input&#45;area">Y <br><input class="coord" type='number' id="property&#45;zone&#45;atmosphere&#45;center&#45;y"></input></div> -->
-    <!--             <div class="input&#45;area">Z <br><input class="coord" type='number' id="property&#45;zone&#45;atmosphere&#45;center&#45;z"></input></div> -->
-    <!--             <div> -->
-    <!--                 <input type="button" id="center&#45;atmosphere&#45;in&#45;zone" value="Center to Zone"> -->
-    <!--             </div> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="zone&#45;section atmosphere&#45;section property"> -->
-    <!--         <div class="label">Atmosphere Inner Radius</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input class="coord" type='number' id="property&#45;zone&#45;atmosphere&#45;inner&#45;radius" step="1"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="zone&#45;section atmosphere&#45;section property"> -->
-    <!--         <div class="label">Atmosphere Outer Radius</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input class="coord" type='number' id="property&#45;zone&#45;atmosphere&#45;outer&#45;radius" step="1"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="zone&#45;section atmosphere&#45;section property"> -->
-    <!--         <div class="label">Atmosphere Mie Scattering</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input class="coord no&#45;spin" type='number' id="property&#45;zone&#45;atmosphere&#45;mie&#45;scattering" min="0" max="0.5" step="any"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="zone&#45;section atmosphere&#45;section property"> -->
-    <!--         <div class="label">Atmosphere Rayleigh Scattering</div> -->
-    <!--         <div class="value"> -->
-    <!--             <input class="coord no&#45;spin" type='number' id="property&#45;zone&#45;atmosphere&#45;rayleigh&#45;scattering" min="0" max="0.5" step="any"></input> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="zone&#45;section atmosphere&#45;section property"> -->
-    <!--         <div class="label">Atmosphere Scattering Wavelenghts</div> -->
-    <!--         <div class="value"> -->
-    <!--             <div class="input&#45;area">X <br><input class="coord no&#45;spin" type='number' id="property&#45;zone&#45;atmosphere&#45;scattering&#45;wavelengths&#45;x" min="0" max="1" step="any"></input></div> -->
-    <!--             <div class="input&#45;area">Y <br><input class="coord no&#45;spin" type='number' id="property&#45;zone&#45;atmosphere&#45;scattering&#45;wavelengths&#45;y" min="0" max="1" step="any"></input></div> -->
-    <!--             <div class="input&#45;area">Z <br><input class="coord no&#45;spin" type='number' id="property&#45;zone&#45;atmosphere&#45;scattering&#45;wavelengths&#45;z" min="0" max="1" step="any"></input></div> -->
-    <!--         </div> -->
-    <!--     </div> -->
-    <!--     <div class="zone&#45;section atmosphere&#45;section property" style="display:none"> -->
-    <!--         <span class="label">Atmosphere Has Stars</span> -->
-    <!--         <span class="value"> -->
-    <!--             <input type='checkbox' id="property&#45;zone&#45;atmosphere&#45;has&#45;stars"> -->
-    <!--         </span> -->
-    <!--     </div> -->
-    <!-- </div> -->
-</body>
+    </body>
 </html>
