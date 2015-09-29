@@ -21,6 +21,7 @@
 #include "LimitedNodeList.h"
 #include "NLPacket.h"
 #include "Node.h"
+#include "udt/ReceivedMessage.h"
 
 class AssetRequest;
 class AssetUpload;
@@ -47,9 +48,9 @@ public:
     Q_INVOKABLE AssetUpload* createUpload(const QString& filename);
 
 private slots:
-    void handleAssetGetInfoReply(QSharedPointer<NLPacket> packet, SharedNodePointer senderNode);
-    void handleAssetGetReply(QSharedPointer<NLPacketList> packetList, SharedNodePointer senderNode);
-    void handleAssetUploadReply(QSharedPointer<NLPacket> packet, SharedNodePointer senderNode);
+    void handleAssetGetInfoReply(QSharedPointer<NLPacket> message, SharedNodePointer senderNode);
+    void handleAssetGetReply(QSharedPointer<ReceivedMessage> message, SharedNodePointer senderNode);
+    void handleAssetUploadReply(QSharedPointer<NLPacket> message, SharedNodePointer senderNode);
 
     void handleNodeKilled(SharedNodePointer node);
 

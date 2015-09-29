@@ -18,6 +18,7 @@
 #include <QThreadPool>
 
 #include "AssetUtils.h"
+#include "udt/ReceivedMessage.h"
 
 class AssetServer : public ThreadedAssignment {
     Q_OBJECT
@@ -30,7 +31,7 @@ public slots:
 private slots:
     void handleAssetGetInfo(QSharedPointer<NLPacket> packet, SharedNodePointer senderNode);
     void handleAssetGet(QSharedPointer<NLPacket> packet, SharedNodePointer senderNode);
-    void handleAssetUpload(QSharedPointer<NLPacketList> packetList, SharedNodePointer senderNode);
+    void handleAssetUpload(QSharedPointer<ReceivedMessage> packetList, SharedNodePointer senderNode);
     
     void sendStatsPacket();
     

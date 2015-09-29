@@ -117,7 +117,7 @@ void PacketList::closeCurrentPacket(bool shouldSendEmpty) {
     }
 }
 
-QByteArray PacketList::getMessage() {
+QByteArray PacketList::getMessage() const {
     size_t sizeBytes = 0;
 
     for (const auto& packet : _packets) {

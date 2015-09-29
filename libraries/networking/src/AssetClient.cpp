@@ -203,7 +203,7 @@ void AssetClient::handleAssetGetInfoReply(QSharedPointer<NLPacket> packet, Share
     }
 }
 
-void AssetClient::handleAssetGetReply(QSharedPointer<NLPacketList> packetList, SharedNodePointer senderNode) {
+void AssetClient::handleAssetGetReply(QSharedPointer<ReceivedMessage> packetList, SharedNodePointer senderNode) {
     QByteArray data = packetList->getMessage();
     QBuffer packet { &data };
     packet.open(QIODevice::ReadOnly);

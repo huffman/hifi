@@ -136,7 +136,7 @@ void AssetServer::handleAssetGet(QSharedPointer<NLPacket> packet, SharedNodePoin
     _taskPool.start(task);
 }
 
-void AssetServer::handleAssetUpload(QSharedPointer<NLPacketList> packetList, SharedNodePointer senderNode) {
+void AssetServer::handleAssetUpload(QSharedPointer<ReceivedMessage> packetList, SharedNodePointer senderNode) {
     
     if (senderNode->getCanRez()) {
         qDebug() << "Starting an UploadAssetTask for upload from" << uuidStringWithoutCurlyBraces(senderNode->getUUID());

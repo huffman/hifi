@@ -251,12 +251,13 @@ void DomainHandler::requestDomainSettings() {
     }
 }
 
-void DomainHandler::processSettingsPacketList(QSharedPointer<NLPacketList> packetList) {
+void DomainHandler::processSettingsPacketList(QSharedPointer<ReceivedMessage> packetList) {
+    qCDebug(networking) << "Got settings!! " << packetList->getMessage().size();
     auto data = packetList->getMessage();
 
-    _settingsObject = QJsonDocument::fromJson(data).object();
-
     qCDebug(networking) << "Received domain settings: \n" << QString(data);
+
+    _settingsObject = QJsonDocument::fromJson(data).object();
 
     // reset failed settings requests to 0, we got them
     _failedSettingsRequests = 0;

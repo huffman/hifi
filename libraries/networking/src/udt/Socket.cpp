@@ -20,6 +20,7 @@
 #include "ControlPacket.h"
 #include "Packet.h"
 #include "../NLPacket.h"
+#include "../NLPacketList.h"
 #include "PacketList.h"
 
 using namespace udt;
@@ -121,10 +122,15 @@ qint64 Socket::writePacketList(std::unique_ptr<PacketList> packetList, const Hif
     if (packetList->isReliable()) {
         // hand this packetList off to writeReliablePacketList
         // because Qt can't invoke with the unique_ptr we have to release it here and re-construct in writeReliablePacketList
+        // qDebug() << "Writing packet list at address: " << packetList.get();
+        // qDebug() << "Writing packet list at address: " << packetList.release();
+        // qDebug() << "Writing packet list at address: " << packetList.get();
         
         if (QThread::currentThread() != thread()) {
+            PacketList* ptr = packetList.release();
+            qDebug() << "ptr is: " << ptr;
             QMetaObject::invokeMethod(this, "writeReliablePacketList", Qt::QueuedConnection,
-                                      Q_ARG(PacketList*, packetList.release()),
+                                      Q_ARG(PacketList*, ptr),
                                       Q_ARG(HifiSockAddr, sockAddr));
         } else {
             writeReliablePacketList(packetList.release(), sockAddr);
