@@ -127,9 +127,9 @@ qint64 Socket::writePacketList(std::unique_ptr<PacketList> packetList, const Hif
         // qDebug() << "Writing packet list at address: " << packetList.get();
         
         if (QThread::currentThread() != thread()) {
-            PacketList* ptr = packetList.release();
+            auto ptr = packetList.release();
             qDebug() << "ptr is: " << ptr;
-            QMetaObject::invokeMethod(this, "writeReliablePacketList", Qt::QueuedConnection,
+            QMetaObject::invokeMethod(this, "writeReliablePacketList", Qt::AutoConnection,
                                       Q_ARG(PacketList*, ptr),
                                       Q_ARG(HifiSockAddr, sockAddr));
         } else {

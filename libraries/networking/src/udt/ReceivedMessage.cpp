@@ -14,23 +14,33 @@
 
 #include "QSharedPointer"
 
-ReceivedMessage::ReceivedMessage(const udt::PacketList& packetList)
+// ReceivedMessage::ReceivedMessage(const udt::PacketList& packetList)
+//     : _data(packetList.getMessage()),
+//       _numPackets(packetList.getNumPackets()),
+//       _packetType(packetList.getType())
+// {
+//     qDebug() << "Creating ReceivedMessage with data: " << packetList.getMessage();
+// }
+
+ReceivedMessage::ReceivedMessage(const NLPacketList& packetList)
     : _data(packetList.getMessage()),
-      _packetType(packetList.getType())
+      _numPackets(packetList.getNumPackets()),
+      _packetType(packetList.getType()),
+      _sourceID(packetList.getSourceID())
 {
-    qDebug() << "Creating ReceivedMessage with data: " << packetList.getMessage();
+    qDebug() << "Creating ReceivedMessage with nl data: " << packetList.getMessage();
 }
 
-ReceivedMessage::ReceivedMessage(NLPacket& packet)
-    : _data(packet.readAll()),
-      _packetType(packet.getType())
-{
-}
+// ReceivedMessage::ReceivedMessage(NLPacket& packet)
+//     : _data(packet.readAll()),
+//       _packetType(packet.getType())
+// {
+// }
 
-ReceivedMessage::ReceivedMessage(udt::Packet& packet)
-    : _data(packet.readAll())
-{
-}
+// ReceivedMessage::ReceivedMessage(udt::Packet& packet)
+//     : _data(packet.readAll())
+// {
+// }
 
 qint64 ReceivedMessage::peek(char* data, qint64 size) {
     memcpy(data, _data.constData() + _position, size);

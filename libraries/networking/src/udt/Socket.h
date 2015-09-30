@@ -24,7 +24,7 @@
 #include "../HifiSockAddr.h"
 #include "CongestionControl.h"
 #include "Connection.h"
-#include "ReceivedMessage.h"
+// #include "ReceivedMessage.h"
 
 //#define UDT_CONNECTION_DEBUG
 
@@ -73,7 +73,7 @@ public:
     
     void setCongestionControlFactory(std::unique_ptr<CongestionControlVirtualFactory> ccFactory);
 
-    void pendingMessageReceived(std::unique_ptr<PacketList> packetList);
+    // void pendingMessageReceived(std::unique_ptr<PacketList> packetList);
     void messageReceived(std::unique_ptr<PacketList> packetList);
     
     StatsVector sampleStatsForAllConnections();

@@ -106,6 +106,8 @@ NodeList::NodeList(char newOwnerType, unsigned short socketListenPort, unsigned 
 }
 
 qint64 NodeList::sendStats(const QJsonObject& statsObject, const HifiSockAddr& destination) {
+    // qDebug() << "Skipping stats";
+    // return 0;
     auto statsPacketList = NLPacketList::create(PacketType::NodeJsonStats, QByteArray(), true, true);
 
     QJsonDocument jsonDocument(statsObject);

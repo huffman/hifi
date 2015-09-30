@@ -13,21 +13,23 @@
 #ifndef hifi_ReceivedMessage_h
 #define hifi_ReceivedMessage_h
 
-#include <QBuffer>
+// #include <QBuffer>
 #include <QByteArray>
 #include <QObject>
 
-#include "../NLPacket.h"
+// #include "../NLPacket.h"
+#include "../NLPacketList.h"
 
-#include "PacketList.h"
+// #include "PacketList.h"
 
 class ReceivedMessage : public QObject {
 
     Q_OBJECT
 public:
-    ReceivedMessage(const udt::PacketList& packetList);
-    ReceivedMessage(NLPacket& packet);
-    ReceivedMessage(udt::Packet& packet);
+    // ReceivedMessage(const udt::PacketList& packetList);
+    ReceivedMessage(const NLPacketList& packetList);
+    // ReceivedMessage(NLPacket& packet);
+    // ReceivedMessage(udt::Packet& packet);
 
     QByteArray getMessage() const { return _data; }
     // QBuffer getMessageAsBuffer() { return QBuffer(&_data); }
@@ -55,7 +57,7 @@ private:
     QUuid _sourceID;
     qint64 _numPackets;
     PacketType _packetType;
-    qint64 _position;
+    qint64 _position { 0 };
 
     std::atomic<bool> _isComplete { true };  
 };
