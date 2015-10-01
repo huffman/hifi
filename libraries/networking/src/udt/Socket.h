@@ -25,6 +25,8 @@
 #include "CongestionControl.h"
 #include "Connection.h"
 // #include "ReceivedMessage.h"
+// #include "../NLPacketList.h"
+//  #include "Packet.h"
 
 //#define UDT_CONNECTION_DEBUG
 
@@ -33,7 +35,6 @@ class UDTTest;
 namespace udt {
 
 class BasePacket;
-class ControlSender;
 class Packet;
 class PacketList;
 class SequenceNumber;

@@ -21,14 +21,14 @@ public:
     static std::unique_ptr<NLPacketList> create(PacketType packetType, QByteArray extendedHeader = QByteArray(),
                                                 bool isReliable = false, bool isOrdered = false);
     
-    static std::unique_ptr<NLPacketList> fromPacketList(std::unique_ptr<PacketList>);
+    static std::unique_ptr<NLPacketList> fromPacketList(std::unique_ptr<udt::PacketList>);
 
     const QUuid& getSourceID() const { return _sourceID; }
     
 private:
     NLPacketList(PacketType packetType, QByteArray extendedHeader = QByteArray(), bool isReliable = false,
                  bool isOrdered = false);
-    NLPacketList(PacketList&& packetList);
+    NLPacketList(udt::PacketList&& packetList);
     NLPacketList(const NLPacketList& other) = delete;
     NLPacketList& operator=(const NLPacketList& other) = delete;
 
