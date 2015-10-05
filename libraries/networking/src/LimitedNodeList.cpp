@@ -392,7 +392,7 @@ qint64 LimitedNodeList::sendPacket(std::unique_ptr<NLPacket> packet, const Node&
     return sendPacket(std::move(packet), destinationSockAddr, destinationNode.getConnectionSecret());
 }
 
-int LimitedNodeList::updateNodeWithDataFromPacket(QSharedPointer<NLPacket> packet, SharedNodePointer sendingNode) {
+int LimitedNodeList::updateNodeWithDataFromPacket(QSharedPointer<ReceivedMessage> message, SharedNodePointer sendingNode) {
     QMutexLocker locker(&sendingNode->getMutex());
 
     NodeData* linkedData = sendingNode->getLinkedData();
@@ -402,7 +402,7 @@ int LimitedNodeList::updateNodeWithDataFromPacket(QSharedPointer<NLPacket> packe
 
     if (linkedData) {
         QMutexLocker linkedDataLocker(&linkedData->getMutex());
-        return linkedData->parseData(*packet);
+        return linkedData->parseData(*message);
     }
     
     return 0;

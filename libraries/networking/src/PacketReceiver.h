@@ -25,6 +25,7 @@
 #include "NLPacket.h"
 #include "NLPacketList.h"
 #include "udt/PacketHeaders.h"
+#include "udt/ReceivedMessage.h"
 
 class EntityEditPacketSender;
 class OctreePacketProcessor;
@@ -53,6 +54,7 @@ public:
     
     void handleVerifiedPacket(std::unique_ptr<udt::Packet> packet);
     void handleVerifiedPacketList(std::unique_ptr<udt::PacketList> packetList);
+    bool handleVerifiedMessage(std::unique_ptr<ReceivedMessage> message);
 
 signals:
     void dataReceived(quint8 channelType, int bytes);

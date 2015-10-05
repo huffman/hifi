@@ -252,6 +252,11 @@ void PacketReceiver::handleVerifiedPacketList(std::unique_ptr<udt::PacketList> p
     auto nlPacketList = NLPacketList::fromPacketList(std::move(packetList));
     auto receivedMessage = std::unique_ptr<ReceivedMessage>(new ReceivedMessage(*nlPacketList.release()));
 
+    handleVerifiedMessage(std::move(receivedMessage));
+}
+
+bool PacketReceiver::handleVerifiedMessage(std::unique_ptr<ReceivedMessage> receivedMessage) {
+
     auto nodeList = DependencyManager::get<LimitedNodeList>();
     
     _inPacketCount += receivedMessage->getNumPackets();
@@ -269,13 +274,13 @@ void PacketReceiver::handleVerifiedPacketList(std::unique_ptr<udt::PacketList> p
     
     auto it = _packetListListenerMap.find(receivedMessage->getType());
     
+            
+    bool success = false;
     if (it != _packetListListenerMap.end() && it->second.isValid()) {
         
         auto listener = it.value();
         
         if (listener.first) {
-            
-            bool success = false;
             
             Qt::ConnectionType connectionType;
             // check if this is a directly connected listener
@@ -363,6 +368,8 @@ void PacketReceiver::handleVerifiedPacketList(std::unique_ptr<udt::PacketList> p
         // insert a dummy listener so we don't print this again
         _packetListListenerMap.insert(receivedMessage->getType(), { nullptr, QMetaMethod() });
     }
+
+    return success;
 }
 
 void PacketReceiver::handleVerifiedPacket(std::unique_ptr<udt::Packet> packet) {
@@ -376,6 +383,12 @@ void PacketReceiver::handleVerifiedPacket(std::unique_ptr<udt::Packet> packet) {
     
     // setup an NLPacket from the packet we were passed
     auto nlPacket = NLPacket::fromBase(std::move(packet));
+    auto receivedMessage = std::unique_ptr<ReceivedMessage>(new ReceivedMessage(*nlPacket.get()));
+    bool success = handleVerifiedMessage(std::move(receivedMessage));
+
+    if (success) {
+        return;
+    }
     
     _inPacketCount++;
     _inByteCount += nlPacket->getDataSize();

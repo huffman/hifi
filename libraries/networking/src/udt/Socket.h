@@ -68,6 +68,7 @@ public:
     void setPacketFilterOperator(PacketFilterOperator filterOperator) { _packetFilterOperator = filterOperator; }
     void setPacketHandler(PacketHandler handler) { _packetHandler = handler; }
     void setPacketListHandler(PacketListHandler handler) { _packetListHandler = handler; }
+    void setPendingMessageHandler(PacketListHandler handler) { _packetListHandler = handler; }
     
     void addUnfilteredHandler(const HifiSockAddr& senderSockAddr, BasePacketHandler handler)
         { _unfilteredHandlers[senderSockAddr] = handler; }

@@ -26,28 +26,30 @@ class ReceivedMessage : public QObject {
 
     Q_OBJECT
 public:
-    // ReceivedMessage(const udt::PacketList& packetList);
     ReceivedMessage(const NLPacketList& packetList);
-    // ReceivedMessage(NLPacket& packet);
-    // ReceivedMessage(udt::Packet& packet);
+    ReceivedMessage(NLPacket& packet);
 
     QByteArray getMessage() const { return _data; }
     // QBuffer getMessageAsBuffer() { return QBuffer(&_data); }
     //
     PacketType getType() const { return _packetType; }
+    qint64 getPayloadSize() const { return _data.size(); }
 
     bool isComplete() const { return _isComplete; }
     const QUuid& getSourceID() const { return _sourceID; }
 
     void seek(qint64 position) { _position = position; }
+    qint64 pos() const { return _position; }
     qint64 size() const { return _data.size(); }
     qint64 getNumPackets() const { return _numPackets; }
+    qint64 bytesLeftToRead() const { return _data.size() -  _position; }
 
     qint64 peek(char* data, qint64 size);
     qint64 read(char* data, qint64 size);
 
     QByteArray peek(qint64 size);
     QByteArray read(qint64 size);
+    QByteArray readWithoutCopy(qint64 size);
 
     template<typename T> qint64 peekPrimitive(T* data);
     template<typename T> qint64 readPrimitive(T* data);

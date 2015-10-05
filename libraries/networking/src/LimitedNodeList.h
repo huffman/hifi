@@ -40,6 +40,7 @@
 #include "PacketReceiver.h"
 #include "NLPacketList.h"
 #include "udt/PacketHeaders.h"
+#include "udt/ReceivedMessage.h"
 #include "udt/Socket.h"
 #include "UUIDHasher.h"
 
@@ -146,7 +147,7 @@ public:
 
     void processKillNode(NLPacket& packet);
 
-    int updateNodeWithDataFromPacket(QSharedPointer<NLPacket> packet, SharedNodePointer matchingNode);
+    int updateNodeWithDataFromPacket(QSharedPointer<ReceivedMessage> packet, SharedNodePointer matchingNode);
 
     unsigned int broadcastToNodes(std::unique_ptr<NLPacket> packet, const NodeSet& destinationNodeTypes);
     SharedNodePointer soloNodeOfType(NodeType_t nodeType);

@@ -14,33 +14,22 @@
 
 #include "QSharedPointer"
 
-// ReceivedMessage::ReceivedMessage(const udt::PacketList& packetList)
-//     : _data(packetList.getMessage()),
-//       _numPackets(packetList.getNumPackets()),
-//       _packetType(packetList.getType())
-// {
-//     qDebug() << "Creating ReceivedMessage with data: " << packetList.getMessage();
-// }
-
 ReceivedMessage::ReceivedMessage(const NLPacketList& packetList)
     : _data(packetList.getMessage()),
+      _sourceID(packetList.getSourceID()),
       _numPackets(packetList.getNumPackets()),
-      _packetType(packetList.getType()),
-      _sourceID(packetList.getSourceID())
+      _packetType(packetList.getType())
 {
     qDebug() << "Creating ReceivedMessage with nl data: " << packetList.getMessage();
 }
 
-// ReceivedMessage::ReceivedMessage(NLPacket& packet)
-//     : _data(packet.readAll()),
-//       _packetType(packet.getType())
-// {
-// }
-
-// ReceivedMessage::ReceivedMessage(udt::Packet& packet)
-//     : _data(packet.readAll())
-// {
-// }
+ReceivedMessage::ReceivedMessage(NLPacket& packet)
+    : _data(packet.readAll()),
+      _sourceID(packet.getSourceID()),
+      _numPackets(1),
+      _packetType(packet.getType())
+{
+}
 
 qint64 ReceivedMessage::peek(char* data, qint64 size) {
     memcpy(data, _data.constData() + _position, size);
@@ -58,6 +47,12 @@ QByteArray ReceivedMessage::peek(qint64 size) {
 }
 
 QByteArray ReceivedMessage::read(qint64 size) {
+    auto data = _data.mid(_position, size);
+    _position += size;
+    return data;
+}
+
+QByteArray ReceivedMessage::readWithoutCopy(qint64 size) {
     auto data = _data.mid(_position, size);
     _position += size;
     return data;

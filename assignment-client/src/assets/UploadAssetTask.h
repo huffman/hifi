@@ -26,7 +26,7 @@ class Node;
 
 class UploadAssetTask : public QRunnable {
 public:
-    UploadAssetTask(QSharedPointer<ReceivedMessage> receivedMessage, QSharedPointer<Node> senderNode, const QDir& resourcesDir);
+    UploadAssetTask(QSharedPointer<ReceivedMessage> message, QSharedPointer<Node> senderNode, const QDir& resourcesDir);
     
     void run();
     

@@ -57,15 +57,15 @@ Agent::Agent(NLPacket& packet) :
     packetReceiver.registerListener(PacketType::Jurisdiction, this, "handleJurisdictionPacket");
 }
 
-void Agent::handleOctreePacket(QSharedPointer<NLPacket> packet, SharedNodePointer senderNode) {
-    auto packetType = packet->getType();
+void Agent::handleOctreePacket(QSharedPointer<ReceivedMessage> message, SharedNodePointer senderNode) {
+    auto packetType = message->getType();
 
     if (packetType == PacketType::OctreeStats) {
 
         int statsMessageLength = OctreeHeadlessViewer::parseOctreeStats(packet, senderNode);
-        if (packet->getPayloadSize() > statsMessageLength) {
+        if (message->getPayloadSize() > statsMessageLength) {
             // pull out the piggybacked packet and create a new QSharedPointer<NLPacket> for it
-            int piggyBackedSizeWithHeader = packet->getPayloadSize() - statsMessageLength;
+            int piggyBackedSizeWithHeader = message->getPayloadSize() - statsMessageLength;
             
             auto buffer = std::unique_ptr<char[]>(new char[piggyBackedSizeWithHeader]);
             memcpy(buffer.get(), packet->getPayload() + statsMessageLength, piggyBackedSizeWithHeader);
@@ -95,8 +95,8 @@ void Agent::handleJurisdictionPacket(QSharedPointer<NLPacket> packet, SharedNode
     }
 } 
 
-void Agent::handleAudioPacket(QSharedPointer<NLPacket> packet) {
-    _receivedAudioStream.parseData(*packet);
+void Agent::handleAudioPacket(QSharedPointer<ReceivedMessage> message) {
+    _receivedAudioStream.parseData(*message);
 
     _lastReceivedAudioLoudness = _receivedAudioStream.getNextOutputFrameLoudness();
 
