@@ -304,7 +304,7 @@ bool PacketReceiver::handleVerifiedMessage(std::unique_ptr<ReceivedMessage> rece
                 emit dataReceived(matchingNode->getType(), receivedMessage->size());
                 QMetaMethod metaMethod = listener.second;
 
-                qDebug() << "Got verified packet list: " << QString(receivedMessage->getMessage());
+                // qDebug() << "Got verified packet list: " << QString(receivedMessage->getMessage());
                 
                 static const QByteArray QSHAREDPOINTER_NODE_NORMALIZED = QMetaObject::normalizedType("QSharedPointer<Node>");
                 static const QByteArray SHARED_NODE_NORMALIZED = QMetaObject::normalizedType("SharedNodePointer");
@@ -396,7 +396,7 @@ void PacketReceiver::handleVerifiedPacket(std::unique_ptr<udt::Packet> packet) {
     nlPacket->seek(0);
 
     if (success) {
-        qDebug() << "succesfully called handleVerifiedMessage";
+        // qDebug() << "succesfully called handleVerifiedMessage";
         return;
     }
     qDebug() << "Did not successfully call handleVerifiedMessage: " << nlPacket->getType();
