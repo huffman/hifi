@@ -140,25 +140,25 @@ QMetaMethod PacketReceiver::matchingMethodForListener(PacketType type, QObject* 
     // normalize the slot with the expected parameters
     
     static const QString SIGNATURE_TEMPLATE("%1(%2)");
-    static const QString NON_SOURCED_PACKET_LISTENER_PARAMETERS = "QSharedPointer<NLPacket>";
+    // static const QString NON_SOURCED_PACKET_LISTENER_PARAMETERS = "QSharedPointer<NLPacket>";
     static const QString NON_SOURCED_PACKETLIST_LISTENER_PARAMETERS = "QSharedPointer<ReceivedMessage>";
 
     QSet<QString> possibleSignatures {
-        SIGNATURE_TEMPLATE.arg(slot, NON_SOURCED_PACKET_LISTENER_PARAMETERS),
+        // SIGNATURE_TEMPLATE.arg(slot, NON_SOURCED_PACKET_LISTENER_PARAMETERS),
         SIGNATURE_TEMPLATE.arg(slot, NON_SOURCED_PACKETLIST_LISTENER_PARAMETERS)
     };
 
     if (!NON_SOURCED_PACKETS.contains(type)) {
-        static const QString SOURCED_PACKET_LISTENER_PARAMETERS = "QSharedPointer<NLPacket>,QSharedPointer<Node>";
-        static const QString TYPEDEF_SOURCED_PACKET_LISTENER_PARAMETERS = "QSharedPointer<NLPacket>,SharedNodePointer";
+        // static const QString SOURCED_PACKET_LISTENER_PARAMETERS = "QSharedPointer<NLPacket>,QSharedPointer<Node>";
+        // static const QString TYPEDEF_SOURCED_PACKET_LISTENER_PARAMETERS = "QSharedPointer<NLPacket>,SharedNodePointer";
         static const QString SOURCED_PACKETLIST_LISTENER_PARAMETERS = "QSharedPointer<ReceivedMessage>,QSharedPointer<Node>";
         static const QString TYPEDEF_SOURCED_PACKETLIST_LISTENER_PARAMETERS = "QSharedPointer<ReceivedMessage>,SharedNodePointer";
 
         // a sourced packet must take the shared pointer to the packet but optionally could include
         // a shared pointer to the node
 
-        possibleSignatures << SIGNATURE_TEMPLATE.arg(slot, TYPEDEF_SOURCED_PACKET_LISTENER_PARAMETERS);
-        possibleSignatures << SIGNATURE_TEMPLATE.arg(slot, SOURCED_PACKET_LISTENER_PARAMETERS);
+        // possibleSignatures << SIGNATURE_TEMPLATE.arg(slot, TYPEDEF_SOURCED_PACKET_LISTENER_PARAMETERS);
+        // possibleSignatures << SIGNATURE_TEMPLATE.arg(slot, SOURCED_PACKET_LISTENER_PARAMETERS);
         possibleSignatures << SIGNATURE_TEMPLATE.arg(slot, TYPEDEF_SOURCED_PACKETLIST_LISTENER_PARAMETERS);
         possibleSignatures << SIGNATURE_TEMPLATE.arg(slot, SOURCED_PACKETLIST_LISTENER_PARAMETERS);
     }
@@ -399,10 +399,8 @@ void PacketReceiver::handleVerifiedPacket(std::unique_ptr<udt::Packet> packet) {
         qDebug() << "succesfully called handleVerifiedMessage";
         return;
     }
-    if (nlPacket->getType() == PacketType::MixedAudio) {
-        qDebug() << "stop";
-    }
     qDebug() << "Did not successfully call handleVerifiedMessage: " << nlPacket->getType();
+    return;
     
     _inPacketCount++;
     _inByteCount += nlPacket->getDataSize();
