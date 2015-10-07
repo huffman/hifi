@@ -145,7 +145,7 @@ public:
     const HifiSockAddr& getLocalSockAddr() const { return _localSockAddr; }
     const HifiSockAddr& getSTUNSockAddr() const { return _stunSockAddr; }
 
-    void processKillNode(NLPacket& packet);
+    void processKillNode(ReceivedMessage& message);
 
     int updateNodeWithDataFromPacket(QSharedPointer<ReceivedMessage> packet, SharedNodePointer matchingNode);
 
@@ -156,10 +156,10 @@ public:
     void resetPacketStats();
 
     std::unique_ptr<NLPacket> constructPingPacket(PingType_t pingType = PingType::Agnostic);
-    std::unique_ptr<NLPacket> constructPingReplyPacket(NLPacket& pingPacket);
+    std::unique_ptr<NLPacket> constructPingReplyPacket(ReceivedMessage& message);
 
     std::unique_ptr<NLPacket> constructICEPingPacket(PingType_t pingType, const QUuid& iceID);
-    std::unique_ptr<NLPacket> constructICEPingReplyPacket(NLPacket& pingPacket, const QUuid& iceID);
+    std::unique_ptr<NLPacket> constructICEPingReplyPacket(ReceivedMessage& message, const QUuid& iceID);
 
     void sendHeartbeatToIceServer(const HifiSockAddr& iceServerSockAddr);
     void sendPeerQueryToIceServer(const HifiSockAddr& iceServerSockAddr, const QUuid& clientID, const QUuid& peerID);

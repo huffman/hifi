@@ -36,7 +36,7 @@ class Agent : public ThreadedAssignment {
     Q_PROPERTY(bool isListeningToAudioStream READ isListeningToAudioStream WRITE setIsListeningToAudioStream)
     Q_PROPERTY(float lastReceivedAudioLoudness READ getLastReceivedAudioLoudness)
 public:
-    Agent(NLPacket& packet);
+    Agent(ReceivedMessage& message);
     
     void setIsAvatar(bool isAvatar);
     bool isAvatar() const { return _isAvatar; }
@@ -56,8 +56,8 @@ public slots:
 
 private slots:
     void handleAudioPacket(QSharedPointer<ReceivedMessage> packet);
-    void handleOctreePacket(QSharedPointer<NLPacket> packet, SharedNodePointer senderNode);
-    void handleJurisdictionPacket(QSharedPointer<NLPacket> packet, SharedNodePointer senderNode);
+    void handleOctreePacket(QSharedPointer<ReceivedMessage> packet, SharedNodePointer senderNode);
+    void handleJurisdictionPacket(QSharedPointer<ReceivedMessage> message, SharedNodePointer senderNode);
     void sendPingRequests();
     void processAgentAvatarAndAudio(float deltaTime);
 

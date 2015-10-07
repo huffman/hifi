@@ -48,9 +48,9 @@ public:
     Q_INVOKABLE AssetUpload* createUpload(const QString& filename);
 
 private slots:
-    void handleAssetGetInfoReply(QSharedPointer<NLPacket> message, SharedNodePointer senderNode);
+    void handleAssetGetInfoReply(QSharedPointer<ReceivedMessage> message, SharedNodePointer senderNode);
     void handleAssetGetReply(QSharedPointer<ReceivedMessage> message, SharedNodePointer senderNode);
-    void handleAssetUploadReply(QSharedPointer<NLPacket> message, SharedNodePointer senderNode);
+    void handleAssetUploadReply(QSharedPointer<ReceivedMessage> message, SharedNodePointer senderNode);
 
     void handleNodeKilled(SharedNodePointer node);
 

@@ -112,7 +112,7 @@ int InboundAudioStream::parseData(ReceivedMessage& message) {
     
     // parse the info after the seq number and before the audio data (the stream properties)
     int prePropertyPosition = message.pos();
-    int propertyBytes = parseStreamProperties(message.getType(), message.readWithoutCopy(message.bytesLeftToRead()), networkSamples);
+    int propertyBytes = parseStreamProperties(message.getType(), message.readWithoutCopy(message.getBytesLeftToRead()), networkSamples);
     message.seek(prePropertyPosition + propertyBytes);
     
     // handle this packet based on its arrival status.
@@ -131,7 +131,7 @@ int InboundAudioStream::parseData(ReceivedMessage& message) {
             if (message.getType() == PacketType::SilentAudioFrame) {
                 writeDroppableSilentSamples(networkSamples);
             } else {
-                parseAudioData(message.getType(), message.readWithoutCopy(message.bytesLeftToRead()), networkSamples);
+                parseAudioData(message.getType(), message.readWithoutCopy(message.getBytesLeftToRead()), networkSamples);
             }
             break;
         }

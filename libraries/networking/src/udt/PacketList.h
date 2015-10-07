@@ -48,6 +48,8 @@ public:
     
     void startSegment();
     void endSegment();
+
+    HifiSockAddr getSenderSockAddr() const;
     
     void closeCurrentPacket(bool shouldSendEmpty = false);
 

@@ -125,6 +125,7 @@ bool PacketReceiver::registerListener(PacketType type, QObject* listener, const 
     QMetaMethod matchingMethod = matchingMethodForListener(type, listener, slot);
 
     if (matchingMethod.isValid()) {
+        qDebug() << "Found: " << matchingMethod.methodSignature();
         registerVerifiedListener(type, listener, matchingMethod);
         return true;
     } else {
@@ -198,13 +199,13 @@ void PacketReceiver::registerVerifiedListener(PacketType type, QObject* object, 
     Q_ASSERT_X(object, "PacketReceiver::registerVerifiedListener", "No object to register");
     QMutexLocker locker(&_packetListenerLock);
 
-    if (_packetListenerMap.contains(type)) {
+    if (_packetListListenerMap.contains(type)) {
         qCWarning(networking) << "Registering a packet listener for packet type" << type
             << "that will remove a previously registered listener";
     }
     
     // add the mapping
-    _packetListenerMap[type] = ObjectMethodPair(QPointer<QObject>(object), slot);
+    _packetListListenerMap[type] = ObjectMethodPair(QPointer<QObject>(object), slot);
 }
 
 void PacketReceiver::unregisterListener(QObject* listener) {
@@ -215,12 +216,12 @@ void PacketReceiver::unregisterListener(QObject* listener) {
         
         // TODO: replace the two while loops below with a replace_if on the vector (once we move to Message everywhere)
         
-        // clear any registrations for this listener in _packetListenerMap
-        auto it = _packetListenerMap.begin();
+        // clear any registrations for this listener in _packetListListenerMap
+        auto it = _packetListListenerMap.begin();
         
-        while (it != _packetListenerMap.end()) {
+        while (it != _packetListListenerMap.end()) {
             if (it.value().first == listener) {
-                it = _packetListenerMap.erase(it);
+                it = _packetListListenerMap.erase(it);
             } else {
                 ++it;
             }
@@ -274,12 +275,19 @@ bool PacketReceiver::handleVerifiedMessage(std::unique_ptr<ReceivedMessage> rece
     
     auto it = _packetListListenerMap.find(receivedMessage->getType());
     
+    if (receivedMessage->getType() == PacketType::MixedAudio) {
+        qDebug() << "Audio";
+    }
             
     bool success = false;
     if (it != _packetListListenerMap.end() && it->second.isValid()) {
         
         auto listener = it.value();
-        
+        if (listener.second.methodSignature().toStdString().find("ReceivedMessage") == std::string::npos) {
+            qDebug() << "listener is not registered for receivedmessage: " << listener.second.methodSignature();
+            return false;
+        }
+    
         if (listener.first) {
             
             Qt::ConnectionType connectionType;
@@ -385,10 +393,16 @@ void PacketReceiver::handleVerifiedPacket(std::unique_ptr<udt::Packet> packet) {
     auto nlPacket = NLPacket::fromBase(std::move(packet));
     auto receivedMessage = std::unique_ptr<ReceivedMessage>(new ReceivedMessage(*nlPacket.get()));
     bool success = handleVerifiedMessage(std::move(receivedMessage));
+    nlPacket->seek(0);
 
     if (success) {
+        qDebug() << "succesfully called handleVerifiedMessage";
         return;
     }
+    if (nlPacket->getType() == PacketType::MixedAudio) {
+        qDebug() << "stop";
+    }
+    qDebug() << "Did not successfully call handleVerifiedMessage: " << nlPacket->getType();
     
     _inPacketCount++;
     _inByteCount += nlPacket->getDataSize();
@@ -403,9 +417,9 @@ void PacketReceiver::handleVerifiedPacket(std::unique_ptr<udt::Packet> packet) {
     
     bool listenerIsDead = false;
     
-    auto it = _packetListenerMap.find(nlPacket->getType());
+    auto it = _packetListListenerMap.find(nlPacket->getType());
     
-    if (it != _packetListenerMap.end() && it->second.isValid()) {
+    if (it != _packetListListenerMap.end() && it->second.isValid()) {
         
         auto listener = it.value();
         
@@ -481,17 +495,17 @@ void PacketReceiver::handleVerifiedPacket(std::unique_ptr<udt::Packet> packet) {
         if (listenerIsDead) {
             qCDebug(networking).nospace() << "Listener for packet " << nlPacket->getType()
                 << " has been destroyed. Removing from listener map.";
-            it = _packetListenerMap.erase(it);
+            it = _packetListListenerMap.erase(it);
             
             // if it exists, remove the listener from _directlyConnectedObjects
             QMutexLocker locker(&_directConnectSetMutex);
             _directlyConnectedObjects.remove(listener.first);
         }
         
-    } else if (it == _packetListenerMap.end()) {
+    } else if (it == _packetListListenerMap.end()) {
         qCWarning(networking) << "No listener found for packet type" << nlPacket->getType();
         
         // insert a dummy listener so we don't print this again
-        _packetListenerMap.insert(nlPacket->getType(), { nullptr, QMetaMethod() });
+        _packetListListenerMap.insert(nlPacket->getType(), { nullptr, QMetaMethod() });
     }
 }

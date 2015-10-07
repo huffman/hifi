@@ -169,18 +169,18 @@ bool AssetClient::getAssetInfo(const QString& hash, const QString& extension, Ge
     return false;
 }
 
-void AssetClient::handleAssetGetInfoReply(QSharedPointer<NLPacket> packet, SharedNodePointer senderNode) {
+void AssetClient::handleAssetGetInfoReply(QSharedPointer<ReceivedMessage> message, SharedNodePointer senderNode) {
     MessageID messageID;
-    packet->readPrimitive(&messageID);
-    auto assetHash = packet->read(SHA256_HASH_LENGTH);
+    message->readPrimitive(&messageID);
+    auto assetHash = message->read(SHA256_HASH_LENGTH);
     
     AssetServerError error;
-    packet->readPrimitive(&error);
+    message->readPrimitive(&error);
 
     AssetInfo info { assetHash.toHex(), 0 };
 
     if (error == AssetServerError::NoError) {
-        packet->readPrimitive(&info.size);
+        message->readPrimitive(&info.size);
     }
 
     // Check if we have any pending requests for this node
@@ -272,19 +272,19 @@ bool AssetClient::uploadAsset(const QByteArray& data, const QString& extension, 
     return false;
 }
 
-void AssetClient::handleAssetUploadReply(QSharedPointer<NLPacket> packet, SharedNodePointer senderNode) {
+void AssetClient::handleAssetUploadReply(QSharedPointer<ReceivedMessage> message, SharedNodePointer senderNode) {
     MessageID messageID;
-    packet->readPrimitive(&messageID);
+    message->readPrimitive(&messageID);
 
     AssetServerError error;
-    packet->readPrimitive(&error);
+    message->readPrimitive(&error);
 
     QString hashString;
 
     if (error) {
         qCWarning(asset_client) << "Error uploading file to asset server";
     } else {
-        auto hash = packet->read(SHA256_HASH_LENGTH);
+        auto hash = message->read(SHA256_HASH_LENGTH);
         hashString = hash.toHex();
         
         qCDebug(asset_client) << "Successfully uploaded asset to asset-server - SHA256 hash is " << hashString;

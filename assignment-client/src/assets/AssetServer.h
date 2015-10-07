@@ -23,7 +23,7 @@
 class AssetServer : public ThreadedAssignment {
     Q_OBJECT
 public:
-    AssetServer(NLPacket& packet);
+    AssetServer(ReceivedMessage& message);
 
 public slots:
     void run();

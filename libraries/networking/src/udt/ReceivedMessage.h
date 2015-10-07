@@ -23,26 +23,31 @@
 // #include "PacketList.h"
 
 class ReceivedMessage : public QObject {
-
     Q_OBJECT
 public:
     ReceivedMessage(const NLPacketList& packetList);
     ReceivedMessage(NLPacket& packet);
 
+    const char* getPayload() const { return _data.constData(); }
     QByteArray getMessage() const { return _data; }
     // QBuffer getMessageAsBuffer() { return QBuffer(&_data); }
     //
     PacketType getType() const { return _packetType; }
+    PacketVersion getVersion() const { return _packetVersion; }
     qint64 getPayloadSize() const { return _data.size(); }
 
     bool isComplete() const { return _isComplete; }
     const QUuid& getSourceID() const { return _sourceID; }
 
+    HifiSockAddr getSenderSockAddr() { return _senderSockAddr; }
+
     void seek(qint64 position) { _position = position; }
     qint64 pos() const { return _position; }
     qint64 size() const { return _data.size(); }
+
     qint64 getNumPackets() const { return _numPackets; }
-    qint64 bytesLeftToRead() const { return _data.size() -  _position; }
+    qint64 getBytesLeftToRead() const { return _data.size() -  _position; }
+    qint64 getDataSize() const { return _data.size(); }
 
     qint64 peek(char* data, qint64 size);
     qint64 read(char* data, qint64 size);
@@ -59,7 +64,13 @@ private:
     QUuid _sourceID;
     qint64 _numPackets;
     PacketType _packetType;
+    PacketVersion _packetVersion;
     qint64 _position { 0 };
+    HifiSockAddr _senderSockAddr;
+
+    // Total size of message, including UDT headers. Does not include UDP headers.
+    qint64 _totalDataSize;
+
 
     std::atomic<bool> _isComplete { true };  
 };

@@ -27,8 +27,8 @@
 
 const QString ASSET_SERVER_LOGGING_TARGET_NAME = "asset-server";
 
-AssetServer::AssetServer(NLPacket& packet) :
-    ThreadedAssignment(packet),
+AssetServer::AssetServer(ReceivedMessage& message) :
+    ThreadedAssignment(message),
     _taskPool(this)
 {
 

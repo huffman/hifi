@@ -89,9 +89,9 @@ public slots:
     void setIceServerHostnameAndID(const QString& iceServerHostname, const QUuid& id);
 
     void processSettingsPacketList(QSharedPointer<ReceivedMessage> packetList);
-    void processICEPingReplyPacket(QSharedPointer<NLPacket> packet);
-    void processDTLSRequirementPacket(QSharedPointer<NLPacket> dtlsRequirementPacket);
-    void processICEResponsePacket(QSharedPointer<NLPacket> icePacket);
+    void processICEPingReplyPacket(QSharedPointer<ReceivedMessage> message);
+    void processDTLSRequirementPacket(QSharedPointer<ReceivedMessage> dtlsRequirementPacket);
+    void processICEResponsePacket(QSharedPointer<ReceivedMessage> icePacket);
 
 private slots:
     void completedHostnameLookup(const QHostInfo& hostInfo);
