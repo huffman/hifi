@@ -19,6 +19,7 @@ ReceivedMessage::ReceivedMessage(const NLPacketList& packetList)
       _sourceID(packetList.getSourceID()),
       _numPackets(packetList.getNumPackets()),
       _packetType(packetList.getType()),
+      _packetVersion(packetList.getVersion()),
       _senderSockAddr(packetList.getSenderSockAddr())
 {
     qDebug() << "Creating ReceivedMessage with nl data: " << packetList.getMessage();
@@ -28,6 +29,7 @@ ReceivedMessage::ReceivedMessage(NLPacket& packet)
     : _data(packet.readAll()),
       _sourceID(packet.getSourceID()),
       _numPackets(1),
+      _packetVersion(packet.getVersion()),
       _packetType(packet.getType()),
       _senderSockAddr(packet.getSenderSockAddr())
 {

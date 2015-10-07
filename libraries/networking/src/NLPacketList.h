@@ -23,6 +23,7 @@ public:
     
     static std::unique_ptr<NLPacketList> fromPacketList(std::unique_ptr<udt::PacketList>);
 
+    PacketVersion getVersion() const { return _packetVersion; }
     const QUuid& getSourceID() const { return _sourceID; }
     
 private:
@@ -34,6 +35,8 @@ private:
 
     virtual std::unique_ptr<udt::Packet> createPacket();
 
+
+    PacketVersion _packetVersion;
     QUuid _sourceID;
 };
 

@@ -54,6 +54,7 @@ void OctreePacketProcessor::processPacket(QSharedPointer<ReceivedMessage> messag
             // construct a new packet from the piggybacked one
             auto buffer = std::unique_ptr<char[]>(new char[piggybackBytes]);
             memcpy(buffer.get(), message->getPayload() + statsMessageLength, piggybackBytes);
+            qDebug() << "Got piggyback, read " << piggybackBytes << " bytes";
             
             auto newPacket = NLPacket::fromReceivedPacket(std::move(buffer), piggybackBytes, message->getSenderSockAddr());
             message = QSharedPointer<ReceivedMessage>(new ReceivedMessage(*newPacket.release()));
@@ -72,6 +73,7 @@ void OctreePacketProcessor::processPacket(QSharedPointer<ReceivedMessage> messag
         const QUuid& senderUUID = message->getSourceID();
         if (!versionDebugSuppressMap.contains(senderUUID, packetType)) {
             
+            qDebug() << "Was stats packet? " << wasStatsPacket;
             qDebug() << "OctreePacketProcessor - piggyback packet version mismatch on" << packetType << "- Sender"
                 << senderUUID << "sent" << (int) message->getVersion() << "but"
                 << (int) versionForPacketType(packetType) << "expected.";
