@@ -54,7 +54,7 @@ public:
     
     void handleVerifiedPacket(std::unique_ptr<udt::Packet> packet);
     void handleVerifiedPacketList(std::unique_ptr<udt::PacketList> packetList);
-    bool handleVerifiedMessage(std::unique_ptr<ReceivedMessage> message);
+    void handleVerifiedMessage(std::unique_ptr<ReceivedMessage> message);
 
 signals:
     void dataReceived(quint8 channelType, int bytes);
@@ -73,7 +73,7 @@ private:
     QMutex _packetListenerLock;
     // TODO: replace the two following hashes with an std::vector once we switch Packet/PacketList to Message
     // QHash<PacketType, ObjectMethodPair> _packetListenerMap;
-    QHash<PacketType, ObjectMethodPair> _packetListListenerMap;
+    QHash<PacketType, ObjectMethodPair> _messageListenerMap;
     int _inPacketCount = 0;
     int _inByteCount = 0;
     bool _shouldDropPackets = false;

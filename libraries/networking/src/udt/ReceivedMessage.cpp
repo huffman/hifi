@@ -29,8 +29,8 @@ ReceivedMessage::ReceivedMessage(NLPacket& packet)
     : _data(packet.readAll()),
       _sourceID(packet.getSourceID()),
       _numPackets(1),
-      _packetVersion(packet.getVersion()),
       _packetType(packet.getType()),
+      _packetVersion(packet.getVersion()),
       _senderSockAddr(packet.getSenderSockAddr())
 {
 }
@@ -57,7 +57,12 @@ QByteArray ReceivedMessage::read(qint64 size) {
 }
 
 QByteArray ReceivedMessage::readWithoutCopy(qint64 size) {
-    auto data = _data.mid(_position, size);
+    QByteArray data { QByteArray::fromRawData(_data.constData() + _position, size) };
     _position += size;
     return data;
+}
+
+void ReceivedMessage::onComplete() {
+    _isComplete = true;
+    emit completed();
 }

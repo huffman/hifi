@@ -13,14 +13,11 @@
 #ifndef hifi_ReceivedMessage_h
 #define hifi_ReceivedMessage_h
 
-// #include <QBuffer>
 #include <QByteArray>
 #include <QObject>
 
 // #include "../NLPacket.h"
 #include "../NLPacketList.h"
-
-// #include "PacketList.h"
 
 class ReceivedMessage : public QObject {
     Q_OBJECT
@@ -30,34 +27,45 @@ public:
 
     const char* getPayload() const { return _data.constData(); }
     QByteArray getMessage() const { return _data; }
-    // QBuffer getMessageAsBuffer() { return QBuffer(&_data); }
-    //
     PacketType getType() const { return _packetType; }
     PacketVersion getVersion() const { return _packetVersion; }
-    qint64 getPayloadSize() const { return _data.size(); }
 
     bool isComplete() const { return _isComplete; }
-    const QUuid& getSourceID() const { return _sourceID; }
 
-    HifiSockAddr getSenderSockAddr() { return _senderSockAddr; }
+    const QUuid& getSourceID() const { return _sourceID; }
+    const HifiSockAddr& getSenderSockAddr() { return _senderSockAddr; }
 
     void seek(qint64 position) { _position = position; }
     qint64 pos() const { return _position; }
     qint64 size() const { return _data.size(); }
 
+    // Get the number of packets that were used to send this message
     qint64 getNumPackets() const { return _numPackets; }
-    qint64 getBytesLeftToRead() const { return _data.size() -  _position; }
+
     qint64 getDataSize() const { return _data.size(); }
+    qint64 getPayloadSize() const { return _data.size(); }
+
+    qint64 getBytesLeftToRead() const { return _data.size() -  _position; }
 
     qint64 peek(char* data, qint64 size);
     qint64 read(char* data, qint64 size);
 
     QByteArray peek(qint64 size);
     QByteArray read(qint64 size);
+
+    // This will return a QByteArray referencing the underlying data _without_ refcounting that data.
+    // Be careful when using this method, only use it when the lifetime of the returned QByteArray will not
+    // exceed that of the ReceivedMessage.
     QByteArray readWithoutCopy(qint64 size);
 
     template<typename T> qint64 peekPrimitive(T* data);
     template<typename T> qint64 readPrimitive(T* data);
+
+signals:
+    void completed();
+
+private slots:
+    void onComplete();
 
 private:
     QByteArray _data;
@@ -70,7 +78,6 @@ private:
 
     // Total size of message, including UDT headers. Does not include UDP headers.
     qint64 _totalDataSize;
-
 
     std::atomic<bool> _isComplete { true };  
 };

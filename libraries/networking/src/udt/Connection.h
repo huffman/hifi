@@ -157,7 +157,7 @@ private:
    
     std::unique_ptr<SendQueue> _sendQueue;
     
-    std::map<MessageNumber, PendingReceivedMessage> _pendingReceivedMessages;
+    std::map<MessageNumber, std::shared_ptr<PendingReceivedMessage>> _pendingReceivedMessages;
     
     int _packetsSinceACK { 0 }; // The number of packets that have been received during the current ACK interval
     

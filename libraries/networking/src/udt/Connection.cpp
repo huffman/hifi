@@ -130,13 +130,13 @@ void Connection::queueReceivedMessagePacket(std::unique_ptr<Packet> packet) {
     Q_ASSERT(packet->isPartOfMessage());
 
     auto messageNumber = packet->getMessageNumber();
-    PendingReceivedMessage& pendingMessage = _pendingReceivedMessages[messageNumber];
+    auto& pendingMessage = _pendingReceivedMessages[messageNumber];
 
-    pendingMessage.enqueuePacket(std::move(packet));
+    pendingMessage->enqueuePacket(std::move(packet));
 
-    if (pendingMessage.isComplete()) {
+    if (pendingMessage->isComplete()) {
         // All messages have been received, create PacketList
-        auto packetList = PacketList::fromReceivedPackets(std::move(pendingMessage._packets));
+        auto packetList = PacketList::fromReceivedPackets(std::move(pendingMessage->_packets));
         
         _pendingReceivedMessages.erase(messageNumber);
 
