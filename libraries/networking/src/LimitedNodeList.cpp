@@ -99,6 +99,11 @@ LimitedNodeList::LimitedNodeList(unsigned short socketListenPort, unsigned short
             _packetReceiver->handleVerifiedPacket(std::move(packet));
         }
     );
+    _nodeSocket.setPendingMessageHandler(
+        [this](std::unique_ptr<udt::Packet> packet) {
+            _packetReceiver->handleVerifiedMessagePacket(std::move(packet));
+        }
+    );
     _nodeSocket.setPacketListHandler(
         [this](std::unique_ptr<udt::PacketList> packetList) {
             _packetReceiver->handleVerifiedPacketList(std::move(packetList));

@@ -31,8 +31,20 @@ ReceivedMessage::ReceivedMessage(NLPacket& packet)
       _numPackets(1),
       _packetType(packet.getType()),
       _packetVersion(packet.getVersion()),
-      _senderSockAddr(packet.getSenderSockAddr())
+      _senderSockAddr(packet.getSenderSockAddr()),
+      _isComplete(packet.getPacketPosition() == NLPacket::ONLY)
 {
+}
+
+void ReceivedMessage::appendPacket(std::unique_ptr<NLPacket> packet) {
+    ++_numPackets;
+
+    _data.append(packet->getPayload(), packet->getPayloadSize());
+    emit progress(this);
+    if (packet->getPacketPosition() == NLPacket::PacketPosition::LAST) {
+        _isComplete = true;
+        emit completed(this);
+    }
 }
 
 qint64 ReceivedMessage::peek(char* data, qint64 size) {
@@ -64,5 +76,5 @@ QByteArray ReceivedMessage::readWithoutCopy(qint64 size) {
 
 void ReceivedMessage::onComplete() {
     _isComplete = true;
-    emit completed();
+    emit completed(this);
 }

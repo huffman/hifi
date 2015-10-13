@@ -38,9 +38,9 @@ AssetClient::AssetClient() {
     
     auto nodeList = DependencyManager::get<NodeList>();
     auto& packetReceiver = nodeList->getPacketReceiver();
-    packetReceiver.registerListener(PacketType::AssetGetInfoReply, this, "handleAssetGetInfoReply");
-    packetReceiver.registerMessageListener(PacketType::AssetGetReply, this, "handleAssetGetReply");
-    packetReceiver.registerListener(PacketType::AssetUploadReply, this, "handleAssetUploadReply");
+    packetReceiver.registerMessageListener(PacketType::AssetGetInfoReply, this, "handleAssetGetInfoReply");
+    packetReceiver.registerMessageListener(PacketType::AssetGetReply, this, "handleAssetGetReply", true);
+    packetReceiver.registerMessageListener(PacketType::AssetUploadReply, this, "handleAssetUploadReply");
 
     connect(nodeList.data(), &LimitedNodeList::nodeKilled, this, &AssetClient::handleNodeKilled);
 }
@@ -105,7 +105,7 @@ AssetUpload* AssetClient::createUpload(const QString& filename) {
 }
 
 bool AssetClient::getAsset(const QString& hash, const QString& extension, DataOffset start, DataOffset end,
-                           ReceivedAssetCallback callback) {
+                           ReceivedAssetCallback callback, ProgressCallback progressCallback) {
     if (hash.length() != SHA256_HASH_HEX_LENGTH) {
         qCWarning(asset_client) << "Invalid hash size";
         return false;
@@ -203,8 +203,14 @@ void AssetClient::handleAssetGetInfoReply(QSharedPointer<ReceivedMessage> messag
     }
 }
 
-void AssetClient::handleAssetGetReply(QSharedPointer<ReceivedMessage> packetList, SharedNodePointer senderNode) {
-    QByteArray data = packetList->getMessage();
+void AssetClient::handleAssetGetReply(QSharedPointer<ReceivedMessage> message, SharedNodePointer senderNode) {
+    if (message->getPayloadSize() > sizeof(MessageID)) {
+        // Read in message id
+    } else {
+        // connect to progress...
+    }
+
+    QByteArray data = message->getMessage();
     QBuffer packet { &data };
     packet.open(QIODevice::ReadOnly);
 

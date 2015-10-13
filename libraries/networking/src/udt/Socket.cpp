@@ -222,6 +222,12 @@ void Socket::messageReceived(std::unique_ptr<PacketList> packetList) {
     }
 }
 
+void Socket::pendingMessageReceived(std::unique_ptr<Packet> packet) {
+    if (_pendingMessageHandler) {
+        _pendingMessageHandler(std::move(packet));
+    }
+}
+
 void Socket::readPendingDatagrams() {
     int packetSizeWithHeader = -1;
     while ((packetSizeWithHeader = _udpSocket.pendingDatagramSize()) != -1) {

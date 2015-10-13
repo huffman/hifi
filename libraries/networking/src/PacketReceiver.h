@@ -14,6 +14,7 @@
 #define hifi_PacketReceiver_h
 
 #include <vector>
+#include <unordered_map>
 
 #include <QtCore/QMap>
 #include <QtCore/QMetaMethod>
@@ -24,11 +25,21 @@
 
 #include "NLPacket.h"
 #include "NLPacketList.h"
+#include "udt/Packet.h"
 #include "udt/PacketHeaders.h"
 #include "udt/ReceivedMessage.h"
 
 class EntityEditPacketSender;
 class OctreePacketProcessor;
+
+namespace std {
+    template <>
+    struct hash<std::pair<HifiSockAddr, udt::Packet::MessageNumber>> {
+        size_t operator()(const std::pair<HifiSockAddr, udt::Packet::MessageNumber>& pair) const {
+            return hash<HifiSockAddr>()(pair.first) ^ hash<udt::Packet::MessageNumber>()(pair.second);
+        }
+    };
+}
 
 class PacketReceiver : public QObject {
     Q_OBJECT
@@ -48,18 +59,26 @@ public:
     void resetCounters() { _inPacketCount = 0; _inByteCount = 0; }
 
     bool registerListenerForTypes(PacketTypeList types, QObject* listener, const char* slot);
-    bool registerMessageListener(PacketType type, QObject* listener, const char* slot);
+    bool registerMessageListener(PacketType type, QObject* listener, const char* slot, bool deliverPending = false);
     bool registerListener(PacketType type, QObject* listener, const char* slot);
     void unregisterListener(QObject* listener);
     
     void handleVerifiedPacket(std::unique_ptr<udt::Packet> packet);
     void handleVerifiedPacketList(std::unique_ptr<udt::PacketList> packetList);
-    void handleVerifiedMessage(std::unique_ptr<ReceivedMessage> message);
+    void handleVerifiedMessage(QSharedPointer<ReceivedMessage> message, bool justReceived);
+
+    void handleVerifiedMessagePacket(std::unique_ptr<udt::Packet> message);
 
 signals:
     void dataReceived(quint8 channelType, int bytes);
     
 private:
+    struct Listener {
+        QPointer<QObject> object;
+        QMetaMethod method;
+        bool deliverPending;
+    };
+
     // these are brutal hacks for now - ideally GenericThread / ReceivedPacketProcessor
     // should be changed to have a true event loop and be able to handle our QMetaMethod::invoke
     void registerDirectListenerForTypes(PacketTypeList types, QObject* listener, const char* slot);
@@ -67,18 +86,18 @@ private:
 
     QMetaMethod matchingMethodForListener(PacketType type, QObject* object, const char* slot) const;
     void registerVerifiedListener(PacketType type, QObject* listener, const QMetaMethod& slot);
-    
-    using ObjectMethodPair = std::pair<QPointer<QObject>, QMetaMethod>;
 
     QMutex _packetListenerLock;
     // TODO: replace the two following hashes with an std::vector once we switch Packet/PacketList to Message
     // QHash<PacketType, ObjectMethodPair> _packetListenerMap;
-    QHash<PacketType, ObjectMethodPair> _messageListenerMap;
+    QHash<PacketType, Listener> _messageListenerMap;
     int _inPacketCount = 0;
     int _inByteCount = 0;
     bool _shouldDropPackets = false;
     QMutex _directConnectSetMutex;
     QSet<QObject*> _directlyConnectedObjects;
+
+    std::unordered_map<std::pair<HifiSockAddr, udt::Packet::MessageNumber>, QSharedPointer<ReceivedMessage>> _pendingMessages;
     
     friend class EntityEditPacketSender;
     friend class OctreePacketProcessor;

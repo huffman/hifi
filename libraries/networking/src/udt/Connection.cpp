@@ -134,6 +134,13 @@ void Connection::queueReceivedMessagePacket(std::unique_ptr<Packet> packet) {
 
     pendingMessage->enqueuePacket(std::move(packet));
 
+    while (pendingMessage->hasAvailablePackets()) {
+        auto packet = pendingMessage->removeNextPacket();
+        if (_parentSocket) {
+            _parentSocket->pendingMessageReceived(std::move(packet));
+        }  
+    }
+
     if (pendingMessage->isComplete()) {
         // All messages have been received, create PacketList
         auto packetList = PacketList::fromReceivedPackets(std::move(pendingMessage->_packets));
@@ -876,4 +883,18 @@ void PendingReceivedMessage::enqueuePacket(std::unique_ptr<Packet> packet) {
     }
     
     _packets.insert(it.base(), std::move(packet));
+}
+
+bool PendingReceivedMessage::hasAvailablePackets() const {
+    return _packets.size() > 0
+        && _nextPartNumber == _packets.front()->getMessagePartNumber();
+}
+
+std::unique_ptr<Packet> PendingReceivedMessage::removeNextPacket() {
+    if (hasAvailablePackets()) {
+        auto p = std::move(_packets.front());
+        _packets.pop_front();
+        return p;
+    }
+    return std::unique_ptr<Packet>();
 }

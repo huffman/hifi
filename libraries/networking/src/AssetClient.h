@@ -35,6 +35,7 @@ using ReceivedAssetCallback = std::function<void(bool responseReceived, AssetSer
 using GetInfoCallback = std::function<void(bool responseReceived, AssetServerError serverError, AssetInfo info)>;
 using UploadResultCallback = std::function<void(bool responseReceived, AssetServerError serverError, const QString& hash)>;
 
+using ProgressCallback = std::function<void(qint64 totalReceived, qint64 total)>;
 
 
 class AssetClient : public QObject, public Dependency {
@@ -56,7 +57,8 @@ private slots:
 
 private:
     bool getAssetInfo(const QString& hash, const QString& extension, GetInfoCallback callback);
-    bool getAsset(const QString& hash, const QString& extension, DataOffset start, DataOffset end, ReceivedAssetCallback callback);
+    bool getAsset(const QString& hash, const QString& extension, DataOffset start, DataOffset end,
+                  ReceivedAssetCallback callback, ProgressCallback progressCallback);
     bool uploadAsset(const QByteArray& data, const QString& extension, UploadResultCallback callback);
 
     static MessageID _currentID;

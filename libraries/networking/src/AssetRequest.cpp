@@ -124,6 +124,7 @@ void AssetRequest::start() {
             
             _state = Finished;
             emit finished(this);
+        }, [](qint64 totalReceived, qint64 total) {
         });
     });
 }

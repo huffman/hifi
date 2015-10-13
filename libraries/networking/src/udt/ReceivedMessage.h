@@ -30,6 +30,8 @@ public:
     PacketType getType() const { return _packetType; }
     PacketVersion getVersion() const { return _packetVersion; }
 
+    void appendPacket(std::unique_ptr<NLPacket> packet);
+
     bool isComplete() const { return _isComplete; }
 
     const QUuid& getSourceID() const { return _sourceID; }
@@ -62,7 +64,8 @@ public:
     template<typename T> qint64 readPrimitive(T* data);
 
 signals:
-    void completed();
+    void progress(ReceivedMessage*);
+    void completed(ReceivedMessage*);
 
 private slots:
     void onComplete();
