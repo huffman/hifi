@@ -14,6 +14,9 @@
 
 #include "QSharedPointer"
 
+static int receivedMessageMetaTypeId = qRegisterMetaType<ReceivedMessage*>("ReceivedMessage*");
+static int sharedPtrReceivedMessageMetaTypeId = qRegisterMetaType<QSharedPointer<ReceivedMessage>>("QSharedPointer<ReceivedMessage>");
+
 ReceivedMessage::ReceivedMessage(const NLPacketList& packetList)
     : _data(packetList.getMessage()),
       _sourceID(packetList.getSourceID()),
@@ -66,6 +69,10 @@ QByteArray ReceivedMessage::read(qint64 size) {
     auto data = _data.mid(_position, size);
     _position += size;
     return data;
+}
+
+QByteArray ReceivedMessage::readAll() {
+    return read(getBytesLeftToRead());
 }
 
 QByteArray ReceivedMessage::readWithoutCopy(qint64 size) {

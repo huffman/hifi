@@ -60,10 +60,6 @@ LimitedNodeList::LimitedNodeList(unsigned short socketListenPort, unsigned short
     if (firstCall) {
         NodeType::init();
 
-        // register the SharedNodePointer meta-type for signals/slots
-        qRegisterMetaType<QSharedPointer<Node>>();
-        qRegisterMetaType<SharedNodePointer>();
-
         firstCall = false;
     }
     
@@ -384,6 +380,11 @@ qint64 LimitedNodeList::sendPacketList(std::unique_ptr<NLPacketList> packetList,
         NLPacket* nlPacket = static_cast<NLPacket*>(packet.get());
         collectPacketStats(*nlPacket);
         fillPacketHeader(*nlPacket, destinationNode.getConnectionSecret());
+    }
+    auto addr = destinationNode.getActiveSocket();
+    if (!addr) {
+        qDebug() << "Null socket addr";
+        return 0;
     }
 
     return _nodeSocket.writePacketList(std::move(packetList), *destinationNode.getActiveSocket());

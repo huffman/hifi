@@ -252,7 +252,7 @@ void PacketReceiver::handleVerifiedMessagePacket(std::unique_ptr<udt::Packet> pa
     auto nlPacket = NLPacket::fromBase(std::move(packet));
     _inPacketCount += 1;
     _inByteCount += nlPacket->size();
-    auto key = std::pair<HifiSockAddr, udt::Packet::MessageNumber>(packet->getSenderSockAddr(), packet->getMessageNumber());
+    auto key = std::pair<HifiSockAddr, udt::Packet::MessageNumber>(nlPacket->getSenderSockAddr(), nlPacket->getMessageNumber());
     auto it = _pendingMessages.find(key);
     QSharedPointer<ReceivedMessage> message;
     if (it == _pendingMessages.end()) {
@@ -260,9 +260,8 @@ void PacketReceiver::handleVerifiedMessagePacket(std::unique_ptr<udt::Packet> pa
         message = QSharedPointer<ReceivedMessage>(new ReceivedMessage(*nlPacket.release()));
         if (!message->isComplete()) {
             _pendingMessages[key] = message;
-        } else {
-            handleVerifiedMessage(message, true);
         }
+        handleVerifiedMessage(message, true);
     } else {
         message = it->second;
         message->appendPacket(std::move(nlPacket));
@@ -331,6 +330,8 @@ void PacketReceiver::handleVerifiedMessage(QSharedPointer<ReceivedMessage> recei
             if (matchingNode) {
                 emit dataReceived(matchingNode->getType(), receivedMessage->size());
                 matchingNode->recordBytesReceived(receivedMessage->size());
+                Node* n = matchingNode.data();
+                auto addr = n->getActiveSocket();
 
                 QMetaMethod metaMethod = listener.method;
 

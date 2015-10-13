@@ -25,7 +25,6 @@
 
 #include "NLPacket.h"
 #include "NLPacketList.h"
-#include "udt/Packet.h"
 #include "udt/PacketHeaders.h"
 #include "udt/ReceivedMessage.h"
 

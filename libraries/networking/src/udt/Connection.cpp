@@ -132,24 +132,24 @@ void Connection::queueReceivedMessagePacket(std::unique_ptr<Packet> packet) {
     auto messageNumber = packet->getMessageNumber();
     auto& pendingMessage = _pendingReceivedMessages[messageNumber];
 
-    pendingMessage->enqueuePacket(std::move(packet));
+    pendingMessage.enqueuePacket(std::move(packet));
 
-    while (pendingMessage->hasAvailablePackets()) {
-        auto packet = pendingMessage->removeNextPacket();
+    while (pendingMessage.hasAvailablePackets()) {
+        auto packet = pendingMessage.removeNextPacket();
         if (_parentSocket) {
             _parentSocket->pendingMessageReceived(std::move(packet));
         }  
     }
 
-    if (pendingMessage->isComplete()) {
+    if (pendingMessage.isComplete()) {
         // All messages have been received, create PacketList
-        auto packetList = PacketList::fromReceivedPackets(std::move(pendingMessage->_packets));
+        //auto packetList = PacketList::fromReceivedPackets(std::move(pendingMessage._packets));
         
         _pendingReceivedMessages.erase(messageNumber);
 
-        if (_parentSocket) {
-            _parentSocket->messageReceived(std::move(packetList));
-        }
+        //if (_parentSocket) {
+            //_parentSocket->messageReceived(std::move(packetList));
+        //}
     }
 }
 
@@ -892,6 +892,7 @@ bool PendingReceivedMessage::hasAvailablePackets() const {
 
 std::unique_ptr<Packet> PendingReceivedMessage::removeNextPacket() {
     if (hasAvailablePackets()) {
+        _nextPartNumber++;
         auto p = std::move(_packets.front());
         _packets.pop_front();
         return p;

@@ -136,7 +136,7 @@ bool AssetClient::getAsset(const QString& hash, const QString& extension, DataOf
 
         nodeList->sendPacket(std::move(packet), *assetServer);
 
-        _pendingRequests[assetServer][messageID] = callback;
+        _pendingRequests[assetServer][messageID] = { callback, progressCallback };
 
         return true;
     }
@@ -204,30 +204,23 @@ void AssetClient::handleAssetGetInfoReply(QSharedPointer<ReceivedMessage> messag
 }
 
 void AssetClient::handleAssetGetReply(QSharedPointer<ReceivedMessage> message, SharedNodePointer senderNode) {
-    if (message->getPayloadSize() > sizeof(MessageID)) {
-        // Read in message id
-    } else {
-        // connect to progress...
-    }
 
-    QByteArray data = message->getMessage();
-    QBuffer packet { &data };
-    packet.open(QIODevice::ReadOnly);
+    
 
-    auto assetHash = packet.read(SHA256_HASH_LENGTH);
+    auto assetHash = message->read(SHA256_HASH_LENGTH);
     qCDebug(asset_client) << "Got reply for asset: " << assetHash.toHex();
 
     MessageID messageID;
-    packet.read(reinterpret_cast<char*>(&messageID), sizeof(messageID));
+    message->readPrimitive(&messageID);
 
     AssetServerError error;
-    packet.read(reinterpret_cast<char*>(&error), sizeof(AssetServerError));
-    QByteArray assetData;
+    message->readPrimitive(&error);
 
+    // QByteArray assetData;
+
+    DataOffset length = 0;
     if (!error) {
-        DataOffset length;
-        packet.read(reinterpret_cast<char*>(&length), sizeof(DataOffset));
-        data = packet.read(length);
+        message->readPrimitive(&length);
     } else {
         qCWarning(asset_client) << "Failure getting asset: " << error;
     }
@@ -242,8 +235,19 @@ void AssetClient::handleAssetGetReply(QSharedPointer<ReceivedMessage> message, S
         // Check if we have this pending request
         auto requestIt = messageCallbackMap.find(messageID);
         if (requestIt != messageCallbackMap.end()) {
-            auto callback = requestIt->second;
-            callback(true, error, data);
+            auto& callbacks = requestIt->second;
+
+            if (message->isComplete()) {
+                callbacks.completeCallback(true, error, message->readAll());
+            } else {
+                connect(message.data(), &ReceivedMessage::progress, this, [this, length, message, callbacks](ReceivedMessage* msg) {
+                    //qDebug() << "Progress: " << msg->getDataSize();
+                    callbacks.progressCallback(msg->getDataSize(), length);
+                });
+                connect(message.data(), &ReceivedMessage::completed, this, [this, message, error, callbacks](ReceivedMessage* msg) {
+                    callbacks.completeCallback(true, error, message->readAll());
+                });
+            }
             messageCallbackMap.erase(requestIt);
         }
 
@@ -325,7 +329,7 @@ void AssetClient::handleNodeKilled(SharedNodePointer node) {
         auto messageMapIt = _pendingRequests.find(node);
         if (messageMapIt != _pendingRequests.end()) {
             for (const auto& value : messageMapIt->second) {
-                value.second(false, AssetServerError::NoError, QByteArray());
+                value.second.completeCallback(false, AssetServerError::NoError, QByteArray());
             }
             messageMapIt->second.clear();
         }

@@ -54,6 +54,7 @@ public:
 
     QByteArray peek(qint64 size);
     QByteArray read(qint64 size);
+    QByteArray readAll();
 
     // This will return a QByteArray referencing the underlying data _without_ refcounting that data.
     // Be careful when using this method, only use it when the lifetime of the returned QByteArray will not
@@ -84,6 +85,9 @@ private:
 
     std::atomic<bool> _isComplete { true };  
 };
+
+Q_DECLARE_METATYPE(ReceivedMessage*)
+Q_DECLARE_METATYPE(QSharedPointer<ReceivedMessage>)
 
 template<typename T> qint64 ReceivedMessage::peekPrimitive(T* data) {
     return peek(reinterpret_cast<char*>(data), sizeof(T));
