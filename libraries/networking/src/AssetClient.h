@@ -21,7 +21,7 @@
 #include "LimitedNodeList.h"
 #include "NLPacket.h"
 #include "Node.h"
-#include "udt/ReceivedMessage.h"
+#include "ReceivedMessage.h"
 
 class AssetRequest;
 class AssetUpload;

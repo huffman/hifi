@@ -40,4 +40,6 @@ private:
     QUuid _sourceID;
 };
 
+Q_DECLARE_METATYPE(QSharedPointer<NLPacketList>)
+
 #endif // hifi_PacketList_h

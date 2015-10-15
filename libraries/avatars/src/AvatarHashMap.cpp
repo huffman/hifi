@@ -79,7 +79,7 @@ void AvatarHashMap::processAvatarDataPacket(QSharedPointer<ReceivedMessage> mess
 
 void AvatarHashMap::processAvatarIdentityPacket(QSharedPointer<ReceivedMessage> message, SharedNodePointer sendingNode) {
     // setup a data stream to parse the packet
-    QDataStream identityStream(message->getPayload());
+    QDataStream identityStream(message->getMessage());
 
     QUuid sessionUUID;
     

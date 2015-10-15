@@ -18,7 +18,7 @@
 #include <QThreadPool>
 
 #include "AssetUtils.h"
-#include "udt/ReceivedMessage.h"
+#include "ReceivedMessage.h"
 
 class AssetServer : public ThreadedAssignment {
     Q_OBJECT

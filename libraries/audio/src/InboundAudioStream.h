@@ -15,7 +15,7 @@
 #include <NodeData.h>
 #include <NumericalConstants.h>
 #include <udt/PacketHeaders.h>
-#include <udt/ReceivedMessage.h>
+#include <ReceivedMessage.h>
 #include <StDev.h>
 
 #include "AudioRingBuffer.h"

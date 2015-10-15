@@ -381,11 +381,6 @@ qint64 LimitedNodeList::sendPacketList(std::unique_ptr<NLPacketList> packetList,
         collectPacketStats(*nlPacket);
         fillPacketHeader(*nlPacket, destinationNode.getConnectionSecret());
     }
-    auto addr = destinationNode.getActiveSocket();
-    if (!addr) {
-        qDebug() << "Null socket addr";
-        return 0;
-    }
 
     return _nodeSocket.writePacketList(std::move(packetList), *destinationNode.getActiveSocket());
 }

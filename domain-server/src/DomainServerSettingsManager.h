@@ -18,7 +18,7 @@
 #include <HifiConfigVariantMap.h>
 #include <HTTPManager.h>
 
-#include <udt/ReceivedMessage.h>
+#include <ReceivedMessage.h>
 
 const QString SETTINGS_PATHS_KEY = "paths";
 

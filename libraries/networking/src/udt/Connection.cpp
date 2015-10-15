@@ -136,20 +136,11 @@ void Connection::queueReceivedMessagePacket(std::unique_ptr<Packet> packet) {
 
     while (pendingMessage.hasAvailablePackets()) {
         auto packet = pendingMessage.removeNextPacket();
-        if (_parentSocket) {
-            _parentSocket->pendingMessageReceived(std::move(packet));
-        }  
+        _parentSocket->pendingMessageReceived(std::move(packet));
     }
 
     if (pendingMessage.isComplete()) {
-        // All messages have been received, create PacketList
-        //auto packetList = PacketList::fromReceivedPackets(std::move(pendingMessage._packets));
-        
         _pendingReceivedMessages.erase(messageNumber);
-
-        //if (_parentSocket) {
-            //_parentSocket->messageReceived(std::move(packetList));
-        //}
     }
 }
 

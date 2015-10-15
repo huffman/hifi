@@ -14,7 +14,7 @@
 
 #include <QtCore/QUuid>
 
-#include "udt/ReceivedMessage.h"
+#include "ReceivedMessage.h"
 
 #include "NodeList.h"
 

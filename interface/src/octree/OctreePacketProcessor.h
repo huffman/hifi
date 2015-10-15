@@ -13,7 +13,7 @@
 #define hifi_OctreePacketProcessor_h
 
 #include <ReceivedPacketProcessor.h>
-#include <udt/ReceivedMessage.h>
+#include <ReceivedMessage.h>
 
 /// Handles processing of incoming voxel packets for the interface application. As with other ReceivedPacketProcessor classes
 /// the user is responsible for reading inbound packets and adding them to the processing queue by calling queueReceivedPacket()

@@ -24,7 +24,7 @@
 #include "NLPacket.h"
 #include "NLPacketList.h"
 #include "Node.h"
-#include "udt/ReceivedMessage.h"
+#include "ReceivedMessage.h"
 
 const unsigned short DEFAULT_DOMAIN_SERVER_PORT = 40102;
 const unsigned short DEFAULT_DOMAIN_SERVER_DTLS_PORT = 40103;

@@ -37,10 +37,10 @@
 #include "DomainHandler.h"
 #include "Node.h"
 #include "NLPacket.h"
-#include "PacketReceiver.h"
 #include "NLPacketList.h"
+#include "PacketReceiver.h"
+#include "ReceivedMessage.h"
 #include "udt/PacketHeaders.h"
-#include "udt/ReceivedMessage.h"
 #include "udt/Socket.h"
 #include "UUIDHasher.h"
 

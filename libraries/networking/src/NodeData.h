@@ -17,7 +17,7 @@
 #include <QtCore/QSharedPointer>
 
 #include "NLPacket.h"
-#include "udt/ReceivedMessage.h"
+#include "ReceivedMessage.h"
 
 class Node;
 

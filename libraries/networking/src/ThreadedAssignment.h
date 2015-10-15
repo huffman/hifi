@@ -14,7 +14,7 @@
 
 #include <QtCore/QSharedPointer>
 
-#include "udt/ReceivedMessage.h"
+#include "ReceivedMessage.h"
 
 #include "Assignment.h"
 

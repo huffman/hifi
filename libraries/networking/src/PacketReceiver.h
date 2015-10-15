@@ -25,8 +25,8 @@
 
 #include "NLPacket.h"
 #include "NLPacketList.h"
+#include "ReceivedMessage.h"
 #include "udt/PacketHeaders.h"
-#include "udt/ReceivedMessage.h"
 
 class EntityEditPacketSender;
 class OctreePacketProcessor;

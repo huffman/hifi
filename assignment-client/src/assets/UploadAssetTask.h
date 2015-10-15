@@ -19,7 +19,7 @@
 #include <QtCore/QRunnable>
 #include <QtCore/QSharedPointer>
 
-#include "udt/ReceivedMessage.h"
+#include "ReceivedMessage.h"
 
 class NLPacketList;
 class Node;
