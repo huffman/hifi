@@ -251,7 +251,7 @@ void PhysicsEngine::stepSimulation() {
         _characterController->preSimulation(timeStep);
     }
 
-    int numSubsteps = _dynamicsWorld->stepSimulation(timeStep, PHYSICS_ENGINE_MAX_NUM_SUBSTEPS, PHYSICS_ENGINE_FIXED_SUBSTEP);
+    int numSubsteps = _dynamicsWorld->stepSimulation(timeStep, 1/*PHYSICS_ENGINE_MAX_NUM_SUBSTEPS*/, PHYSICS_ENGINE_FIXED_SUBSTEP);
     if (numSubsteps > 0) {
         BT_PROFILE("postSimulation");
         _numSubsteps += (uint32_t)numSubsteps;
@@ -364,6 +364,8 @@ const CollisionEvents& PhysicsEngine::getCollisionEvents() {
         }
 
         if (type == CONTACT_EVENT_TYPE_END) {
+            ObjectMotionState* motionStateA = static_cast<ObjectMotionState*>(contactItr->first._a);
+            qDebug() << "Ending " << motionStateA->getObjectID();
             ContactMap::iterator iterToDelete = contactItr;
             ++contactItr;
             _contactMap.erase(iterToDelete);

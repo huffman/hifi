@@ -36,13 +36,13 @@ if (WIN32)
         set(ARCH_DIR "x64")
         set(ARCH_SUFFIX "_x64")
     else()
-        set(ARCH_DIR "Win32")
+        set(ARCH_DIR "win32")
         set(ARCH_SUFFIX "")
     endif()
 
   # FIXME need to account for different architectures 
-  set(${EXTERNAL_NAME_UPPER}_LIBRARIES "${SOURCE_DIR}/lib/${ARCH_DIR}/release_dll/sixense${ARCH_SUFFIX}.lib" CACHE TYPE INTERNAL)
-  add_paths_to_fixup_libs(${SOURCE_DIR}/bin/win32)
+  set(${EXTERNAL_NAME_UPPER}_LIBRARIES "${SOURCE_DIR}/lib/${ARCH_DIR}/VS2013/release_dll/sixense${ARCH_SUFFIX}.lib" CACHE TYPE INTERNAL)
+  add_paths_to_fixup_libs(${SOURCE_DIR}/bin/VS2013/win32)
 
 elseif(APPLE)
 

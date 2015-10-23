@@ -237,8 +237,12 @@ void PhysicalEntitySimulation::handleCollisionEvents(const CollisionEvents& coll
     for (auto collision : collisionEvents) {
         // NOTE: The collision event is always aligned such that idA is never NULL.
         // however idB may be NULL.
+        qDebug() << "got event";
         if (!collision.idB.isNull()) {
+            qDebug() << "Simulation got collision for: " << collision.idA << ", " << collision.idB;
             emit entityCollisionWithEntity(collision.idA, collision.idB, collision);
+        } else {
+            qDebug() << "Simulation got collision for: " << collision.idA << ", idB is NULL";
         }
     }
 }

@@ -2794,6 +2794,7 @@ void Application::update(float deltaTime) {
             });
 
             auto collisionEvents = _physicsEngine->getCollisionEvents();
+            if (collisionEvents.size() > 0) qDebug() << "Found collisionEvent";
             avatarManager->handleCollisionEvents(collisionEvents);
 
             _physicsEngine->dumpStatsIfNecessary();

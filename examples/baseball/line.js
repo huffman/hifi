@@ -22,8 +22,9 @@ var PolyLine = function(position, color, defaultStrokeWidth) {
         { x: 0, y: 0, z: 0 },
     ];
     this.strokeWidths = [
-        this.defaultStrokeWidth,
-    ]
+        0.0,
+        //this.defaultStrokeWidth,
+    ];
     this.normals = [
         { x: 1, y: 0, z: 0 },
     ]
@@ -51,7 +52,7 @@ PolyLine.prototype.enqueuePoint = function(position) {
     position = Vec3.subtract(position, this.position);
     this.points.push(position);
     this.normals.push({ x: 1, y: 0, z: 0 });
-    this.strokeWidths.push(this.defaultStrokeWidth);
+    this.strokeWidths.push(this.defaultStrokeWidth * Math.min(1.0, this.points.length / 10));
     Entities.editEntity(this.entityID, {
         linePoints: this.points,
         normals: this.normals,

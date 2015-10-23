@@ -62,12 +62,12 @@ var PITCHING_MACHINE_PROPERTIES = {
 PITCHING_MACHINE_PROPERTIES.dimensions = Vec3.multiply(2.5, PITCHING_MACHINE_PROPERTIES.dimensions);
 var DISTANCE_FROM_PLATE = PITCHING_MACHINE_PROPERTIES.position.z;
 
-var PITCH_RATE = 5000;
+var PITCH_RATE = 1000;
 
 var BASEBALL_MODEL_URL = "atp:7185099f1f650600ca187222573a88200aeb835454bd2f578f12c7fb4fd190fa.fbx";
-var BASEBALL_MIN_SPEED = 2.7;
-var BASEBALL_MAX_SPEED = 5.7;
-var BASEBALL_RADIUS = 0.07468;
+var BASEBALL_MIN_SPEED = 8.7;
+var BASEBALL_MAX_SPEED = 12.7;
+var BASEBALL_RADIUS = 0.27468;
 var BASEBALL_PROPERTIES = {
     name: "Baseball",
     type: "Model",
@@ -132,7 +132,7 @@ function randomFloat(low, high) {
     return low + Math.random() * (high - low);
 }
 
-var ACCELERATION_SPREAD = 10.15;
+var ACCELERATION_SPREAD = 0;
 
 function Baseball(position, velocity, ballScale) {
     var self = this;
@@ -141,13 +141,11 @@ function Baseball(position, velocity, ballScale) {
     var properties = shallowCopy(BASEBALL_PROPERTIES);
     properties.position = position;
     properties.velocity = velocity;
-    /*
     properties.gravity = {
-        x: randomInt(-ACCELERATION_SPREAD, ACCELERATION_SPREAD),
-        y: randomInt(-ACCELERATION_SPREAD, ACCELERATION_SPREAD),
+        x: 0,//randomInt(-ACCELERATION_SPREAD, ACCELERATION_SPREAD),
+        y: 0,//randomInt(-ACCELERATION_SPREAD, ACCELERATION_SPREAD),
         z: 0.0,
     };
-    */
     properties.dimensions = Vec3.multiply(ballScale, properties.dimensions);
 
     // Create entity
@@ -205,7 +203,7 @@ Baseball.prototype = {
             }
         }, 50);
         Entities.editEntity(self.entityID, {
-            velocity: Vec3.multiply(2, properties.velocity),
+            velocity: Vec3.multiply(3, properties.velocity),
             gravity: {
                 x: 0,
                 y: -9.8,
@@ -265,18 +263,18 @@ function pitchBall() {
     var pitchFromPosition = Vec3.sum(pitchFromPositionBase, pitchFromOffset);
     var pitchDirection = Quat.getFront(machineProperties.rotation);
     var ballScale = machineProperties.dimensions.x / PITCHING_MACHINE_PROPERTIES.dimensions.x;
-    print("Creating baseball");
 
     var speed = randomFloat(BASEBALL_MIN_SPEED, BASEBALL_MAX_SPEED)
     var timeToPassPlate = (DISTANCE_FROM_PLATE + 1.0) / speed;
 
     var baseball = new Baseball(pitchFromPosition, Vec3.multiply(speed, pitchDirection), ballScale);
+    print("Creating baseball " + baseball.entityID);
     lastBall = baseball;
 
     baseball.onHit = function(entityB, collision) {
         var properties = Entities.getEntityProperties(entityB, ["name"]);
         var name = properties.name;
-        print("Hit: " + name);
+        print("Hit: " + entityB + ", " + name);
         if (name == "backstop") {
             print("STRIKE");
         } else if (name == "bat") {
@@ -288,7 +286,6 @@ function pitchBall() {
                   });
               }, 500);
         }
-        //Script.clearTimeout(strikeTimeout);
         return true;
     }
 
