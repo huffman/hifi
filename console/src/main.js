@@ -9,6 +9,9 @@ var shell = require('shell');
 var os = require('os');
 var childProcess = require('child_process');
 var path = require('path');
+var fs = require('fs');
+// var Tail = require('tail').Tail;
+var Tail = require('always-tail');
 
 var hfprocess = require('./modules/hf-process.js');
 var Process = hfprocess.Process;
@@ -19,9 +22,9 @@ const ipcMain = electron.ipcMain;
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
 var mainWindow = null;
+var logWindow = null;
 var appIcon = null;
 
-var path = require('path');
 var TRAY_ICON = path.join(__dirname, '../resources/console-tray.png');
 var APP_ICON = path.join(__dirname, '../resources/console.png');
 
@@ -59,6 +62,30 @@ function openFileBrowser(path) {
     }
 }
 
+var logMonitors = {};
+
+function ProcessLogMonitor(pid, path) {
+    console.log(pid, path);
+    this.pid = pid;
+    this.path = path;
+
+    this.data = "";
+
+    var logTail = new Tail(path, '\n', { start: 0 });
+
+    logTail.on('line', function(pid) {
+        return function(data) {
+            this.data += data;
+            logWindow.webContents.send('log-message', { pid: pid, message: data });
+        };
+    }(pid).bind(this));
+    logTail.on('error', function(error) {
+        console.log("ERROR:", error);
+    });
+};
+
+
+
 // if at this point any of the paths are null, we're missing something we wanted to find
 // TODO: show an error for the binaries that couldn't be found
 
@@ -75,6 +102,7 @@ app.on('ready', function() {
     }]);
     appIcon.setContextMenu(contextMenu);
 
+    var homeServer = null;
     // Create the browser window.
     mainWindow = new BrowserWindow({width: 800, height: 600, icon: APP_ICON});
 
@@ -90,6 +118,9 @@ app.on('ready', function() {
         // in an array if your app supports multi windows, this is the time
         // when you should delete the corresponding element.
         mainWindow = null;
+        if (homeServer) {
+            homeServer.stop();
+        }
     });
 
     // When a link is clicked that has `_target="_blank"`, open it in the user's native browser
@@ -98,14 +129,32 @@ app.on('ready', function() {
         shell.openExternal(url);
     });
 
+    // Create the browser window.
+    logWindow = new BrowserWindow({ width: 700, height: 500, icon: APP_ICON });
+    logWindow.loadURL('file://' + __dirname + '/log.html');
+    logWindow.webContents.openDevTools();
+    logWindow.on('closed', function() {
+        logWindow = null;
+    });
+    // When a link is clicked that has `_target="_blank"`, open it in the user's native browser
+    logWindow.webContents.on('new-window', function(e, url) {
+        e.preventDefault();
+        shell.openExternal(url);
+    });
+
     var logPath = path.join(app.getAppPath(), 'logs');
+
+    var httpStatusPort = 60332;
 
     if (interfacePath && dsPath && acPath) {
         var pInterface = new Process('interface', interfacePath);
 
-        var homeServer = new ProcessGroup('home', [
+        var acMonitor = new Process('ac_monitor', acPath, ['-n1',
+                                                           '--log-directory', logPath,
+                                                           '--http-status-port', httpStatusPort], logPath);
+        homeServer = new ProcessGroup('home', [
             new Process('domain_server', dsPath),
-            new Process('ac_monitor', acPath, ['-n6', '--log-directory', logPath])
+            acMonitor
         ]);
         homeServer.start();
 
@@ -118,6 +167,38 @@ app.on('ready', function() {
             console.log("Sending process update to web view");
             mainWindow.webContents.send('process-update', processes);
         };
+
+        logMonitors[acMonitor.child.pid] = new ProcessLogMonitor(acMonitor.child.pid, path.join(app.getAppPath(), acMonitor.logStdout));
+        var http = require('http');
+        var request = require('request');
+        function checkAC() {
+            console.log("Checking AC");
+
+            var options = {
+                url: "http://localhost:" + httpStatusPort + "/status",
+                json: true
+            };
+            request(options, function(error, response, body) {
+                if (error) {
+                    console.log('ERROR', error);
+                } else {
+                    console.log("Response", body);
+                    for (var pid in body.servers) {
+                        if (!(pid in logMonitors)) {
+                            console.log(pid);
+                            var info = body.servers[pid];
+                            console.log(info);
+                            var path = info.logStdout;
+
+                            logMonitors[pid] = new ProcessLogMonitor(pid, path);
+                        }
+                    }
+                }
+            });
+
+            // setTimeout(checkAC, 5000);
+        }
+        setTimeout(checkAC, 1000);
 
         pInterface.on('state-update', sendProcessUpdate);
         homeServer.on('state-update', sendProcessUpdate);

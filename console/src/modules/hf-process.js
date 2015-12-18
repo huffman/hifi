@@ -78,13 +78,14 @@ var ID = 0;
 function Process(name, command, commandArgs, logDirectory) {
     events.EventEmitter.call(this);
 
-    this.blah = 'adsf';
     this.id = ++ID;
     this.name = name;
     this.command = command;
     this.commandArgs = commandArgs ? commandArgs : [];
     this.child = null;
     this.logDirectory = logDirectory;
+    this.logStdout = null;
+    this.logStderr = null;
 
     this.state = ProcessStates.STOPPED;
 };
@@ -153,6 +154,7 @@ Process.prototype = extend(Process.prototype, {
                     console.log("Error renaming log file from " + tmpLogStdout + " to " + pidLogStdout, e);
                 }
             });
+            this.logStdout = pidLogStdout;
         }
 
         if (logStderr != 'ignore') {
@@ -162,6 +164,7 @@ Process.prototype = extend(Process.prototype, {
                     console.log("Error renaming log file from " + tmpLogStdout + " to " + pidLogStdout, e);
                 }
             });
+            this.logStderr = pidLogStderr;
         }
 
         this.child.on('error', this.onChildStartError.bind(this));
