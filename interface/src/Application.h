@@ -142,6 +142,8 @@ public:
     EntityTreePointer getEntityClipboard() { return _entityClipboard; }
     EntityTreeRenderer* getEntityClipboardRenderer() { return &_entityClipboardRenderer; }
     EntityEditPacketSender* getEntityEditPacketSender() { return &_entityEditSender; }
+    EntityTreePointer getLocalEntityTree() { return _localEntityTree; }
+    EntityTreeRenderer* getLocalEntityRenderer() { return &_localEntityRenderer; }
 
     ivec2 getMouse() const;
     ivec2 getTrueMouse() const;
@@ -444,6 +446,10 @@ private:
 
     EntityTreeRenderer _entityClipboardRenderer;
     EntityTreePointer _entityClipboard;
+
+    EntityTreeRenderer _localEntityRenderer;
+    EntityTreePointer _localEntityTree;
+    EntityScriptingInterface _localEntityScriptingInterface;
 
     ViewFrustum _viewFrustum; // current state of view frustum, perspective, orientation, etc.
     ViewFrustum _lastQueriedViewFrustum; /// last view frustum used to query octree servers (voxels)

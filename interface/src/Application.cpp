@@ -387,6 +387,9 @@ Application::Application(int& argc, char** argv, QElapsedTimer& startupTimer) :
     _physicsEngine(new PhysicsEngine(Vectors::ZERO)),
     _entityClipboardRenderer(false, this, this),
     _entityClipboard(new EntityTree()),
+    _localEntityRenderer(false, this, this),
+    _localEntityTree(new EntityTree()),
+    _localEntityScriptingInterface(),
     _lastQueriedTime(usecTimestampNow()),
     _mirrorViewRect(QRect(MIRROR_VIEW_LEFT_PADDING, MIRROR_VIEW_TOP_PADDING, MIRROR_VIEW_WIDTH, MIRROR_VIEW_HEIGHT)),
     _firstRun("firstRun", true),
@@ -417,6 +420,9 @@ Application::Application(int& argc, char** argv, QElapsedTimer& startupTimer) :
     qputenv("QT_BEARER_POLL_TIMEOUT", EXTREME_BEARER_POLL_TIMEOUT);
 
     _entityClipboard->createRootElement();
+
+    _localEntityTree->createRootElement();
+    _localEntityScriptingInterface.setEntityTree(_localEntityTree);
 
     _pluginContainer = new PluginContainerProxy();
 #ifdef Q_OS_WIN
@@ -2668,6 +2674,10 @@ void Application::init() {
     _entityClipboardRenderer.setViewFrustum(getViewFrustum());
     _entityClipboardRenderer.setTree(_entityClipboard);
 
+    _localEntityRenderer.setViewFrustum(getViewFrustum());
+    _localEntityRenderer.setTree(_localEntityTree);
+    _localEntityRenderer.init();
+
     // Make sure any new sounds are loaded as soon as know about them.
     connect(tree.get(), &EntityTree::newCollisionSoundURL, DependencyManager::get<SoundCache>().data(), &SoundCache::getSound);
     connect(getMyAvatar(), &MyAvatar::newCollisionSoundURL, DependencyManager::get<SoundCache>().data(), &SoundCache::getSound);
@@ -4161,6 +4171,8 @@ void Application::registerScriptEngineWithApplicationServices(ScriptEngine* scri
                             RayToOverlayIntersectionResultFromScriptValue);
 
     scriptEngine->registerGlobalObject("Desktop", DependencyManager::get<DesktopScriptingInterface>().data());
+
+    scriptEngine->registerGlobalObject("LocalEntities", &_localEntityScriptingInterface);
 
     scriptEngine->registerGlobalObject("Window", DependencyManager::get<WindowScriptingInterface>().data());
     scriptEngine->registerGetterSetter("location", LocationScriptingInterface::locationGetter,

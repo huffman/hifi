@@ -35,7 +35,10 @@ EntityScriptingInterface::EntityScriptingInterface() :
 
 void EntityScriptingInterface::queueEntityMessage(PacketType packetType,
                                                   EntityItemID entityID, const EntityItemProperties& properties) {
-    getEntityPacketSender()->queueEditEntityMessage(packetType, entityID, properties);
+    auto packetSender = getEntityPacketSender();
+    if (packetSender) {
+        packetSender->queueEditEntityMessage(packetType, entityID, properties);
+    }
 }
 
 bool EntityScriptingInterface::canAdjustLocks() {

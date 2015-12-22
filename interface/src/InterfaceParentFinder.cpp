@@ -31,6 +31,14 @@ SpatiallyNestableWeakPointer InterfaceParentFinder::find(QUuid parentID) const {
         return parent;
     }
 
+    // search local entities
+    treeRenderer = qApp->getLocalEntityRenderer();
+    tree = treeRenderer->getTree();
+    parent = tree->findEntityByEntityItemID(parentID);
+    if (!parent.expired()) {
+        return parent;
+    }
+
     // search avatars
     QSharedPointer<AvatarManager> avatarManager = DependencyManager::get<AvatarManager>();
     return avatarManager->getAvatarBySessionID(parentID);
