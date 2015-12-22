@@ -387,7 +387,7 @@ Application::Application(int& argc, char** argv, QElapsedTimer& startupTimer) :
     _physicsEngine(new PhysicsEngine(Vectors::ZERO)),
     _entityClipboardRenderer(false, this, this),
     _entityClipboard(new EntityTree()),
-    _localEntityRenderer(false, this, this),
+    _localEntityRenderer(true, this, this),
     _localEntityTree(new EntityTree()),
     _localEntityScriptingInterface(),
     _lastQueriedTime(usecTimestampNow()),

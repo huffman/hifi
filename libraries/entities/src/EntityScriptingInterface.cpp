@@ -295,7 +295,10 @@ void EntityScriptingInterface::deleteEntity(QUuid id) {
 
     // if at this point, we know the id, and we should still delete the entity, send the update to the entity server
     if (shouldDelete) {
-        getEntityPacketSender()->queueEraseEntityMessage(entityID);
+        auto packetSender = getEntityPacketSender();
+        if (packetSender) {
+            packetSender->queueEraseEntityMessage(entityID);
+        }
     }
 }
 
