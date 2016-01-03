@@ -132,6 +132,13 @@ ScriptEngine::ScriptEngine(const QString& scriptContents, const QString& fileNam
     _allScriptsMutex.lock();
     _allKnownScriptEngines.insert(this);
     _allScriptsMutex.unlock();
+
+    connect(this, &QScriptEngine::signalHandlerException, this, [](const QScriptValue& exception) {
+            auto fileName = exception.property("fileName").toString();
+            auto lineNumber = exception.property("lineNumber").toString();
+            auto message = "[UncaughtException] " + exception.toString() + " in " + fileName + ":" + lineNumber;
+            qCWarning(scriptengine) << qPrintable(message);
+    });
 }
 
 ScriptEngine::~ScriptEngine() {
