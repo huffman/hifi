@@ -1,3 +1,5 @@
+// TODO: Add an enabled property (or possibly this with 'visible') and make it
+//       available to components.
 
 /*
  {"components":{"button":{}, "eventProxy": {"buttonActivated": {"to": "light1", "method":"toggle"} } }}
@@ -35,6 +37,13 @@ findEntities = function(properties, searchRadius) {
     return matchedEntities;
 }
 
+function getArg(args, key, defaultValue) {
+    if (args.hasOwnProperty(key)) {
+        return args[key];
+    }
+    return defaultValue;
+}
+
 /******************************************************************************
  *** Button Component
  ******************************************************************************/
@@ -55,24 +64,8 @@ extend(ButtonComponent.prototype, {
     // Event handlers
     onActivated: function(event) {
         console.log("Activated button!");
-        // Entities.editEntity(this.entityID, {
-        //     color: {
-        //         red: Math.random() * 255,
-        //         green: Math.random() * 255,
-        //         blue: Math.random() * 255,
-        //     }
-        // });
         this.async('buttonActivated');
-    },
-
-    // // Public functionality
-    // toggleButton: function() {
-    //     async(this.toggleButton_Server);
-    // },
-    // toggleButton_Server: function() {
-    //     this.buttonDown = !this.buttonDown;
-    //     emit('buttonClick', this.buttonDown);
-    // },
+    }
 });
 ButtonServerComponent = function(entityManager, properties) {
     Component.call(this, entityManager);
@@ -88,7 +81,7 @@ extend(ButtonServerComponent.prototype, {
     init: function() {
         var HIFI_PUBLIC_BUCKET = "http://s3.amazonaws.com/hifi-public/";
         var audioURL = HIFI_PUBLIC_BUCKET + "sounds/Guns/GUN-SHOT2.raw";
-        var audioURL = "atp:cc6df0de217f6c9350098ef3f3a6bce65596ca5611b21f2c253325619c70d21a.wav";
+        //var audioURL = "atp:cc6df0de217f6c9350098ef3f3a6bce65596ca5611b21f2c253325619c70d21a.wav";
         this.fireSound = SoundCache.getSound(audioURL);
         this.audioOptions = {
             volume: 0.9,
@@ -99,10 +92,58 @@ extend(ButtonServerComponent.prototype, {
     onActivated: function() {
         console.log("Button activated!!");
         Audio.playSound(this.fireSound, this.audioOptions);
-        // var properties = Entities.getEntityProperties(this.entityID, ['position']);
-        // Entities.editEntity(this.entityID, {
-        //     position: Vec3.sum(properties.position, {x: 0, y: 0.05, z: 0 }),
-        // });
+    }
+});
+
+
+
+/******************************************************************************
+ *** ToggleButton Component
+ ******************************************************************************/
+ToggleButtonComponent = function(entityManager, properties) {
+    Component.call(this, entityManager);
+
+    this.triggerOnServer = properties.triggerOnServer;
+};
+ToggleButtonComponent.prototype = Object.create(Component.prototype);
+extend(ToggleButtonComponent.prototype, {
+    type: "toggleButton",
+
+    init: function() {
+        this.entityManager.on('mouseDown', this.onActivated.bind(this));
+        this.entityManager.on('startDistanceGrab', this.onActivated.bind(this));
+    },
+
+    // Event handlers
+    onActivated: function(event) {
+        console.log("Activated button!");
+        this.async('buttonActivated');
+    }
+});
+ToggleButtonServerComponent = function(entityManager, properties) {
+    Component.call(this, entityManager);
+
+    this.triggerOnServer = properties.triggerOnServer;
+
+    this.entityManager.on('buttonActivated', this.onActivated.bind(this));
+};
+ToggleButtonServerComponent.prototype = Object.create(Component.prototype);
+extend(ToggleButtonServerComponent.prototype, {
+    type: "button",
+
+    init: function() {
+        var HIFI_PUBLIC_BUCKET = "http://s3.amazonaws.com/hifi-public/";
+        var audioURL = HIFI_PUBLIC_BUCKET + "sounds/Guns/GUN-SHOT2.raw";
+        var audioURL = "atp:cc6df0de217f6c9350098ef3f3a6bce65596ca5611b21f2c253325619c70d21a.wav";
+        this.fireSound = SoundCache.getSound(audioURL);
+        this.audioOptions = {
+            volume: 0.9,
+            position: { x: 0, y: 0, z: 0 }
+        };
+    },
+
+    onActivated: function() {
+        Audio.playSound(this.fireSound, this.audioOptions);
     }
 });
 
@@ -252,16 +293,17 @@ extend(EventProxyComponent.prototype, {
         if (route) {
             var to = route.to;
             var method = route.method;
+            var args = getArg(route, 'args', []);
 
             if (typeof to == "string" || to instanceof String) {
                 // Search for entity by name
                 to = { name: to };
             }
 
-            console.log("Routing " + event + " to " + JSON.stringify(to));
+            console.log("Routing " + event + " to " + JSON.stringify(to) + " with " + JSON.stringify(args));
             var entityIDs = findEntities(to);
             for (var i in entityIDs) {
-                this.entityManager.sendEvent(entityIDs[i], method);
+                this.entityManager.sendEvent(entityIDs[i], method, args);
             }
             if (entityIDs.length == 0) {
                 console.log("Routing failed, could not find entities: ", JSON.stringify(to));
@@ -269,6 +311,130 @@ extend(EventProxyComponent.prototype, {
         }
     }
 });
+
+
+
+/******************************************************************************
+ *** Audio Component
+ ******************************************************************************/
+AudioComponent = function(entityManager, properties) {
+    Component.call(this, entityManager);
+};
+AudioComponent.prototype = Object.create(Component.prototype);
+extend(AudioComponent.prototype, {
+    type: "audio",
+
+    init: function() {
+    },
+});
+AudioServerComponent = function(entityManager, properties) {
+    Component.call(this, entityManager);
+
+    this.url = getArg(properties, 'url', '');
+    this.volume = getArg(properties, 'volume', 1.0);
+    this.loop = getArg(properties, 'loop', true);
+
+    console.warn("In audio component");
+};
+AudioServerComponent.prototype = Object.create(Component.prototype);
+extend(AudioServerComponent.prototype, {
+    type: "audio",
+
+    init: function() {
+        console.warn("Audio component init", this.url);
+        var properties = Entities.getEntityProperties(['position']);
+        console.warn("Getting url", this.url);
+        this.sound = SoundCache.getSound(this.url);
+        this.timer = Script.setInterval(function() {
+            console.log("READY??");
+            if (this.sound.downloaded) {
+                console.log("READY");
+                Script.clearInterval(this.timer);
+                this.injector = Audio.playSound(this.sound, {
+                    volume: this.volume,
+                    position: properties.position,
+                    loop: true
+                });
+            }
+        }.bind(this), 500);
+    },
+
+    destroy: function() {
+        this.injector.stop();
+    }
+});
+
+function createComponent(name, client, server) {
+    var ClientComponent = function(entityManager, properties) {
+        Component.call(this, entityManager);
+        if (client.ctor) {
+            client.ctor();
+        }
+    }
+    ClientComponent.prototype = Object.create(Component.prototype);
+    ClientComponent.prototype.type = name;
+    extend(ClientComponent.prototype, client);
+
+    var ServerComponent = function(entityManager, properties) {
+        Component.call(this, entityManager);
+        if (server.ctor) {
+            server.ctor();
+        }
+    };
+    ServerComponent.prototype = Object.create(Component.prototype);
+    ServerComponent.prototype.type = name;
+    extend(ServerComponent.prototype, server);
+
+    registerComponent(name, ClientComponent, ServerComponent);
+};
+
+createComponent('flickeringLight', {}, {
+    init: function() {
+        this.time = 0;
+        this.elapsed = 0;
+        this.entityManager.on('update', this.onUpdate.bind(this));
+    },
+    onUpdate: function(dt) {
+        this.time += dt;
+        this.elapsed += dt;
+        if (this.elapsed > 0.1) {
+            this.elapsed -= 0.1;
+            Entities.editEntity(this.entityManager.entityID, {
+                intensity: 1.0 + (Math.sin(this.time) * 0.2) + (0.3 + Math.random() * 0.6)
+            });
+        }
+    }
+});
+
+Script.include('componentsCreate.js');
+ObjectTypes = {
+    ball: {
+        type: "Sphere",
+        color: { red: 128, green: 255, blue: 192 },
+        collisionsWillMove: true,
+        gravity: { x: 0, y: -9.8, z: 0 },
+        velocity: { x: 0, y: 0.1, z: 0 }
+    }
+};
+createComponent('objectCreator', {}, {
+    init: function() {
+        this.entityManager.on('create', this.onCreate.bind(this));
+        this.position = Entities.getEntityProperties(this.entityManager.entityID, ['position']).position;
+    },
+    onCreate: function(type) {
+        if (!ObjectTypes.hasOwnProperty(type)) {
+            console.warn("ObjectCreator: Cannot find object type " + type)
+            return;
+        }
+
+        console.log('Creating', type);
+        var data = ObjectTypes[type];
+        data.position = this.position;
+
+        createObject(data);
+    }
+});
+
 
 // Components to create:
 //   ephemeral
@@ -279,3 +445,4 @@ registerComponent("rangeTarget", RangeTargetComponent, RangeTargetServerComponen
 registerComponent("shootingRange", ShootingRangeComponent, ShootingRangeServerComponent);
 registerComponent("toggle", ToggleComponent, ToggleComponent);
 registerComponent("eventProxy", EventProxyComponent, EventProxyComponent);
+registerComponent("audio", null, AudioServerComponent);
