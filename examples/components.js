@@ -1,5 +1,17 @@
 var console = {
     log: function() {
+        console._message('[DEBUG]', arguments);
+    },
+    warn: function() {
+        console._message('[WARNING]', arguments);
+    },
+    error: function() {
+        console._message('[ERROR]', arguments);
+    },
+    _message: function(prefix, args) {
+        args = Array.prototype.slice.call(args);
+        args.unshift(prefix);
+        print.apply(null, args);
     }
 };
 // Taken from MDN
@@ -49,28 +61,38 @@ EventEmitter.prototype = {
         }
         console.log("on: ", event);
     },
-    emit: function(event) {
-        console.log('emit', this.entityID, event, this);
+    emitWithArgs: function(event, args) {
+        //console.log('emit', this.entityID, event, this);
         var listeners = this.eventListeners[event];
         if (listeners) {
-            console.log('emit', event);
+            console.log('emit', event, JSON.stringify(args));
             for (var i in listeners) {
-                listeners[i].apply(null, Array.prototype.slice.call(arguments, 1));
+                listeners[i].apply(null, args);
             }
         } else {
-            console.log("No listeners found for", event);
+            //console.log("No listeners found for", event);
         }
+    },
+    emit: function(event) {
+        this.emitWithArgs(event, Array.prototype.slice.call(arguments, 1));
     }
 };
 
-function parseJSON(userData) {
+function parseJSON(jsonString) {
     var data;
     try {
-        data = JSON.parse(userData);
+        data = JSON.parse(jsonString);
     } catch(e) {
         data = {};
     }
     return data;
+}
+
+function arg(args, key, defaultValue) {
+    if (args.hasOwnProperty(key)) {
+        return args[key];
+    }
+    return defaultValue;
 }
 
 ComponentInfo = function(name, clientCtor, serverCtor) {
@@ -97,6 +119,7 @@ EntityManager = function(entityID, isServer, entityScript, serverEntityList) {
     if (componentData) {
         for (var componentType in componentData) {
             console.log("Creating component " + componentType);
+            console.warn('component', entityID, componentType);
             var component = createComponent(this, componentType, componentData[componentType], isServer);
             if (component) {
                 this.components[componentType] = component;
@@ -121,7 +144,7 @@ EntityManager = function(entityID, isServer, entityScript, serverEntityList) {
             entityScript[key] = function(event) {
                 return function() {
                     console.log("emitting, ", event);
-                    self.emit.apply(self, [event]);
+                    self.emitWithArgs.apply(self, [event, arguments]);
                 }.bind(this);
             }(event);
         }
@@ -140,38 +163,58 @@ EntityManager = function(entityID, isServer, entityScript, serverEntityList) {
 };
 EntityManager.prototype = Object.create(EventEmitter.prototype);
 extend(EntityManager.prototype, {
-    sendEvent: function(entityID, event) {
-        if (this.isServer) {
-            var entityManager = this.serverEntityList[entityID];
-            console.log(JSON.stringify(Object.keys(this.serverEntityList))); if (entityManager) {entityManager.emit(event);
-            } else {
-                console.log("Could not send event to unknown entity: ", entityID);
-            }
+    getProperties: function(keys) {
+        if (keys) {
+            return Entities.getEntityProperties(this.entityID, keys);
         } else {
-            Entities.callEntityMethod(entityID, 'remoteEvent', [event]);
+            return Entities.getEntityProperties(this.entityID);
         }
     },
-    onRemoteEvent: function(event) {
-        console.log("Got remote event: ", event);
-        this.emit(event);
+    sendEvent: function(entityID, event, args) {
+        if (!args) args = [];
+        if (this.isServer) {
+            var entityManager = this.serverEntityList[entityID];
+            console.log(JSON.stringify(Object.keys(this.serverEntityList)));
+            if (entityManager) {
+                entityManager.emitWithArgs(event, args);
+            } else {
+                console.warn("Could not send event to unknown entity: ", entityID);
+            }
+        } else {
+            Entities.callEntityMethod(entityID, 'remoteEvent', [event, args]);
+        }
+    },
+    onRemoteEvent: function(event, args) {
+        console.log("Got remote event: ", event, args);
+        this.emitWithArgs(event, args);
+    },
+    destroy: function() {
+        for (var key in this.components) {
+            this.components[key].destroy();
+        }
     }
 });
 
 var componentInfos = {};
 
 // Factory method for creating components
+// TODO Move this into EntityManager
 function createComponent(entityManager, type, properties) {
     if (!(type in componentInfos)) {
-        console.log("Unknown component type: " + type);
+        console.error("Unknown component type: " + type);
         return null;
     }
 
     var componentInfo = componentInfos[type];
     var component;
     if (entityManager.isServer) {
-        component = new componentInfo.serverCtor(entityManager, properties);
+        if (componentInfo.serverCtor) {
+            component = new componentInfo.serverCtor(entityManager, properties);
+        }
     } else {
-        component = new componentInfo.clientCtor(entityManager, properties);
+        if (componentInfo.clientCtor) {
+            component = new componentInfo.clientCtor(entityManager, properties);
+        }
     }
 
     return component;
@@ -179,7 +222,7 @@ function createComponent(entityManager, type, properties) {
 
 registerComponent = function(name, clientCtor, serverCtor) {
     if (name in componentInfos) {
-        console.log("Warning: registering known component type: " + name);
+        console.warn("Registering known component type: " + name);
     }
     componentInfos[name] = new ComponentInfo(name, clientCtor, serverCtor);
 };
@@ -214,13 +257,17 @@ Component.prototype = {
         console.log("Initializing component " + this.type);
     },
 
+    destroy: function() {
+        console.log("Initializing component " + this.type);
+    },
+
     on: function() {
         this.entityManager.apply(this.entityManager, arguments);
     },
 
     handleMessage: function(channel, message) {
-        console.log("Got", this.type, this, channel, message);
-        console.log('this', this);
+        //console.log("Got", this.type, this, channel, message);
+        //console.log('this', this);
         if (this.isServer) {
             if (channel == this.serverChannel) {
                 var msg = JSON.parse(message);

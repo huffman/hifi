@@ -5,7 +5,9 @@ var entities = {};
 
 function onEntityAdded(entityID) {
     print("Added entity", entityID);
-    entities[entityID] = new EntityManager(entityID, true, null, entities);
+    if (!entities.hasOwnProperty(entityID)) {
+        entities[entityID] = new EntityManager(entityID, true, null, entities);
+    }
     print("Entities", JSON.stringify(Object.keys(entities)));
 }
 
@@ -13,6 +15,7 @@ function onEntityRemoved(entityID) {
     print("Removed entity", entityID);
     var entityManager = entities[entityID];
     if (entityManager) {
+        entityManager.destroy();
         delete entities[entityID];
     }
 }
@@ -20,7 +23,7 @@ function onEntityRemoved(entityID) {
 function onEntitiesCleared() {
     print("Entities cleared");
     for (var key in entities) {
-        entities[key].shutdown();
+        entities[key].destroy();
     }
     entities = {};
 }
