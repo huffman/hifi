@@ -12,7 +12,7 @@ var SCENE = {
                     buttonActivated: {
                         to: 'warpArea',
                         method: 'create',
-                        args: ['ball']
+                        args: ['randopace']
                     }
                 }
             }
@@ -45,6 +45,25 @@ var SCENE = {
                     loop: true
                 }
             }
+        },
+
+        // Plane game
+        {
+            name: "planeGameManager",
+            components: {
+                planeGameManager: {
+                }
+            },
+            children: [
+                {
+                    name: "baton",
+                    type: "Model",
+                    components: {
+                        planeGameBaton: {
+                        }
+                    }
+                }
+            ]
         }
     ]
 }
