@@ -407,31 +407,95 @@ createComponent('flickeringLight', {}, {
 });
 
 Script.include('componentsCreate.js');
+
+// Return a random float in the range [min, max)
+function randFloat(min, max) {
+    return min + Math.random() * (max - min);
+}
+
+// Return a random integer in the range [min, max]
+function randInt(min, max) {
+    return Math.floor(randFloat(min, max + 1));
+}
+
+function randColor() {
+    return {
+        red: randInt(0, 255),
+        green: randInt(0, 255),
+        blue: randInt(0, 255)
+    };
+}
+
 ObjectTypes = {
-    ball: {
-        type: "Sphere",
-        color: { red: 128, green: 255, blue: 192 },
+    ball: function() {
+        return {
+            type: "Sphere",
+            color: randColor(),
+            collisionsWillMove: true,
+            gravity: { x: 0, y: -9.8, z: 0 },
+            velocity: { x: 0, y: -0.01, z: 0 }
+        };
+    },
+    box: function() {
+        return {
+            type: "Box",
+            color: randColor(),
+            collisionsWillMove: true,
+            gravity: { x: 0, y: -9.8, z: 0 },
+            velocity: { x: 0, y: -0.01, z: 0 }
+        };
+    },
+    raptor: {
+        type: "Model",
+        modelURL: "http://localhost:8000/home/raptor.fbx",
+        dimensions: { x: 0.65, y: 0.29, z: 0.10 },
         collisionsWillMove: true,
+        shapeType: 'box',
         gravity: { x: 0, y: -9.8, z: 0 },
-        velocity: { x: 0, y: 0.1, z: 0 }
+        velocity: { x: 0, y: -0.01, z: 0 }
+    },
+    horse: {
+        type: "Model",
+        modelURL: "http://localhost:8000/home/horse.fbx",
+        dimensions: { x: 0.14, y: 0.36, z: 0.54 },
+        collisionsWillMove: true,
+        shapeType: 'box',
+        gravity: { x: 0, y: -9.8, z: 0 },
+        velocity: { x: 0, y: -0.01, z: 0 }
+    },
+    heart: {
+        type: "Model",
+        modelURL: "http://localhost:8000/heart.fbx",
+        dimensions: { x: 0.09, y: 0.11, z: 0.05 },
+        collisionsWillMove: true,
+        shapeType: 'sphere',
+        gravity: { x: 0, y: -9.8, z: 0 },
+        velocity: { x: 0, y: -0.01, z: 0 }
     }
 };
+var ObjectTypesKeys = Object.keys(ObjectTypes);
 createComponent('objectCreator', {}, {
     init: function() {
         this.entityManager.on('create', this.onCreate.bind(this));
         this.position = Entities.getEntityProperties(this.entityManager.entityID, ['position']).position;
     },
     onCreate: function(type) {
-        if (!ObjectTypes.hasOwnProperty(type)) {
-            console.warn("ObjectCreator: Cannot find object type " + type)
-            return;
-        }
-
         console.log('Creating', type);
-        var data = ObjectTypes[type];
-        data.position = this.position;
+        var data = null;
+        if (type == 'random') {
+            var key = ObjectTypesKeys[randInt(0, ObjectTypesKeys.length)];
+            data = ObjectTypes[key];
+        } else {
+            if (!ObjectTypes.hasOwnProperty(type)) {
+                console.warn("ObjectCreator: Cannot find object type " + type)
+                return;
+            }
+            data = ObjectTypes[type];
+        }
+        var props = typeof(data) == 'function' ? data() : data;
+        props.position = this.position;
 
-        createObject(data);
+        createObject(props);
     }
 });
 
