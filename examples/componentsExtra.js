@@ -1,13 +1,6 @@
 // TODO: Add an enabled property (or possibly this with 'visible') and make it
 //       available to components.
 
-/*
- {"components":{"button":{}, "eventProxy": {"buttonActivated": {"to": "light1", "method":"toggle"} } }}
-
- {"components":{"toggle":{}}}
-
- http://localhost:8000/componentsClient.js
- */
 findEntity = function(properties, searchRadius) {
     var entities = findEntities(properties, searchRadius);
     return entities.length > 0 ? entities[0] : null;
@@ -149,91 +142,7 @@ extend(ToggleButtonServerComponent.prototype, {
 
 
 
-/******************************************************************************
- *** RangeTarget Component
- ******************************************************************************/
-RangeTargetComponent = function(entityManager, properties) {
-    Component.call(this, entityManager);
-};
-RangeTargetComponent.prototype = Object.create(Component.prototype);
-extend(RangeTargetComponent.prototype, {
-    type: "rangeTarget",
 
-    init: function() {
-    },
-
-    // Event handlers
-    onShot: function(shooterUUID, shotType) {
-    }
-});
-RangeTargetServerComponent = function(entityManager, properties) {
-    Component.call(this, entityManager);
-};
-RangeTargetServerComponent.prototype = Object.create(Component.prototype);
-extend(RangeTargetServerComponent.prototype, {
-    type: "rangeTarget",
-
-    init: function() {
-    }
-});
-
-
-
-/******************************************************************************
- *** ShootingRange Component
- ******************************************************************************/
-// Shooting range target
-ShootingRangeComponent = function(entityManager, properties) {
-    Component.call(this, entityManager);
-
-    var running = false;
-};
-ShootingRangeComponent.prototype = Object.create(Component.prototype);
-extend(ShootingRangeComponent.prototype, {
-    type: "shootingRange",
-
-    init: function() {
-    },
-
-    start: function() {
-    }
-});
-
-// Shooting range target
-ShootingRangeServerComponent = function(entityManager, properties) {
-    Component.call(this, entityManager);
-
-    this.targetTimer = null;
-    this.running = false;
-    this.numberOfTargetsLeft = 0;
-};
-ShootingRangeServerComponent.prototype = Object.create(Component.prototype);
-extend(ShootingRangeServerComponent.prototype, {
-    type: "shootingRange",
-
-    init: function() {
-    },
-
-    start: function() {
-        if (this.running) {
-            return false;
-        }
-        this.running = true;
-        this.numberOfTargetsLeft = 10;
-        this.targetTimer = Script.setInterval(this.shootTarget.bind(this), 4000);
-        return true;
-    },
-    shootTarget: function() {
-        --this.numberOfTargetsLeft;
-
-        console.log("Deploying a target");
-
-        if (this.numberOfTargetsLeft <= 0) {
-            this.running = false;
-            Script.clearInterval(this.targetTimer);
-        }
-    }
-});
 
 
 ToggleComponent = function(entityManager, properties) {
@@ -364,7 +273,7 @@ extend(AudioServerComponent.prototype, {
     }
 });
 
-function createComponent(name, client, server) {
+function createComponentType(name, client, server) {
     var ClientComponent = function(entityManager, properties) {
         Component.call(this, entityManager);
         if (client.ctor) {
@@ -388,7 +297,7 @@ function createComponent(name, client, server) {
     registerComponent(name, ClientComponent, ServerComponent);
 };
 
-createComponent('flickeringLight', {}, {
+createComponentType('flickeringLight', {}, {
     init: function() {
         this.time = 0;
         this.elapsed = 0;
@@ -471,10 +380,51 @@ ObjectTypes = {
         shapeType: 'sphere',
         gravity: { x: 0, y: -9.8, z: 0 },
         velocity: { x: 0, y: -0.01, z: 0 }
+    },
+    torch: {
+        name: "torch",
+        type: "Box",
+        components: {
+            audio: {
+                url: 'http://hifi-public.s3.amazonaws.com/ryan/demo/0619_Fireplace__Tree_B.L.wav',
+                volume: 0.25,
+                loop: true,
+                follow: true
+            }
+        },
+        children: [
+            {
+                name: "torch.fire",
+                type: "ParticleEffect",
+                localPosition: {
+                    x: 0,
+                    y: 0.1,
+                    z: 0
+                }
+            },
+            {
+                name: "torch.smoke",
+                type: "ParticleEffect",
+                localPosition: {
+                    x: 0,
+                    y: 0.15,
+                    z: 0
+                }
+            },
+            {
+                name: 'torch.light',
+                type: 'Light',
+                dimensions: { x: 3, y: 3, z: 3 },
+                color: { red: 207, green: 150, blue: 67 },
+                components: {
+                    flickeringLight: {}
+                }
+            }
+        ]
     }
 };
 var ObjectTypesKeys = Object.keys(ObjectTypes);
-createComponent('objectCreator', {}, {
+createComponentType('objectCreator', {}, {
     init: function() {
         this.entityManager.on('create', this.onCreate.bind(this));
         this.position = Entities.getEntityProperties(this.entityManager.entityID, ['position']).position;
@@ -505,8 +455,9 @@ createComponent('objectCreator', {}, {
 
 
 registerComponent("button", ButtonComponent, ButtonServerComponent);
-registerComponent("rangeTarget", RangeTargetComponent, RangeTargetServerComponent);
-registerComponent("shootingRange", ShootingRangeComponent, ShootingRangeServerComponent);
 registerComponent("toggle", ToggleComponent, ToggleComponent);
 registerComponent("eventProxy", EventProxyComponent, EventProxyComponent);
 registerComponent("audio", null, AudioServerComponent);
+
+
+// Script.include('componentsTarget.js');

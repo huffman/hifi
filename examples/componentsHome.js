@@ -12,7 +12,7 @@ var SCENE = {
                     buttonActivated: {
                         to: 'warpArea',
                         method: 'create',
-                        args: ['randopace']
+                        args: ['random']
                     }
                 }
             }
@@ -42,7 +42,8 @@ var SCENE = {
                 audio: {
                     url: 'http://hifi-public.s3.amazonaws.com/ryan/demo/0619_Fireplace__Tree_B.L.wav',
                     volume: 0.25,
-                    loop: true
+                    loop: true,
+                    follow: true
                 }
             }
         },
