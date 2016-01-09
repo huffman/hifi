@@ -6,13 +6,15 @@ var SCENE = {
         {
             name: "fireplaceSwitch",
             type: "Box",
+            position: { x: 0.5, y: 0, z: 0 },
             components: {
+                positionPrinter: {},
                 button: {},
                 eventProxy: {
                     buttonActivated: {
                         to: 'warpArea',
                         method: 'create',
-                        args: ['random']
+                        args: ['torch']
                     }
                 }
             }
@@ -22,6 +24,7 @@ var SCENE = {
             position: { x: 0, y: 0.5, z: 0 },
             ignoreForCollisions: true,
             components: {
+                positionPrinter: {},
                 objectCreator: {}
             }
         },
@@ -34,11 +37,13 @@ var SCENE = {
                     dimensions: { x: 3, y: 3, z: 3 },
                     color: { red: 207, green: 150, blue: 67 },
                     components: {
+                        positionPrinter: {},
                         flickeringLight: {}
                     }
                 },
             ],
             components: {
+                positionPrinter: {},
                 audio: {
                     url: 'http://hifi-public.s3.amazonaws.com/ryan/demo/0619_Fireplace__Tree_B.L.wav',
                     volume: 0.25,
@@ -48,24 +53,24 @@ var SCENE = {
             }
         },
 
-        // Plane game
-        {
-            name: "planeGameManager",
-            components: {
-                planeGameManager: {
-                }
-            },
-            children: [
-                {
-                    name: "baton",
-                    type: "Model",
-                    components: {
-                        planeGameBaton: {
-                        }
-                    }
-                }
-            ]
-        }
+        // // Plane game
+        // {
+        //     name: "planeGameManager",
+        //     components: {
+        //         planeGameManager: {
+        //         }
+        //     },
+        //     children: [
+        //         {
+        //             name: "baton",
+        //             type: "Model",
+        //             components: {
+        //                 planeGameBaton: {
+        //                 }
+        //             }
+        //         }
+        //     ]
+        // }
     ]
 }
 

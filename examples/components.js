@@ -62,7 +62,7 @@ EventEmitter.prototype = {
         console.log("on: ", event);
     },
     emitWithArgs: function(event, args) {
-        //console.log('emit', this.entityID, event, this);
+        // console.log('emit', this.entityID, event, this);
         var listeners = this.eventListeners[event];
         if (listeners) {
             console.log('emit', event, JSON.stringify(args));
@@ -70,7 +70,7 @@ EventEmitter.prototype = {
                 listeners[i].apply(null, args);
             }
         } else {
-            //console.log("No listeners found for", event);
+            console.log("No listeners found for", event);
         }
     },
     emit: function(event) {
@@ -112,7 +112,9 @@ EntityManager = function(entityID, isServer, entityScript, serverEntityList) {
 
     var properties = Entities.getEntityProperties(entityID, ['userData']);
     var userData = parseJSON(properties.userData);
-    console.log("Got data: ", properties.userData);
+    console.log("Got d: ", properties.userData);
+    var p = Entities.getEntityProperties(entityID);//, ['name', 'localPosition', 'position', 'dimensions']);
+    console.log("Got p: ", JSON.stringify(p));
 
     this.components = {};
     var componentData = userData.components;

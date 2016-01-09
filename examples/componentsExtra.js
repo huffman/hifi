@@ -433,7 +433,7 @@ createComponentType('objectCreator', {}, {
         console.log('Creating', type);
         var data = null;
         if (type == 'random') {
-            var key = ObjectTypesKeys[randInt(0, ObjectTypesKeys.length)];
+            var key = ObjectTypesKeys[randInt(0, ObjectTypesKeys.length - 1)];
             data = ObjectTypes[key];
         } else {
             if (!ObjectTypes.hasOwnProperty(type)) {
@@ -442,10 +442,22 @@ createComponentType('objectCreator', {}, {
             }
             data = ObjectTypes[type];
         }
+        var p = Entities.getEntityProperties(this.entityManager.entityID, ['name', 'position']);
         var props = typeof(data) == 'function' ? data() : data;
         props.position = this.position;
+        props.lifetime = 5;
+        console.log("Creating object", this.entityManager.entityID, p.name, JSON.stringify(p));
 
         createObject(props);
+    }
+});
+
+createComponentType('positionPrinter', {}, {
+    init: function() {
+        Script.setInterval(function() {
+            var props = Entities.getEntityProperties(this.entityManager.entityID);//, ['name', 'position', 'dimensions']);
+            console.log('new Props:', JSON.stringify([props.name, props.position, props.dimensions]));
+        }.bind(this), 1000);
     }
 });
 
