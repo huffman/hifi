@@ -301,7 +301,9 @@ createComponentType('flickeringLight', {}, {
     init: function() {
         this.time = 0;
         this.elapsed = 0;
-        this.entityManager.on('update', this.onUpdate.bind(this));
+        // this.entityManager.on('update', this.onUpdate.bind(this));
+        Script.update.connect(this.onUpdate.bind(this));
+        // this.intervalID = Script.setInterval(this.onUpdate.bind(this), 100);
     },
     onUpdate: function(dt) {
         this.time += dt;
@@ -309,9 +311,12 @@ createComponentType('flickeringLight', {}, {
         if (this.elapsed > 0.1) {
             this.elapsed -= 0.1;
             Entities.editEntity(this.entityManager.entityID, {
-                intensity: 1.0 + (Math.sin(this.time) * 0.2) + (0.3 + Math.random() * 0.6)
+                intensity: 5.0 + (Math.sin(this.time) * 0.2) + randFloat(-3.0, 3.0)
             });
         }
+    },
+    destroy: function() {
+        Script.clearInterval(this.intervalID);
     }
 });
 
@@ -384,6 +389,7 @@ ObjectTypes = {
     torch: {
         name: "torch",
         type: "Box",
+        collisionsWillMove: true,
         components: {
             audio: {
                 url: 'http://hifi-public.s3.amazonaws.com/ryan/demo/0619_Fireplace__Tree_B.L.wav',
@@ -400,16 +406,19 @@ ObjectTypes = {
                     x: 0,
                     y: 0.1,
                     z: 0
-                }
+                },
+                emitterShouldTrail: true
             },
             {
+                "color":{"red":255,"green":255,"blue":255},"maxParticles":1000,"lifespan":5,"emitRate":2,"emitSpeed":1,"speedSpread":0,"emitOrientation":{"x":-0.7071068286895752,"y":0,"z":0,"w":0.7071068286895752},"emitDimensions":{"x":0,"y":0,"z":0},"emitRadiusStart":1,"polarStart":0,"polarFinish":0,"azimuthStart":-3.1415927410125732,"azimuthFinish":3.1415927410125732,"emitAcceleration":{"x":0,"y":-0.30000001192092896,"z":0},"accelerationSpread":{"x":0,"y":0,"z":0},"particleRadius":0.03999999910593033,"radiusSpread":0,"radiusStart":0.03999999910593033,"radiusFinish":0.03999999910593033,"colorSpread":{"red":0,"green":0,"blue":0},"colorStart":{"red":255,"green":255,"blue":255},"colorFinish":{"red":255,"green":255,"blue":255},"alpha":1,"alphaSpread":0,"alphaStart":1,"alphaFinish":1,"emitterShouldTrail":0,"textures":"https://hifi-public.s3.amazonaws.com/alan/Particles/Particle-Sprite-Smoke-1.png","queryAACube":{"x":-9.412508010864258,"y":-10.814034461975098,"z":-9.105239868164062,"scale":19.052560806274414},
                 name: "torch.smoke",
                 type: "ParticleEffect",
                 localPosition: {
                     x: 0,
                     y: 0.15,
                     z: 0
-                }
+                },
+                emitterShouldTrail: true
             },
             {
                 name: 'torch.light',
@@ -445,7 +454,7 @@ createComponentType('objectCreator', {}, {
         var p = Entities.getEntityProperties(this.entityManager.entityID, ['name', 'position']);
         var props = typeof(data) == 'function' ? data() : data;
         props.position = this.position;
-        props.lifetime = 5;
+        props.lifetime = 30;
         console.log("Creating object", this.entityManager.entityID, p.name, JSON.stringify(p));
 
         createObject(props);

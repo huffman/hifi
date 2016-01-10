@@ -8,7 +8,7 @@ function onEntityAdded(entityID) {
     if (!entities.hasOwnProperty(entityID)) {
         entities[entityID] = new EntityManager(entityID, true, null, entities);
     }
-    print("Entities", JSON.stringify(Object.keys(entities)));
+    // print("Entities", JSON.stringify(Object.keys(entities)));
 }
 
 function onEntityRemoved(entityID) {
