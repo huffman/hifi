@@ -40,6 +40,8 @@ function getArg(args, key, defaultValue) {
 /******************************************************************************
  *** Button Component
  ******************************************************************************/
+var HIFI_PUBLIC_BUCKET = "http://s3.amazonaws.com/hifi-public/";
+var AUDIO_GUN_SHOT_URL = HIFI_PUBLIC_BUCKET + "sounds/Guns/GUN-SHOT2.raw";
 ButtonComponent = function(entityManager, properties) {
     Component.call(this, entityManager);
 
@@ -72,10 +74,7 @@ extend(ButtonServerComponent.prototype, {
     type: "button",
 
     init: function() {
-        var HIFI_PUBLIC_BUCKET = "http://s3.amazonaws.com/hifi-public/";
-        var audioURL = HIFI_PUBLIC_BUCKET + "sounds/Guns/GUN-SHOT2.raw";
-        //var audioURL = "atp:cc6df0de217f6c9350098ef3f3a6bce65596ca5611b21f2c253325619c70d21a.wav";
-        this.fireSound = SoundCache.getSound(audioURL);
+        this.fireSound = SoundCache.getSound(AUDIO_GUN_SHOT_URL);
         this.audioOptions = {
             volume: 0.9,
             position: { x: 0, y: 0, z: 0 }
@@ -361,7 +360,7 @@ ObjectTypes = {
     },
     raptor: {
         type: "Model",
-        modelURL: "http://localhost:8000/home/raptor.fbx",
+        modelURL: "https://hifi-public.s3.amazonaws.com/huffman/raptor.fbx",
         dimensions: { x: 0.65, y: 0.29, z: 0.10 },
         collisionsWillMove: true,
         shapeType: 'box',
@@ -370,7 +369,7 @@ ObjectTypes = {
     },
     horse: {
         type: "Model",
-        modelURL: "http://localhost:8000/home/horse.fbx",
+        modelURL: "https://hifi-public.s3.amazonaws.com/huffman/horse.fbx",
         dimensions: { x: 0.14, y: 0.36, z: 0.54 },
         collisionsWillMove: true,
         shapeType: 'box',
@@ -379,7 +378,7 @@ ObjectTypes = {
     },
     heart: {
         type: "Model",
-        modelURL: "http://localhost:8000/heart.fbx",
+        modelURL: "https://hifi-public.s3.amazonaws.com/huffman/heart.fbx",
         dimensions: { x: 0.09, y: 0.11, z: 0.05 },
         collisionsWillMove: true,
         shapeType: 'sphere',
@@ -430,6 +429,39 @@ ObjectTypes = {
                 }
             }
         ]
+    },
+    pistol: {
+        type: 'Model',
+        modelURL: "https://s3.amazonaws.com/hifi-public/eric/models/gun.fbx",
+        dimensions: {
+            x: 0.05,
+            y: .23,
+            z: .36
+        },
+        script: scriptURL,
+        color: {
+            red: 200,
+            green: 0,
+            blue: 20
+        },
+        shapeType: 'box',
+        collisionsWillMove: true,
+        gravity: {x: 0, y: -5.0, z: 0},
+        restitution: 0,
+        collisionSoundURL: "https://s3.amazonaws.com/hifi-public/sounds/Guns/Gun_Drop_and_Metalli_1.wav",
+        userData: {
+            grabbableKey: {
+                spatialKey: {
+                    relativePosition: {
+                        x: 0,
+                        y: 0.05,
+                        z: -0.08
+                    },
+                    relativeRotation: Quat.fromPitchYawRollDegrees(90, 90, 0)
+                },
+                invertSolidWhileHeld: true
+            }
+        }
     }
 };
 var ObjectTypesKeys = Object.keys(ObjectTypes);
@@ -467,6 +499,54 @@ createComponentType('positionPrinter', {}, {
             var props = Entities.getEntityProperties(this.entityManager.entityID);//, ['name', 'position', 'dimensions']);
             console.log('new Props:', JSON.stringify([props.name, props.position, props.dimensions]));
         }.bind(this), 1000);
+    }
+});
+
+createComponentType('triggerable', {
+    init: function() {
+        this.equipped = false;
+        this.equippedHand = null;
+    },
+    startEquip: function(id, params) {
+        this.equipped = true;
+        this.equippedHand = JSON.parse(params[0]);
+    },
+    unequip: function() {
+        this.equipped = false;
+        this.equippedHand = null;
+    }
+}, {
+});
+
+createComponentType('gun', {
+}, {
+});
+
+createComponentType('explosive', {
+}, {
+    init: function() {
+        this.timeoutID = Script.setTimeout(this.detonate.bind(this), 2000);
+        this.fireSound = SoundCache.getSound(AUDIO_GUN_SHOT_URL);
+    }, detonate: function() {
+        var properties = Entities.getEntityProperties(this.entityManager.entityID, ['position']);
+        Entities.deleteEntity(this.entityManager.entityID);
+        Audio.playSound(this.fireSound, {
+            volume: 0.9,
+            position: properties.position
+        });
+        // Entities.addEntity({
+        //     type: "ParticleEffect",
+        //     position: properties.position
+        // });
+    }
+});
+
+createComponentType('bird', {
+}, {
+    init: function() {
+        this.entityManager.on('update', this.onUpdate.bind(this));
+    },
+    onUpdate: function(dt) {
     }
 });
 

@@ -157,7 +157,7 @@ EntityManager = function(entityID, isServer, entityScript, serverEntityList) {
         entityScript.remoteEvent = this.onRemoteEvent.bind(this);
     }
 
-    //Script.update.connect(function(dt) { this.emit('update', dt); }.bind(this));
+    Script.update.connect(function(dt) { this.emit('update', dt); }.bind(this));
 
     // Initialize components
     for (var key in this.components) {
