@@ -1,6 +1,8 @@
 // TODO: Add an enabled property (or possibly this with 'visible') and make it
 //       available to components.
 
+var scriptURL = Script.resolvePath("componentsClient.js");
+
 findEntity = function(properties, searchRadius) {
     var entities = findEntities(properties, searchRadius);
     return entities.length > 0 ? entities[0] : null;
