@@ -529,7 +529,8 @@ createComponentType('explosive', {
     init: function() {
         this.timeoutID = Script.setTimeout(this.detonate.bind(this), 2000);
         this.fireSound = SoundCache.getSound(AUDIO_GUN_SHOT_URL);
-    }, detonate: function() {
+    },
+    detonate: function() {
         var properties = Entities.getEntityProperties(this.entityManager.entityID, ['position']);
         Entities.deleteEntity(this.entityManager.entityID);
         Audio.playSound(this.fireSound, {
