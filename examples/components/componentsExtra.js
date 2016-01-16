@@ -553,6 +553,29 @@ createComponentType('bird', {
     }
 });
 
+createComponentType('projectileGun', {
+    ctor: function(entityManager, properties) {
+        this.projectileType = properties.projectileType;
+        this.speed = properties.speed;
+    },
+    onTrigger: function() {
+        // Create object
+
+        // Set velocity of object
+
+    }
+}, {
+});
+
+createComponentType('timer', {
+}, {
+    ctor: function(entityManager, properties) {
+        Script.setTimeout(function() { this.entityManager.emit('timeout'); }.bind(this), properties.time));
+    },
+    onTrigger: function() {
+    }
+});
+
 
 // Components to create:
 //   ephemeral

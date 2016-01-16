@@ -36,7 +36,7 @@ function _createEntity(sceneName, entityManager, parentID, data) {
         data.parentID = parentID;
     }
 
-    print("Creating ", data.name, data.type, data.parentID)
+    print("Creating ", data.name, data.type, data.parentID);
     var entityID = entityManager.addEntity(data);
 
     for (var i in children) {
