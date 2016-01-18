@@ -1,7 +1,13 @@
+//
+// componentsServer.js
+//
+// Implements a server-side AC script for finding entities
+// and running their respective components.
+//
+
 Script.include("components.js");
 
 var entities = {};
-
 
 function onEntityAdded(entityID) {
     print("Added entity", entityID);

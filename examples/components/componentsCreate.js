@@ -1,7 +1,4 @@
-Script.include('util.js');
-
-//{"components":{"button":{}, "eventProxy": {"buttonActivated": {"to": "light1", "method":"toggle"} } }}
-//{"components":{"toggle":{}}}
+Script.include('utils.js');
 
 var SCRIPT_URL = Script.resolvePath('componentsClient.js');
 
@@ -69,3 +66,11 @@ destroyScene = function(name) {
         }
     }
 };
+
+var types = {};
+registerType = function(name, data) {
+    if (data.indexOf(name) >= 0) {
+        console.warning("Overwriting type ", name);
+    }
+    types[name] = data;
+}

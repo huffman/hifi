@@ -48,6 +48,43 @@ var SCENE = {
                 }
             }
         },
+        {
+            name: 'pistol',
+            type: 'Model',
+            // modelURL: "https://s3.amazonaws.com/hifi-public/eric/models/gun.fbx",
+            modelURL: Script.resolvePath('../gunshow/nail_gun.fbx'),
+            dimensions: {
+                x: 0.05,
+                y: .23,
+                z: .36
+            },
+            color: {
+                red: 200,
+                green: 0,
+                blue: 20
+            },
+            shapeType: 'box',
+            collisionsWillMove: true,
+            gravity: {x: 0, y: -5.0, z: 0},
+            restitution: 0,
+            collisionSoundURL: "https://s3.amazonaws.com/hifi-public/sounds/Guns/Gun_Drop_and_Metalli_1.wav",
+            userData: {
+                grabbableKey: {
+                    spatialKey: {
+                        relativePosition: {
+                            x: 0,
+                            y: 0.05,
+                            z: -0.08
+                        },
+                        relativeRotation: Quat.fromPitchYawRollDegrees(90, 90, 0)
+                    },
+                    invertSolidWhileHeld: true
+                }
+            },
+            components: {
+                gun: {}
+            }
+        }
 
         // // Plane game
         // {
@@ -125,27 +162,148 @@ SCENE = {
                 }
             }
         },
-
-        // // Plane game
-        // {
-        //     name: "planeGameManager",
-        //     components: {
-        //         planeGameManager: {
-        //         }
-        //     },
-        //     children: [
-        //         {
-        //             name: "baton",
-        //             type: "Model",
-        //             components: {
-        //                 planeGameBaton: {
-        //                 }
-        //             }
-        //         }
-        //     ]
-        // }
-    ]
-}
+        {
+            name: 'pistol',
+            type: 'Model',
+            // modelURL: "https://s3.amazonaws.com/hifi-public/eric/models/gun.fbx",
+            modelURL: Script.resolvePath('../gunshow/nail_gun.fbx'),
+            dimensions: {
+                x: 0.68,
+                y: 0.59,
+                z: 0.18
+            },
+            color: {
+                red: 200,
+                green: 0,
+                blue: 20
+            },
+            shapeType: 'box',
+            collisionsWillMove: true,
+            gravity: {x: 0, y: -5.0, z: 0},
+            restitution: 0,
+            collisionSoundURL: "https://s3.amazonaws.com/hifi-public/sounds/Guns/Gun_Drop_and_Metalli_1.wav",
+            userData: {
+                grabbableKey: {
+                    spatialKey: {
+                        relativePosition: {
+                            x: 0,
+                            y: 0.05,
+                            z: -0.08
+                        },
+                        relativeRotation: Quat.fromPitchYawRollDegrees(0, 90, 0)
+                    },
+                    invertSolidWhileHeld: true
+                }
+            },
+            components: {
+                gun: {
+                    fireSoundURL: Script.resolvePath("../gunshow/gatling.wav")
+                }
+            },
+            children: [
+                {
+                    type: "ParticleEffect",
+                    "name": "muzzle-smoke",
+                    position: {
+                        x: 0.2,
+                        y: 0,
+                        z: 0
+                    },
+                    "maxParticles": 1000,
+                    isEmitting: false,
+                    "emitRate": 20,
+                    emitSpeed: 0,
+                    "speedSpread": 0,
+                    "emitDimensions": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "polarStart": 0,
+                    "polarFinish": 0,
+                    "azimuthStart": -3.1415927410125732,
+                    "azimuthFinish": 3.14,
+                    "emitAcceleration": {
+                        "x": 0,
+                        "y": 0.5,
+                        "z": 0
+                    },
+                    "accelerationSpread": {
+                        "x": 0.2,
+                        "y": 0,
+                        "z": 0.2
+                    },
+                    "radiusSpread": 0.04,
+                    "particleRadius": 0.07,
+                    "radiusStart": 0.07,
+                    "radiusFinish": 0.07,
+                    "alpha": 0.7,
+                    "alphaSpread": 0,
+                    "alphaStart": 0,
+                    "alphaFinish": 0,
+                    "additiveBlending": 0,
+                    "textures": "https://hifi-public.s3.amazonaws.com/alan/Particles/Particle-Sprite-Smoke-1.png"
+                },
+                {
+                    type: "ParticleEffect",
+                    position: this.barrelPoint,
+                    "name": "muzzle-flash",
+                    parentID: this.entityID,
+                    "color": {
+                        red: 228,
+                        green: 128,
+                        blue: 12
+                    },
+                    "maxParticles": 1000,
+                    "lifespan": 0.1,
+                    "emitRate": 1000,
+                    "emitSpeed": 0.5,
+                    "speedSpread": 0,
+                    "emitOrientation": {
+                        "x": -0.4,
+                        "y": 1,
+                        "z": -0.2,
+                        "w": 0.7071068286895752
+                    },
+                    "emitDimensions": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "polarStart": 0,
+                    "polarFinish": Math.PI,
+                    "azimuthStart": -3.1415927410125732,
+                    "azimuthFinish": 2,
+                    "emitAcceleration": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "accelerationSpread": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "particleRadius": 0.05,
+                    "radiusSpread": 0.01,
+                    "radiusStart": 0.05,
+                    "radiusFinish": 0.05,
+                    "colorSpread": {
+                        red: 100,
+                        green: 100,
+                        blue: 20
+                    },
+                    "alpha": 1,
+                    "alphaSpread": 0,
+                    "alphaStart": 0,
+                    "alphaFinish": 0,
+                    "additiveBlending": true,
+                    "textures": "http://ericrius1.github.io/PartiArt/assets/star.png"
+                }
+                ]
+            }
+        ]
+    }
 
 Script.scriptEnding.connect(function() {
     print("Script ending");

@@ -1,4 +1,9 @@
-// Client-side Entity Script for Components
+//
+// componentsClient.js
+//
+// Implements a client-side entity script for loading components
+//
+
 (function() {
     Script.include("components.js");
 

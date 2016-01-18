@@ -278,7 +278,7 @@ function createComponentType(name, client, server) {
     var ClientComponent = function(entityManager, properties) {
         Component.call(this, entityManager);
         if (client.ctor) {
-            client.ctor();
+            client.ctor.apply(this, arguments);
         }
     }
     ClientComponent.prototype = Object.create(Component.prototype);
@@ -288,7 +288,7 @@ function createComponentType(name, client, server) {
     var ServerComponent = function(entityManager, properties) {
         Component.call(this, entityManager);
         if (server.ctor) {
-            server.ctor();
+            server.ctor().apply(this, arguments);
         }
     };
     ServerComponent.prototype = Object.create(Component.prototype);
@@ -463,6 +463,9 @@ ObjectTypes = {
                 },
                 invertSolidWhileHeld: true
             }
+        },
+        components: {
+            gun: {}
         }
     }
 };
@@ -521,6 +524,82 @@ createComponentType('triggerable', {
 });
 
 createComponentType('gun', {
+    ctor: function(entityManager, properties) {
+        console.log("init gun component", properties.fireSoundURL);
+        var soundURL = properties.fireSoundURL || AUDIO_GUN_SHOT_URL;
+        console.log("url", soundURL);
+        this.fireSound = SoundCache.getSound(soundURL);
+        entityManager.on('useBegin', this.onUseBegin.bind(this));
+        entityManager.on('useEnd', this.onUseEnd.bind(this));
+        console.log("done initting");
+    },
+    stopMuzzleFlash: function() {
+        if (this.muzzleSmokeID) {
+            Entities.editEntity(this.muzzleSmokeID, { isEmitting: false });
+        }
+        if (this.muzzleFlashID) {
+            Entities.editEntity(this.muzzleFlashID, { isEmitting: false });
+        }
+    },
+    onUseBegin: function(entityID, args) {
+        print("use begin", this.entityManager.entityID);
+
+        var properties = Entities.getEntityProperties(this.entityManager.entityID, ['position', 'rotation']);
+        print("1");
+        var audioOptions = {
+            volume: 0.9,
+            position: properties.position
+        };
+        print("2");
+        Audio.playSound(this.fireSound, audioOptions);
+        print("played sound", args);
+
+        args = parseJSON(args[0]);
+
+        print("3");
+        // Spawn projectile
+        Entities.addEntity({
+            type: "Box",
+            rotation: Quat.multiply(properties.rotation, Quat.fromPitchYawRollDegrees(0, 90, 0)),
+            position: args.position,
+            velocity: args.direction,
+            dimensions: { x: 0.01, y: 0.01, z: 0.1 },
+            lifetime: 10
+        });
+
+        print("4");
+        // TODO: Do we want to access other entities directly, or send them messages??
+        if (this.muzzleSmokeID === undefined) {
+            this.muzzleSmokeID = findEntity({
+                name: 'muzzle-smoke',
+                parentID: this.entityManager.entityID
+            });
+        }
+        if (this.muzzleFlashID === undefined) {
+            this.muzzleFlashID = findEntity({
+                name: 'muzzle-flash',
+                parentID: this.entityManager.entityID
+            });
+        }
+        print("5");
+        if (this.muzzleSmokeID) {
+            console.log('playing particle effect');
+            // Adjust particle effect properties
+            Entities.editEntity(this.muzzleSmokeID, { isEmitting: true });
+            Script.setTimeout(this.stopMuzzleFlash.bind(this), 500);
+        }
+        if (this.muzzleFlashID) {
+            Entities.editEntity(this.muzzleFlashID, { isEmitting: true });
+            Script.setTimeout(this.stopMuzzleFlash.bind(this), 500);
+        }
+        if (this.particleTimeoutID) {
+            Script.clearTimeout(this.particleTimeoutID);
+        }
+        print("6");
+    },
+    onUseEnd: function(args) {
+        print("use end");
+    }
 }, {
 });
 
@@ -570,7 +649,7 @@ createComponentType('projectileGun', {
 createComponentType('timer', {
 }, {
     ctor: function(entityManager, properties) {
-        Script.setTimeout(function() { this.entityManager.emit('timeout'); }.bind(this), properties.time));
+        // Script.setTimeout(function() { this.entityManager.emit('timeout'); }.bind(this), properties.time));
     },
     onTrigger: function() {
     }
