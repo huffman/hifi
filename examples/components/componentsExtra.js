@@ -557,12 +557,18 @@ createComponentType('gun', {
         args = parseJSON(args[0]);
 
         print("3");
+        var forward = Quat.getRight(properties.rotation);
         // Spawn projectile
         Entities.addEntity({
             type: "Box",
             rotation: Quat.multiply(properties.rotation, Quat.fromPitchYawRollDegrees(0, 90, 0)),
-            position: args.position,
-            velocity: args.direction,
+            // position: args.position,
+            position: Vec3.sum(properties.position, forward),
+            rotation: properties.rotation,
+            // velocity: args.direction,
+            velocity: Vec3.multiply(20, forward),
+            linearDamping: 0.001,
+            gravity: { x: 0, y: -9.8, z: 0 },
             dimensions: { x: 0.01, y: 0.01, z: 0.1 },
             lifetime: 10
         });

@@ -205,8 +205,8 @@ SCENE = {
                     type: "ParticleEffect",
                     "name": "muzzle-smoke",
                     position: {
-                        x: 0.2,
-                        y: 0,
+                        x: 0.4,
+                        y: 0.05,
                         z: 0
                     },
                     "maxParticles": 1000,
@@ -246,7 +246,12 @@ SCENE = {
                 },
                 {
                     type: "ParticleEffect",
-                    position: this.barrelPoint,
+                    position: {
+                        x: 0.4,
+                        y: 0.05,
+                        z: 0
+                    },
+                    isEmitting: false,
                     "name": "muzzle-flash",
                     parentID: this.entityID,
                     "color": {
