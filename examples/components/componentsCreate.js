@@ -68,9 +68,18 @@ destroyScene = function(name) {
 };
 
 var types = {};
-registerType = function(name, data) {
+registerBlueprint = function(name, data) {
     if (data.indexOf(name) >= 0) {
         console.warning("Overwriting type ", name);
     }
     types[name] = data;
-}
+};
+
+spawnBlueprint = function(name) {
+    var blueprint = types[name];
+    if (!blueprint) {
+        console.warn("Cannot find blueprint: " + name);
+        return null;
+    }
+    return Entities.addEntity(blueprint);
+};

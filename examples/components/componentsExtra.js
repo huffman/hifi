@@ -557,7 +557,7 @@ createComponentType('gun', {
         args = parseJSON(args[0]);
 
         print("3");
-        var forward = Quat.getRight(properties.rotation);
+        var forward = Quat.getFront(properties.rotation);
         // Spawn projectile
         Entities.addEntity({
             type: "Box",
