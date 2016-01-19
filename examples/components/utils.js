@@ -90,3 +90,17 @@ exports.extend = function(a, b) {
     }
 };
 extend = exports.extend;
+
+exports.deepCopy = function(a) {
+    var obj = {};
+    for (var k in a) {
+        var t = typeof(a[k]);
+        if (t === 'object') {
+            obj[k] = deepCopy(a[k]);
+        } else {
+            obj[k] = a[k];
+        }
+    }
+    return obj;
+}
+deepCopy = exports.deepCopy;

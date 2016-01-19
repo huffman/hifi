@@ -3,6 +3,7 @@ Script.include('utils.js');
 var SCRIPT_URL = Script.resolvePath('componentsClient.js');
 
 // Create a single entity in a scene, including its children, recursively
+// TODO Add blueprint generation here
 function _createEntity(sceneName, entityManager, parentID, data) {
     var children = [];
     if (data.hasOwnProperty('children')) {
@@ -67,19 +68,69 @@ destroyScene = function(name) {
     }
 };
 
-var types = {};
+var blueprintTypes = {};
 registerBlueprint = function(name, data) {
-    if (data.indexOf(name) >= 0) {
+    if (name in blueprintTypes) {
         console.warning("Overwriting type ", name);
     }
-    types[name] = data;
+    print("Registering blueprint type " + name);
+    blueprintTypes[name] = data;
 };
 
-spawnBlueprint = function(name) {
-    var blueprint = types[name];
-    if (!blueprint) {
+spawnBlueprint = function(name, overrideProperties) {
+    if (!(name in blueprintTypes)) {
         console.warn("Cannot find blueprint: " + name);
         return null;
     }
-    return Entities.addEntity(blueprint);
+    var blueprint = blueprintTypes[name];
+    var properties = {};
+    for (var k in blueprint) {
+        properties[k] = blueprint[k];
+    }
+    for (k in overrideProperties) {
+        properties[k] = overrideProperties[k];
+    }
+    return createObject(properties);
 };
+
+// {
+//     blueprint: 'nailgun.nail',
+//     dimensions: {
+//     },
+//     gravity: {
+//     }
+// }
+
+registerBlueprint('nailgun.nail', {
+    type: 'Model',
+    name: 'nail',
+    modelURL: Script.resolvePath("../gunshow/nail.obj"),
+    dimensions: {
+        x: 0.1,
+        y: 0.1,
+        z: 0.56
+    },
+    shapeType: "box",
+    linearDamping: 0.001,
+    gravity: { x: 0, y: -9.8, z: 0 },
+    lifetime: 10,
+    components: {
+        sticky: {}
+    }
+});
+
+registerBlueprint('grenade', {
+    type: 'Sphere',
+    name: 'grenade',
+    dimensions: {
+        x: 0.1,
+        y: 0.05,
+        z: 0.1
+    },
+    gravity: { x: 0, y: -9.8, z: 0 },
+    lifetime: 10,
+    collisionsWillMove: true,
+    components: {
+        timedExplosive: {}
+    }
+});

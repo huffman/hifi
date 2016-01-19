@@ -529,6 +529,7 @@ createComponentType('gun', {
         var soundURL = properties.fireSoundURL || AUDIO_GUN_SHOT_URL;
         console.log("url", soundURL);
         this.fireSound = SoundCache.getSound(soundURL);
+        this.projectileBlueprint = properties.projectileBlueprint || 'nailgun.nail';
         entityManager.on('useBegin', this.onUseBegin.bind(this));
         entityManager.on('useEnd', this.onUseEnd.bind(this));
         console.log("done initting");
@@ -559,18 +560,10 @@ createComponentType('gun', {
         print("3");
         var forward = Quat.getFront(properties.rotation);
         // Spawn projectile
-        Entities.addEntity({
-            type: "Box",
-            rotation: Quat.multiply(properties.rotation, Quat.fromPitchYawRollDegrees(0, 90, 0)),
-            // position: args.position,
-            position: Vec3.sum(properties.position, forward),
-            rotation: properties.rotation,
-            // velocity: args.direction,
+        spawnBlueprint(this.projectileBlueprint, {
             velocity: Vec3.multiply(20, forward),
-            linearDamping: 0.001,
-            gravity: { x: 0, y: -9.8, z: 0 },
-            dimensions: { x: 0.01, y: 0.01, z: 0.1 },
-            lifetime: 10
+            rotation: properties.rotation,
+            position: Vec3.sum(properties.position, forward)
         });
 
         print("4");
@@ -609,13 +602,35 @@ createComponentType('gun', {
 }, {
 });
 
-createComponentType('explosive', {
+createComponentType('sticky', {
+    init: function() {
+        Script.addEventHandler(this.entityID, "collisionWithEntity", this.onCollisionWithEntity.bind(this));
+    },
+    onCollisionWithEntity: function(entityA, entityB, collision) {
+        var properties = Entities.getEntityProperties(entityA, ['position', 'rotation']);
+        var otherProperties = Entities.getEntityProperties(entityB, ['name', 'position', 'rotation']);
+        console.log("Hit: " + otherProperties.name);
+        Entities.editEntity(entityA, {
+            parentID: entityB,
+            //localPosition: Vec3.subtract(properties.position, otherProperties.position),
+            //localRotation: Quat.rotationBetween(properties.rotation, otherProperties.rotation),
+            velocity: { x: 0, y: 0, z: 0 },
+            gravity: { x: 0, y: 0, z: 0 },
+            collisionsWillMove: false,
+            ignoreForCollisions: true
+        });
+    }
+}, {
+});
+
+createComponentType('timedExplosive', {
 }, {
     init: function() {
-        this.timeoutID = Script.setTimeout(this.detonate.bind(this), 2000);
+        this.timeoutID = Script.setTimeout(this.detonate.bind(this), 1000);
         this.fireSound = SoundCache.getSound(AUDIO_GUN_SHOT_URL);
     },
     detonate: function() {
+        console.log("detonate!");
         var properties = Entities.getEntityProperties(this.entityManager.entityID, ['position']);
         Entities.deleteEntity(this.entityManager.entityID);
         Audio.playSound(this.fireSound, {
