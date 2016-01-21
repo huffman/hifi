@@ -134,3 +134,20 @@ registerBlueprint('grenade', {
         timedExplosive: {}
     }
 });
+
+registerBlueprint('rainbow-disc', {
+    type: 'Sphere',
+    name: 'grenade',
+    dimensions: {
+        x: 0.1,
+        y: 0.0001,
+        z: 0.1
+    },
+    gravity: { x: 0, y: -9.8, z: 0 },
+    lifetime: 10,
+    collisionsWillMove: true,
+    components: {
+        timedExplosive: {},
+        trail: {}
+    }
+});

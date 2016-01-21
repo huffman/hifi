@@ -13,6 +13,9 @@
         print("This is: ", this);
         entityComponentManager = new EntityManager(entityID, false, this);
     };
+    this.unload = function() {
+        entityComponentManager.destroy();
+    };
 });
 
 // Script.include("components.js");

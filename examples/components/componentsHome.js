@@ -90,7 +90,7 @@ SCENE = {
             },
             components: {
                 gun: {
-                    projectileBlueprint: 'grenade',
+                    projectileBlueprint: 'rainbow-disc',
                     fireSoundURL: Script.resolvePath("../gunshow/gatling.wav")
                 }
             },

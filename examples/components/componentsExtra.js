@@ -1,6 +1,8 @@
 // TODO: Add an enabled property (or possibly this with 'visible') and make it
 //       available to components.
 
+Script.include('../libraries/line.js');
+
 var scriptURL = Script.resolvePath("componentsClient.js");
 
 findEntity = function(properties, searchRadius) {
@@ -673,6 +675,33 @@ createComponentType('timer', {
         // Script.setTimeout(function() { this.entityManager.emit('timeout'); }.bind(this), properties.time));
     },
     onTrigger: function() {
+    }
+});
+
+createComponentType('trail', {
+}, {
+    init: function() {
+        console.log("TRAIL START");
+        var properties = Entities.getEntityProperties(this.entityManager.entityID, ['position', 'rotation']);
+        // Create infiniteline
+        this.line = new InifiniteLine(
+            properties.position, { red: 255, green: 255, blue: 255 }, 100);
+        var normal = Quat.getUp(properties.rotation);
+        this.line.enqueuePoint(properties.position, 0.5, normal);
+        this.line.enqueuePoint(properties.position, 0.5, normal);
+
+        this.intervalID = Script.setInterval(function() {
+            console.log("TRAIL APPEND");
+            var properties = Entities.getEntityProperties(this.entityManager.entityID, ['position', 'rotation']);
+            var normal = Quat.getUp(properties.rotation);
+            this.line.enqueuePoint(properties.position, 0.5, normal);
+        }.bind(this), 100);
+    },
+    destroy: function() {
+        console.log("TRAIL DESTROY");
+        // Destory line
+        Script.clearInterval(this.intervalID);
+        this.line.destroy();
     }
 });
 

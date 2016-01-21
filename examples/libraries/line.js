@@ -43,7 +43,7 @@ var PolyLine = function(position, color, lifetime, texture) {
     });
 };
 
-PolyLine.prototype.enqueuePoint = function(position, strokeWidth) {
+PolyLine.prototype.enqueuePoint = function(position, strokeWidth, normal) {
     if (this.isFull()) {
         error("Hit max PolyLine size");
         return;
@@ -51,7 +51,7 @@ PolyLine.prototype.enqueuePoint = function(position, strokeWidth) {
 
     position = Vec3.subtract(position, this.position);
     this.points.push(position);
-    this.normals.push({ x: 1, y: 0, z: 0 });
+    this.normals.push(normal || { x: 1, y: 0, z: 0 });
     this.strokeWidths.push(strokeWidth);
     Entities.editEntity(this.entityID, {
         linePoints: this.points,
@@ -111,7 +111,7 @@ InfiniteLine = function(position, color, lifetime, textureBegin, textureMiddle) 
     this.textureMiddle = textureMiddle ? textureMiddle : "";
 };
 
-InfiniteLine.prototype.enqueuePoint = function(position, strokeWidth) {
+InfiniteLine.prototype.enqueuePoint = function(position, strokeWidth, normal) {
     var currentLine;
 
     if (this.lines.length == 0) {
@@ -123,12 +123,12 @@ InfiniteLine.prototype.enqueuePoint = function(position, strokeWidth) {
 
     if (currentLine.isFull()) {
         var newLine = new PolyLine(currentLine.getLastPoint(), this.color, this.lifetime, this.textureMiddle);
-        newLine.enqueuePoint(currentLine.getLastPoint(), strokeWidth);
+        newLine.enqueuePoint(currentLine.getLastPoint(), strokeWidth, normal);
         this.lines.push(newLine);
         currentLine = newLine;
     }
 
-    currentLine.enqueuePoint(position, strokeWidth);
+    currentLine.enqueuePoint(position, strokeWidth, normal);
 
     ++this.size;
 };
