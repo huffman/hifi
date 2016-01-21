@@ -28,7 +28,7 @@ UpdateChecker.prototype = extend(UpdateChecker.prototype, {
             if (response.statusCode == 200) {
                 try {
                     var $ = cheerio.load(body, { xmlMode: true });
-                    const latestBuild = $('project[name="interface"] platform[name="' + platform + '"]').children().first();
+                    const latestBuild = $('project[name="release"] platform[name="' + platform + '"]').children().first();
                     const latestVersion = parseInt(latestBuild.find('version').text());
                     console.log("Latest version is:", latestVersion, this.currentVersion);
                     if (latestVersion > this.currentVersion) {
