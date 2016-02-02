@@ -24,10 +24,58 @@
 #include "InterfaceLogging.h"
 #include "MainWindow.h"
 
+#include <BuildInfo.h>
+
+#include <winsock2.h>
+#include <CrashRpt.h>
+
+
+// Define the callback function that will be called on crash
+int CALLBACK CrashCallback(CR_CRASH_CALLBACK_INFO* pInfo)
+{
+    // The application has crashed!
+    qDebug() << "Application has crashed!";
+    // Return CR_CB_DODEFAULT to generate error report
+    return CR_CB_DODEFAULT;
+}
+
 int main(int argc, const char* argv[]) {
+    QString applicationName = "High Fidelity Interface";
+    // Setup crash reporting via CrashRpt
+    CR_INSTALL_INFO info;
+    memset(&info, 0, sizeof(CR_INSTALL_INFO));
+    info.cb = sizeof(CR_INSTALL_INFO);
+    info.pszAppName = applicationName.toUtf8();
+    info.pszAppVersion = BuildInfo::VERSION.toUtf8();
+    info.pszUrl = "http://crashes.highfidelity.io/index.php/crashReport/uploadExternal";
+    info.uPriorities[CR_HTTP] = 1;  // First try send report over HTTP 
+    info.dwFlags |= CR_INST_ALL_POSSIBLE_HANDLERS;
+    info.dwFlags |= CR_INST_AUTO_THREAD_HANDLERS;
+    // Restart the app on crash 
+    //info.dwFlags |= CR_INST_APP_RESTART;
+    //info.dwFlags |= CR_INST_SEND_QUEUED_REPORTS;
+    //info.pszRestartCmdLine = _T("/restart");
+
+    // Define the Privacy Policy URL 
+    info.pszPrivacyPolicyURL = "http://highfidelity.com/privacypolicy.html";
+
+    // Install crash reporting
+    int nResult = crInstall(&info);
+    if (nResult != 0)
+    {
+        // Something goes wrong. Get error message.
+        char errorMsg[512] = "";
+        crGetLastErrorMsg(errorMsg, 512);
+        qDebug() << "Error! " << QString(errorMsg);
+        return 1;
+    }
+
+    // Set crash callback function
+    crSetCrashCallback(CrashCallback, NULL);
+
     disableQtBearerPoll(); // Fixes wifi ping spikes
     
-    QString applicationName = "High Fidelity Interface - " + qgetenv("USERNAME");
+    QString applicationNameWithUsername = applicationName + qgetenv("USERNAME");
 
     bool instanceMightBeRunning = true;
 
@@ -35,7 +83,7 @@ int main(int argc, const char* argv[]) {
     // Try to create a shared memory block - if it can't be created, there is an instance of
     // interface already running. We only do this on Windows for now because of the potential
     // for crashed instances to leave behind shared memory instances on unix.
-    QSharedMemory sharedMemory { applicationName };
+    QSharedMemory sharedMemory { applicationNameWithUsername };
     instanceMightBeRunning = !sharedMemory.create(1, QSharedMemory::ReadOnly);
 #endif
 
@@ -43,7 +91,7 @@ int main(int argc, const char* argv[]) {
         // Try to connect and send message to existing interface instance
         QLocalSocket socket;
 
-        socket.connectToServer(applicationName);
+        socket.connectToServer(applicationNameWithUsername);
 
         static const int LOCAL_SERVER_TIMEOUT_MS = 500;
 
@@ -110,8 +158,8 @@ int main(int argc, const char* argv[]) {
         QLocalServer server { &app };
 
         // We failed to connect to a local server, so we remove any existing servers.
-        server.removeServer(applicationName);
-        server.listen(applicationName);
+        server.removeServer(applicationNameWithUsername);
+        server.listen(applicationNameWithUsername);
 
         QObject::connect(&server, &QLocalServer::newConnection, &app, &Application::handleLocalServerConnection);
 
@@ -127,5 +175,9 @@ int main(int argc, const char* argv[]) {
     Application::shutdownPlugins();
 
     qCDebug(interfaceapp, "Normal exit.");
+
+    // Shutdown CrashRpt
+    crUninstall();
+
     return exitCode;
 }

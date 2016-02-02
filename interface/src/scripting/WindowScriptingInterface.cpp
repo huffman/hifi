@@ -43,6 +43,9 @@ WebWindowClass* WindowScriptingInterface::doCreateWebWindow(const QString& title
 }
 
 QScriptValue WindowScriptingInterface::hasFocus() {
+    QObject* object = nullptr;
+    bool value = object->isWindowType();
+    Q_UNUSED(value);
     return qApp->hasFocus();
 }
 

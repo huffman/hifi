@@ -119,6 +119,7 @@ if (WIN32)
   add_dependency_external_projects(sdl2)
   add_dependency_external_projects(OpenVR)
   add_dependency_external_projects(neuron)
+  add_dependency_external_projects(crashrpt)
 endif()
 
 # disable /OPT:REF and /OPT:ICF for the Debug builds
@@ -143,9 +144,19 @@ target_bullet()
 target_glew()
 target_opengl()
 
+target_crashrpt()
+find_package(Crashrpt REQUIRED)
+add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+  COMMAND "${CMAKE_COMMAND}" -E copy
+  "${CRASHRPT_SENDER_PATH}"
+  $<TARGET_FILE_DIR:${TARGET_NAME}>
+)
+
+
 if (WIN32 OR APPLE)
   target_faceshift()
 endif()
+
 
 # perform standard include and linking for found externals
 foreach(EXTERNAL ${OPTIONAL_EXTERNALS})
@@ -268,5 +279,7 @@ if (WIN32)
     set(TARGET_INSTALL_COMPONENT ${CLIENT_COMPONENT})
     manually_install_ssl_eay()
 
+    # Message
+    message("FIXUP LIBS" ${FIXUP_LIBS})
     package_libraries_for_deployment()
 endif()
