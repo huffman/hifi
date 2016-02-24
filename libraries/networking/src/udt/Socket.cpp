@@ -282,6 +282,7 @@ void Socket::readPendingDatagrams() {
                                                                   packet->getDataSize(),
                                                                   packet->getPayloadSize())) {
                         // the connection indicated that we should not continue processing this packet
+                        qDebug() << "Processing should not continue for: " << int32_t(packet->getSequenceNumber());
                         continue;
                     }
                 }
@@ -291,8 +292,15 @@ void Socket::readPendingDatagrams() {
                     connection.queueReceivedMessagePacket(std::move(packet));
                 } else if (_packetHandler) {
                     // call the verified packet callback to let it handle this packet
+                    if (int32_t(packet->getSequenceNumber()) == 1) {
+                        QByteArray data { packet->getPayload(), int32_t(packet->getPayloadSize()) };
+                        qDebug() << "got: " << data.toHex();
+                    }
+                    qDebug() << int32_t(packet->getSequenceNumber());
                     _packetHandler(std::move(packet));
                 }
+            } else {
+                qDebug() << "Filtered a packet: " << int32_t(packet->getSequenceNumber());
             }
         }
     }

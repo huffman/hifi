@@ -413,8 +413,8 @@ bool Connection::processReceivedSequenceNumber(SequenceNumber sequenceNumber, in
 
     if (!_hasReceivedData) {
         _initialReceiveSequenceNumber = sequenceNumber;
-        _lastReceivedSequenceNumber = sequenceNumber;
-    }
+        _lastReceivedSequenceNumber = sequenceNumber - 1;
+     }
     
     _isReceivingData = _hasReceivedData = true;
     
