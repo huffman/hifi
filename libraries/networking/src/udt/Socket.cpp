@@ -38,12 +38,12 @@ Socket::Socket(QObject* parent) :
     _synTimer->start(_synInterval);
 }
 
-void Socket::rebind() {
-    quint16 oldPort = _udpSocket.localPort();
-    
-    _udpSocket.close();
-    bind(QHostAddress::AnyIPv4, oldPort);
-}
+//void Socket::rebind() {
+//    quint16 oldPort = _udpSocket.localPort();
+//    
+//    _udpSocket.close();
+//    bind(QHostAddress::AnyIPv4, oldPort);
+//}
 
 void Socket::setSystemBufferSizes() {
     for (int i = 0; i < 2; i++) {
@@ -282,6 +282,7 @@ void Socket::readPendingDatagrams() {
                                                                   packet->getDataSize(),
                                                                   packet->getPayloadSize())) {
                         // the connection indicated that we should not continue processing this packet
+                        qDebug() << "Processing should not continue for: " << int32_t(packet->getSequenceNumber());
                         continue;
                     }
                 }

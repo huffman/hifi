@@ -89,6 +89,8 @@ SendQueue::SendQueue(Socket* socket, HifiSockAddr dest) :
     // randomize the intial sequence number
     _initialSequenceNumber = SequenceNumber(distribution(generator));
 
+    qDebug() << "Initial sequence number is: " << uint32_t(_initialSequenceNumber);
+
     // set our member variables from randomized initial number
     _currentSequenceNumber = _initialSequenceNumber - 1;
     _atomicCurrentSequenceNumber = uint32_t(_currentSequenceNumber);
@@ -519,4 +521,4 @@ void SendQueue::deactivate() {
     emit queueInactive();
     
     _state = State::Stopped;
-}
+} 

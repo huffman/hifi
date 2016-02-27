@@ -328,7 +328,7 @@ void Procedural::setupUniforms() {
             v.y = date.month() - 1;
             // But not the day... go figure
             v.z = date.day();
-            v.w = (time.hour() * 3600) + (time.minute() * 60) + time.second();
+            v.w = (time.hour() * 3600) + (time.minute() * 60) + time.second() + (time.msec() / 1000);
             batch._glUniform(_standardUniformSlots[DATE], v);
         });
     }

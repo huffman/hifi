@@ -212,6 +212,8 @@ void PacketReceiver::handleVerifiedPacket(std::unique_ptr<udt::Packet> packet) {
     auto nlPacket = NLPacket::fromBase(std::move(packet));
     auto receivedMessage = QSharedPointer<ReceivedMessage>::create(*nlPacket);
 
+    //qDebug() << "Got: " << receivedMessage->getType();
+
     _inPacketCount += 1;
     _inByteCount += nlPacket->size();
 

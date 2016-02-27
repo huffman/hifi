@@ -406,9 +406,19 @@ SequenceNumber Connection::nextACK() const {
 }
 
 bool Connection::processReceivedSequenceNumber(SequenceNumber sequenceNumber, int packetSize, int payloadSize) {
+
+    qDebug() << "Processing seq: " << int32_t(sequenceNumber);
     
     if (!_hasReceivedHandshake) {
-        // refuse to process any packets until we've received the handshake
+        // Refuse to process any packets until we've received the handshake
+        // Send handshake request to re-request a handshake
+        static auto handshakeRequestPacket = ControlPacket::create(ControlPacket::HandshakeRequest, 0);
+        _parentSocket->writeBasePacket(*handshakeRequestPacket, _destination);
+
+#ifdef UDT_CONNECTION_DEBUG
+        qCDebug(networking) << "Received packet before receiving handshake, sending HandshakeRequest";
+#endif
+
         return false;
     }
 
@@ -540,6 +550,17 @@ void Connection::processControl(std::unique_ptr<ControlPacket> controlPacket) {
                 processProbeTail(move(controlPacket));
             }
             break;
+        case ControlPacket::HandshakeRequest:
+            if (_hasReceivedHandshakeACK) {
+                // We're already in a state where we've received a handshake ack, so we are likely in a state
+                // where the other end expired our connection. Let's reset.
+
+#ifdef UDT_CONNECTION_DEBUG
+                qCDebug(networking) << "Got handshake request, stopping SendQueue";
+#endif
+                stopSendQueue();
+            }
+            break;
     }
 }
 
@@ -567,6 +588,7 @@ void Connection::processACK(std::unique_ptr<ControlPacket> controlPacket) {
     // read the ACKed sequence number
     SequenceNumber ack;
     controlPacket->readPrimitive(&ack);
+    //qDebug() << "Got ack: " << uint32_t(ack);
     
     // update the total count of received ACKs
     _stats.record(ConnectionStats::Stats::ReceivedACK);
@@ -574,7 +596,8 @@ void Connection::processACK(std::unique_ptr<ControlPacket> controlPacket) {
     // validate that this isn't a BS ACK
     if (ack > getSendQueue().getCurrentSequenceNumber()) {
         // in UDT they specifically break the connection here - do we want to do anything?
-        Q_ASSERT_X(false, "Connection::processACK", "ACK recieved higher than largest sent sequence number");
+        //Q_ASSERT_X(false, "Connection::processACK", "ACK recieved higher than largest sent sequence number");
+        qDebug() << "Out of order ack!!! " << int(ack) << ", " << int(getSendQueue().getCurrentSequenceNumber());
         return;
     }
     
@@ -584,6 +607,9 @@ void Connection::processACK(std::unique_ptr<ControlPacket> controlPacket) {
     
     if (ack < _lastReceivedACK) {
         // this is an out of order ACK, bail
+#ifdef UDT_CONNECTION_DEBUG
+        qCDebug(networking) << "Got an out of order ACK: " << uint32_t(ack);
+#endif
         return;
     }
     
@@ -595,6 +621,9 @@ void Connection::processACK(std::unique_ptr<ControlPacket> controlPacket) {
     
     if (ack == _lastReceivedACK) {
         // processing an already received ACK, bail
+#ifdef UDT_CONNECTION_DEBUG
+        //qCDebug(networking) << "Got an already received ACK: " << uint32_t(ack);
+#endif
         return;
     }
     
@@ -737,7 +766,7 @@ void Connection::processHandshake(std::unique_ptr<ControlPacket> controlPacket) 
         // as long as we haven't received a handshake yet or we have and we've received some data
         resetReceiveState();
     }
-    
+
     // immediately respond with a handshake ACK
     static auto handshakeACK = ControlPacket::create(ControlPacket::HandshakeACK, 0);
     _parentSocket->writeBasePacket(*handshakeACK, _destination);

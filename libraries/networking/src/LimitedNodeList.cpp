@@ -552,6 +552,18 @@ SharedNodePointer LimitedNodeList::addOrUpdateNode(const QUuid& uuid, NodeType_t
             });
         }
 
+        static int numKills = 0;
+        if (nodeType == NodeType::AssetServer) {
+            //kill connection
+            auto uuid = newNode->getUUID();
+            if (numKills++ < 10) {
+                QTimer::singleShot(2000, this, [this, uuid]() {
+                    qDebug() << " Killing asset server connection";
+                    killNodeWithUUID(uuid);
+                });
+            }
+        }
+
         return newNodePointer;
     }
 }
