@@ -39,7 +39,7 @@ int main(int argc, const char* argv[]) {
     static const DWORD BUG_SPLAT_FLAGS = MDSF_PREVENTHIJACKING | MDSF_USEGUARDMEMORY;
     static const char* BUG_SPLAT_DATABASE = "interface_alpha";
     static const char* BUG_SPLAT_APPLICATION_NAME = "Interface";
-    MiniDmpSender mpSender { BUG_SPLAT_DATABASE, BUG_SPLAT_APPLICATION_NAME, BuildInfo::VERSION.toLatin1().constData(),
+    MiniDmpSender mpSender { BUG_SPLAT_DATABASE, BUG_SPLAT_APPLICATION_NAME, qPrintable(BuildInfo::VERSION),
                              nullptr, BUG_SPLAT_FLAGS };
 #endif
     

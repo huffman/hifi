@@ -36,7 +36,6 @@ Window {
     property var assetProxyModel: Assets.proxyModel;
     property var assetMappingsModel: Assets.mappingModel;
     property var currentDirectory;
-    property alias currentFileUrl: fileUrlTextField.text;
 
     Settings {
         category: "Overlay.AssetServer"
@@ -46,8 +45,8 @@ Window {
     }
 
     Component.onCompleted: {
-        assetMappingsModel.errorGettingMappings.connect(handleGetMappingsError)
-        reload()
+        assetMappingsModel.errorGettingMappings.connect(handleGetMappingsError);
+        reload();
     }
 
     function doDeleteFile(path) {
@@ -220,47 +219,69 @@ Window {
         });
     }
 
-    function chooseClicked() {
-        var browser = desktop.fileDialog({
-            selectDirectory: false,
-            dir: currentDirectory
-        });
-        browser.selectedFile.connect(function(url){
-            fileUrlTextField.text = fileDialogHelper.urlToPath(url);
-            currentDirectory = browser.dir;
-        });
-    }
 
     property var uploadOpen: false;
+    Timer {
+        id: timer
+    }
     function uploadClicked() {
         if (uploadOpen) {
             return;
         }
         uploadOpen = true;
 
-        var fileUrl = fileUrlTextField.text
-        var shouldAddToWorld = addToWorldCheckBox.checked
+        var fileUrl = "";
 
-        var path = assetProxyModel.data(treeView.selection.currentIndex, 0x100);
-        var directory = path ? path.slice(0, path.lastIndexOf('/') + 1) : "/";
-        var filename = fileUrl.slice(fileUrl.lastIndexOf('/') + 1);
-
-        Assets.uploadFile(fileUrl, directory + filename, function(err, path) {
-            if (err) {
-                console.log("Asset Browser - error uploading: ", fileUrl, " - error ", err);
-                var box = errorMessage("There was an error uploading:\n" + fileUrl + "\n" + Assets.getErrorString(err));
-                box.selected.connect(reload);
-            } else {
-                console.log("Asset Browser - finished uploading: ", fileUrl);
-
-                if (shouldAddToWorld) {
-                    addToWorld("atp:" + path);
-                }
-
-                reload();
-            }
+        var browser = desktop.fileDialog({
+            selectDirectory: false,
+            dir: currentDirectory
         });
-        uploadOpen = false;
+        browser.canceled.connect(function() {
+            uploadOpen = false;
+        });
+        browser.selectedFile.connect(function(url){
+            var fileUrl = fileDialogHelper.urlToPath(url);
+            currentDirectory = browser.dir;
+
+            //var fileUrl = fileUrlTextField.text
+
+            var path = assetProxyModel.data(treeView.selection.currentIndex, 0x100);
+            var directory = path ? path.slice(0, path.lastIndexOf('/') + 1) : "/";
+            var filename = fileUrl.slice(fileUrl.lastIndexOf('/') + 1);
+
+            Assets.uploadFile(fileUrl, directory + filename,
+                function() {
+                    // Upload started
+                    uploadSpinner.visible = true;
+                    uploadButton.enabled = false;
+                    uploadProgressLabel.text = "In progress...";
+                },
+                function(err, path) {
+                    print(err, path);
+                    if (!err) {
+                        uploadProgressLabel.text = "Upload Complete";
+                        timer.interval = 1000;
+                        timer.repeat = false;
+                        timer.triggered.connect(function() {
+                            uploadSpinner.visible = false;
+                            uploadButton.enabled = true;
+                            uploadOpen = false;
+                        });
+                        timer.start();
+                        console.log("Asset Browser - finished uploading: ", fileUrl);
+                        reload();
+                    } else {
+                        if (err > 0) {
+                            console.log("Asset Browser - error uploading: ", fileUrl, " - error ", err);
+                            var box = errorMessage("There was an error uploading:\n" + fileUrl + "\n" + Assets.getErrorString(err));
+                            box.selected.connect(reload);
+                        }
+                        uploadSpinner.visible = false;
+                        uploadButton.enabled = true;
+                        uploadOpen = false;
+                    }
+            })
+        });
     }
 
     function errorMessageBox(message) {
@@ -372,86 +393,88 @@ Window {
                     anchors.fill: parent
                     acceptedButtons: Qt.RightButton
                     onClicked: {
+                        print("onClicked");
                         var index = treeView.indexAt(mouse.x, mouse.y);
-                        contextMenu.currentIndex = index;
-                        contextMenu.popup();
+                        print("onClicked", assetProxyModel.data(index, 0x0100));
+                        treeView.selection.select(index, 0x0001 |  0x0002 | 0x0010 | 0x0020);
+                        print("done");
+                        //contextMenu.currentIndex = index;
+                        //treeView.selection.clearSelection()
+                        //treeView.selection.clear();
+                        //contextMenu.popup();
                     }
                 }
             }
-        }
 
-        HifiControls.ContentSection {
-            id: uploadSection
-            name: ""
-            spacing: hifi.dimensions.contentSpacing.y
+            HifiControls.ContentSection {
+                id: uploadSection
+                name: ""
+                spacing: hifi.dimensions.contentSpacing.y - 10
 
-            HifiControls.TextField {
-                id: fileUrlTextField
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.rightMargin: chooseButton.width + hifi.dimensions.contentSpacing.x
+                HifiControls.Label {
+                    id: uploadLabel
+                    text: "UPLOAD A FILE"
+                    colorScheme: root.colorScheme
+                }
 
-                label: "Upload File"
-                placeholderText: "Paste URL or choose file"
-                colorScheme: root.colorScheme
-            }
-
-            Item {
-                // Take the chooseButton out of the column flow.
-                id: chooseButtonContainer
-                anchors.top: fileUrlTextField.top
-                anchors.right: parent.right
-
-                HifiControls.Button {
-                    id: chooseButton
+                Item {
+                    // Take the chooseButton out of the column flow.
+                    id: buttonContainer
+                    anchors.top: uploadLabel.bottom
                     anchors.right: parent.right
 
-                    text: "Choose"
-                    color: hifi.buttons.white
-                    colorScheme: root.colorScheme
-                    enabled: true
+                    HifiControls.Button {
+                        id: uploadButton
+                        anchors.right: parent.right
 
-                    width: 100
+                        text: "Choose File"
+                        color: hifi.buttons.blue
+                        colorScheme: root.colorScheme
+                        height: 30
+                        width: 155
 
-                    onClicked: root.chooseClicked()
+                        /* enabled: fileUrlTextField.text != "" */
+                        onClicked: root.uploadClicked()
+                    }
                 }
-            }
 
-            HifiControls.CheckBox {
-                id: addToWorldCheckBox
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.rightMargin: uploadButton.width + hifi.dimensions.contentSpacing.x
+                Item {
+                    id: uploadSpinner
+                    /* visible: false */
+                    visible: true
+                    anchors.top: uploadLabel.bottom
+                    anchors.left: parent.left
+                    width: 40
+                    height: 32
 
-                text: "Add to world on upload"
+                    Image {
+                        id: image
+                        width: 24
+                        height: 24
+                        source: "../images/Loading-Outer-Ring.png"
+                        RotationAnimation on rotation {
+                            loops: Animation.Infinite
+                            from: 0
+                            to: 360
+                            duration: 2000
+                        }
+                    }
+                    Image {
+                        width: 24
+                        height: 24
+                        source: "../images/Loading-Inner-H.png"
+                    }
+                    HifiControls.Label {
+                        id: uploadProgressLabel
+                        anchors.left: image.right
+                        text: "In progress..."
+                        colorScheme: root.colorScheme
+                    }
 
-                opacity: canAddToWorld(fileUrlTextField.text) ? 1 : 0
-
-                checked: false
-            }
-
-            Item {
-                // Take the uploadButton out of the column flow.
-                id: uploadButtonContainer
-                anchors.top: addToWorldCheckBox.top
-                anchors.right: parent.right
-
-                HifiControls.Button {
-                    id: uploadButton
-                    anchors.right: parent.right
-
-                    text: "Upload"
-                    color: hifi.buttons.blue
-                    colorScheme: root.colorScheme
-                    height: 30
-                    width: 155
-
-                    enabled: fileUrlTextField.text != ""
-                    onClicked: root.uploadClicked()
                 }
-            }
 
-            HifiControls.VerticalSpacer {}
+                HifiControls.VerticalSpacer {}
+            }
         }
     }
 }
