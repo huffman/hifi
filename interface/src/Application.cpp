@@ -343,18 +343,6 @@ public:
     void call() { _fun(); }
 };
 
-void messageHandler(QtMsgType type, const QMessageLogContext& context, const QString& message) {
-    QString logMessage = LogHandler::getInstance().printMessage((LogMsgType) type, context, message);
-
-    if (!logMessage.isEmpty()) {
-#ifdef Q_OS_WIN
-        OutputDebugStringA(logMessage.toLocal8Bit().constData());
-        OutputDebugStringA("\n");
-#endif
-        qApp->getLogger()->addMessage(qPrintable(logMessage + "\n"));
-    }
-}
-
 bool setupEssentials(int& argc, char** argv) {
     unsigned int listenPort = 0; // bind to an ephemeral port by default
     const char** constArgv = const_cast<const char**>(argv);
@@ -498,8 +486,6 @@ Application::Application(int& argc, char** argv, QElapsedTimer& startupTimer) :
 #endif
 
     _logger = new FileLogger(this);  // After setting organization name in order to get correct directory
-
-    qInstallMessageHandler(messageHandler);
 
     QFontDatabase::addApplicationFont(PathUtils::resourcesPath() + "styles/Inconsolata.otf");
     _window->setWindowTitle("Interface");

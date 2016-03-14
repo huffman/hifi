@@ -30,9 +30,23 @@
 #include <BugSplat.h>
 #endif
 
-int main(int argc, const char* argv[]) {
-    disableQtBearerPoll(); // Fixes wifi ping spikes
+static const QString applicationName { "Interface" };
 
+#include <LogHandler.h>
+void messageHandler(QtMsgType type, const QMessageLogContext& context, const QString& message) {
+    static FileLogger fileLogger;
+    QString logMessage = LogHandler::getInstance().printMessage((LogMsgType) type, context, message);
+
+    if (!logMessage.isEmpty()) {
+#ifdef Q_OS_WIN
+        OutputDebugStringA(logMessage.toLocal8Bit().constData());
+        OutputDebugStringA("\n");
+#endif
+        fileLogger.addMessage(qPrintable(logMessage + "\n"));
+    }
+}
+
+int main(int argc, const char* argv[]) {
 #if HAS_BUGSPLAT
     // Prevent other threads from hijacking the Exception filter, and allocate 4MB up-front that may be useful in
     // low-memory scenarios.
@@ -42,6 +56,11 @@ int main(int argc, const char* argv[]) {
     MiniDmpSender mpSender { BUG_SPLAT_DATABASE, BUG_SPLAT_APPLICATION_NAME, BuildInfo::VERSION.toLatin1().constData(),
                              nullptr, BUG_SPLAT_FLAGS };
 #endif
+
+    disableQtBearerPoll(); // Fixes wifi ping spikes
+    qApp->setApplicationName(applicationName);
+
+    qInstallMessageHandler(messageHandler);
     
     QString applicationName = "High Fidelity Interface - " + qgetenv("USERNAME");
 
