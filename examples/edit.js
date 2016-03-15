@@ -1307,7 +1307,7 @@ function deleteSelectedEntities() {
             Entities.deleteEntity(entityID);
         }
         SelectionManager.clearSelections();
-        pushCommandForSelections([], savedProperties);
+        pushCommandForSelections([], [], savedProperties);
     } else {
         print("  Delete Entity.... not holding...");
     }
@@ -1524,38 +1524,41 @@ function applyEntityProperties(data) {
 
 // For currently selected entities, push a command to the UndoStack that uses the current entity properties for the
 // redo command, and the saved properties for the undo command.  Also, include create and delete entity data.
-function pushCommandForSelections(createdEntityData, deletedEntityData) {
+//
+// propertyNames: Names of properties that will be affected by undo and redo.
+//
+function pushCommandForSelections(propertyNames, createdEntityData, deletedEntityData) {
+    if (propertyNames === undefined || propertyNames === null) {
+        propertyNames = ['position', 'rotation', 'dimensions'];
+    }
     var undoData = {
         setProperties: [],
         createEntities: deletedEntityData || [],
         deleteEntities: createdEntityData || [],
-        selectCreated: true,
+        selectCreated: true
     };
     var redoData = {
         setProperties: [],
         createEntities: createdEntityData || [],
         deleteEntities: deletedEntityData || [],
-        selectCreated: false,
+        selectCreated: false
     };
     for (var i = 0; i < SelectionManager.selections.length; i++) {
         var entityID = SelectionManager.selections[i];
         var initialProperties = SelectionManager.savedProperties[entityID];
-        var currentProperties = Entities.getEntityProperties(entityID);
+        var redoDataProperties = Entities.getEntityProperties(entityID, propertyNames);
+        var undoDataProperties = {};
+        for (var i in propertyNames) {
+            var name = propertyNames[i];
+            undoDataProperties[name] = initialProperties[name];
+        }
         undoData.setProperties.push({
             entityID: entityID,
-            properties: {
-                position: initialProperties.position,
-                rotation: initialProperties.rotation,
-                dimensions: initialProperties.dimensions,
-            },
+            properties: undoDataProperties
         });
         redoData.setProperties.push({
             entityID: entityID,
-            properties: {
-                position: currentProperties.position,
-                rotation: currentProperties.rotation,
-                dimensions: currentProperties.dimensions,
-            },
+            properties: redoDataProperties
         });
     }
     UndoStack.pushCommand(applyEntityProperties, undoData, applyEntityProperties, redoData);
@@ -1645,7 +1648,7 @@ PropertiesTool = function(opts) {
                     entityListTool.sendUpdate();
                 }
             }
-            pushCommandForSelections();
+            pushCommandForSelections(Object.keys(data.properties));
             selectionManager._update();
         } else if (data.type == "showMarketplace") {
             showMarketplace();
@@ -1666,7 +1669,7 @@ PropertiesTool = function(opts) {
                             position: newPosition,
                         });
                     }
-                    pushCommandForSelections();
+                    pushCommandForSelections(['position']);
                     selectionManager._update();
                 }
             } else if (data.action == "moveAllToGrid") {
@@ -1686,7 +1689,7 @@ PropertiesTool = function(opts) {
                             position: newPosition,
                         });
                     }
-                    pushCommandForSelections();
+                    pushCommandForSelections(['position']);
                     selectionManager._update();
                 }
             } else if (data.action == "resetToNaturalDimensions") {
@@ -1705,7 +1708,7 @@ PropertiesTool = function(opts) {
                             });
                         }
                     }
-                    pushCommandForSelections();
+                    pushCommandForSelections(['dimensions']);
                     selectionManager._update();
                 }
             } else if (data.action == "previewCamera") {
@@ -1723,7 +1726,7 @@ PropertiesTool = function(opts) {
                             dimensions: Vec3.multiply(multiplier, properties.dimensions),
                         });
                     }
-                    pushCommandForSelections();
+                    pushCommandForSelections(['dimensions']);
                     selectionManager._update();
                 }
             } else if (data.action == "reloadScript") {

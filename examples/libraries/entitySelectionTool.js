@@ -2298,7 +2298,7 @@ SelectionDisplay = (function() {
             isConstrained = false;
         },
         onEnd: function(event, reason) {
-            pushCommandForSelections(duplicatedEntityIDs);
+            pushCommandForSelections([], duplicatedEntityIDs);
 
             Overlays.editOverlay(xRailOverlay, {
                 visible: false
@@ -2478,7 +2478,7 @@ SelectionDisplay = (function() {
             }
         },
         onEnd: function(event, reason) {
-            pushCommandForSelections(duplicatedEntityIDs);
+            pushCommandForSelections([], duplicatedEntityIDs);
         },
         onMove: function(event) {
             pickRay = Camera.computePickRay(event.x, event.y);
