@@ -25,6 +25,7 @@
 #include "InterfaceLogging.h"
 #include "UserActivityLogger.h"
 #include "MainWindow.h"
+#include <thread>
 
 #ifdef HAS_BUGSPLAT
 #include <BuildInfo.h>
@@ -120,7 +121,8 @@ bool EnforceFilter(bool bEnforce)
 
     // Obtain the address of SetUnhandledExceptionFilter 
 
-    HMODULE hLib = GetModuleHandle(("kernel32.dll"));
+//    HMODULE hLib = GetModuleHandle(("kernel32.dll"));
+    HMODULE hLib = GetModuleHandle(("msvcrt.dll"));
 
     if (hLib == NULL)
     {
@@ -129,7 +131,8 @@ bool EnforceFilter(bool bEnforce)
         return false;
     }
 
-    BYTE* pTarget = (BYTE*)GetProcAddress(hLib, "SetUnhandledExceptionFilter");
+//    BYTE* pTarget = (BYTE*)GetProcAddress(hLib, "SetUnhandledExceptionFilter");
+    BYTE* pTarget = (BYTE*)GetProcAddress(hLib, "_set_purecall_handler");
 
     if (pTarget == 0)
     {
@@ -175,43 +178,161 @@ bool EnforceFilter(bool bEnforce)
 }
 
 
+
+
+LPTOP_LEVEL_EXCEPTION_FILTER WINAPI
+MyDummySetUnhandledExceptionFilter(
+    LPTOP_LEVEL_EXCEPTION_FILTER lpTopLevelExceptionFilter)
+{
+    return NULL;
+}
+
+
+BOOL redirectLibraryFunctionToNOOP(char* library, char* function)
+{
+//    HMODULE hKernel32 = LoadLibrary("msvcr120.dll");
+    HMODULE hKernel32 = LoadLibrary(library);
+    if (hKernel32 == NULL) return FALSE;
+    void *pOrgEntry = GetProcAddress(hKernel32, function);
+    if (pOrgEntry == NULL) return FALSE;
+
+    DWORD dwOldProtect = 0;
+    SIZE_T jmpSize = 5;
+#ifdef _M_X64
+    jmpSize = 13;
+#endif
+    BOOL bProt = VirtualProtect(pOrgEntry, jmpSize,
+        PAGE_EXECUTE_READWRITE, &dwOldProtect);
+    BYTE newJump[20];
+    void *pNewFunc = &MyDummySetUnhandledExceptionFilter;
+#ifdef _M_IX86
+    DWORD dwOrgEntryAddr = (DWORD)pOrgEntry;
+    dwOrgEntryAddr += jmpSize; // add 5 for 5 op-codes for jmp rel32
+    DWORD dwNewEntryAddr = (DWORD)pNewFunc;
+    DWORD dwRelativeAddr = dwNewEntryAddr - dwOrgEntryAddr;
+    // JMP rel32: Jump near, relative, displacement relative to next instruction.
+    newJump[0] = 0xE9;  // JMP rel32
+    memcpy(&newJump[1], &dwRelativeAddr, sizeof(pNewFunc));
+#elif _M_X64
+    // We must use R10 or R11, because these are "scratch" registers 
+    // which need not to be preserved accross function calls
+    // For more info see: Register Usage for x64 64-Bit
+    // http://msdn.microsoft.com/en-us/library/ms794547.aspx
+    // Thanks to Matthew Smith!!!
+    newJump[0] = 0x49;  // MOV R11, ...
+    newJump[1] = 0xBB;  // ...
+    memcpy(&newJump[2], &pNewFunc, sizeof(pNewFunc));
+    //pCur += sizeof (ULONG_PTR);
+    newJump[10] = 0x41;  // JMP R11, ...
+    newJump[11] = 0xFF;  // ...
+    newJump[12] = 0xE3;  // ...
+#endif
+    SIZE_T bytesWritten;
+    BOOL bRet = WriteProcessMemory(GetCurrentProcess(),
+        pOrgEntry, newJump, jmpSize, &bytesWritten);
+
+    if (bProt != FALSE)
+    {
+        DWORD dwBuf;
+        VirtualProtect(pOrgEntry, jmpSize, dwOldProtect, &dwBuf);
+    }
+    return bRet;
+}
+
+
+
+
+
+
 #if HAS_BUGSPLAT
     // Prevent other threads from hijacking the Exception filter, and allocate 4MB up-front that may be useful in
     // low-memory scenarios.
-    static const DWORD BUG_SPLAT_FLAGS = MDSF_PREVENTHIJACKING | MDSF_USEGUARDMEMORY | MDSF_CUSTOMEXCEPTIONFILTER;
+static const DWORD BUG_SPLAT_FLAGS = MDSF_PREVENTHIJACKING | MDSF_USEGUARDMEMORY;// | MDSF_CUSTOMEXCEPTIONFILTER;
     static const char* BUG_SPLAT_DATABASE = "interface_alpha";
     static const char* BUG_SPLAT_APPLICATION_NAME = "Interface";
-    static MiniDmpSender mpSender { BUG_SPLAT_DATABASE, BUG_SPLAT_APPLICATION_NAME, qPrintable(BuildInfo::VERSION) };
-//                             nullptr, BUG_SPLAT_FLAGS };
+    static MiniDmpSender mpSender { BUG_SPLAT_DATABASE, BUG_SPLAT_APPLICATION_NAME, qPrintable(BuildInfo::VERSION),
+                                    nullptr, BUG_SPLAT_FLAGS };
 #endif
 
 
 #include <csignal>
 
+#include <limits>
 namespace crash {
+
+    void pureVirtualCall() {
+        struct B {
+            B() {
+                qDebug() << "Pure Virtual Function Call crash!";
+                Bar();
+            }
+
+            virtual void Foo() = 0;
+
+            void Bar() {
+                Foo();
+            }
+        };
+
+        struct D : public B {
+            void Foo() {
+                qDebug() << "D:Foo()";
+            }
+        };
+
+        B* b = new D;
+        qDebug() << "About to make a pure virtual call";
+        b->Foo();
+    }
         
     void doubleFree() {
+        qDebug() << "About to double delete memory";
         int* blah = new int(200);
-        free(blah);
-        free(blah);
-        free(blah);
-        free(blah);
-        free(blah);
-        free(blah);
-        free(blah);
+        delete blah;
+        delete blah;
+//        free(blah);
+//        free(blah);
+//        free(blah);
+//        free(blah);
+//        free(blah);
+    }
 
-        blah = 0;
+    void nullDeref() {
+        qDebug() << "About to dereference a null pointer";
+        int* p = nullptr;
+        *p = 1;
+    }
 
-    //    *blah = 3;
+    void doAbort() {
+        qDebug() << "About to abort";
+        abort();
+    }
+
+    void outOfBoundsVectorCrash() {
+        qDebug() << "std::vector out of bounds crash!";
+        std::vector<int> v;
+        v[0] = 5;
+    }
+
+    void newFault() {
+        qDebug() << "About to crash inside new fault";
+        // Force crash with large allocation
+        int *pi = new int[std::numeric_limits<uint64_t>::max()];
     }
 }
 void handleSignal(int signal) {
     qDebug() << "Got signal: " << signal;
-    mpSender.unhandledExceptionHandler(nullptr);
+    throw(signal);
+}
+
+void handlePureVirtualCall() {
+    qDebug() << "In handlePureVirtualcall";
+    throw("Pure Virtual Call");
 }
 
 LONG WINAPI TopLevelExceptionHandler(PEXCEPTION_POINTERS pExceptionInfo) {
     qDebug() << "Got exception";
+
     mpSender.unhandledExceptionHandler(pExceptionInfo);
 
     return EXCEPTION_CONTINUE_SEARCH;
@@ -228,11 +349,17 @@ struct _EXCEPTION_POINTERS *ExceptionInfo
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
-void myterminate() {
-    mpSender.unhandledExceptionHandler(nullptr);
-}
-
 int main(int argc, const char* argv[]) {
+    signal(SIGSEGV, handleSignal);
+    signal(SIGABRT, handleSignal);
+    _set_purecall_handler(handlePureVirtualCall);
+
+    // Disable SetUnhandledExceptionFilter from being called by other libraries (CRT in particular)
+    bool s = redirectLibraryFunctionToNOOP("msvcr120.dll", "_set_purecall_handler");
+    qDebug() << "SUCCESS " << s;
+    s = redirectLibraryFunctionToNOOP("kernel32.dll", "SetUnhandledExceptionFilter");
+    qDebug() << "SUCCESS " << s;
+
     disableQtBearerPoll(); // Fixes wifi ping spikes
     
     QString applicationName = "High Fidelity Interface - " + qgetenv("USERNAME");
@@ -351,23 +478,37 @@ int main(int argc, const char* argv[]) {
         }
 
 
-        SetUnhandledExceptionFilter(TopLevelExceptionHandler);
-//        AddVectoredExceptionHandler(0, VectoredHandler);
+
+
+        // Disable WER popup
         SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
         _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
 
-        std::set_terminate(myterminate);
-        signal(SIGSEGV, handleSignal);
-        signal(SIGABRT, handleSignal);
+        // Error handlers
+//        SetUnhandledExceptionFilter(TopLevelExceptionHandler);
+        //AddVectoredExceptionHandler(0, VectoredHandler);
+//        _set_purecall_handler(handlePureVirtualCall);
 
-        bool s = EnforceFilter(true);
-        qDebug() << "SUCCESS " << s;
-
-
+//        crash::doAbort(); // works
+//        crash::outOfBoundsVectorCrash(); //works
+//        crash::newFault(); // works
+//        crash::pureVirtualCall(); // works with handler
         crash::doubleFree();
 
-//        mpSender.unhandledExceptionHandler(nullptr);
-        //mpSender.createReportAndExit();
+//        std::thread([]() {
+////            _set_purecall_handler(handlePureVirtualCall);
+////            crash::pureVirtualCall();
+////        crash::outOfBoundsVectorCrash(); //works
+//        });
+
+//        crash::pureVirtualCall();
+
+//        QThread thread;
+//        QObject::connect(&thread, &QThread::started, []() {
+//            crash::doAbort(); // works
+//        });
+//        thread.start();
+//        crash::doubleFree();
 
         // Setup local server
         QLocalServer server { &app };
@@ -376,7 +517,7 @@ int main(int argc, const char* argv[]) {
         server.removeServer(applicationName);
         server.listen(applicationName);
 
-        QObject::connect(&server, &QLocalServer::newConnection, &app, &Application::handleLocalServerConnection);
+        QObject::connect(&server, &QLocalServer::newConnection, &app, &Application::handleLocalServerConnection, Qt::DirectConnection);
 
 #ifdef HAS_BUGSPLAT
         AccountManager& accountManager = AccountManager::getInstance();
