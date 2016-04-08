@@ -31,19 +31,209 @@
 #include <BugSplat.h>
 #endif
 
+// Patch for SetUnhandledExceptionFilter 
+const BYTE PatchBytes[5] = { 0x33, 0xC0, 0xC2, 0x04, 0x00 };
 
-int main(int argc, const char* argv[]) {
-    disableQtBearerPoll(); // Fixes wifi ping spikes
+// Original bytes at the beginning of SetUnhandledExceptionFilter 
+BYTE OriginalBytes[5] = { 0 };
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+// WriteMemory function 
+// 
+
+bool WriteMemory(BYTE* pTarget, const BYTE* pSource, DWORD Size)
+{
+    DWORD ErrCode = 0;
+
+
+    // Check parameters 
+
+    if (pTarget == 0)
+    {
+        _ASSERTE(!"Target address is null.");
+        return false;
+    }
+
+    if (pSource == 0)
+    {
+        _ASSERTE(!"Source address is null.");
+        return false;
+    }
+
+    if (Size == 0)
+    {
+        _ASSERTE(!("Source size is null."));
+        return false;
+    }
+
+    if (IsBadReadPtr(pSource, Size))
+    {
+        _ASSERTE(!("Source is unreadable."));
+        return false;
+    }
+
+
+    // Modify protection attributes of the target memory page 
+
+    DWORD OldProtect = 0;
+
+    if (!VirtualProtect(pTarget, Size, PAGE_EXECUTE_READWRITE, &OldProtect))
+    {
+        ErrCode = GetLastError();
+        _ASSERTE(!("VirtualProtect() failed."));
+        return false;
+    }
+
+
+    // Write memory 
+
+    memcpy(pTarget, pSource, Size);
+
+
+    // Restore memory protection attributes of the target memory page 
+
+    DWORD Temp = 0;
+
+    if (!VirtualProtect(pTarget, Size, OldProtect, &Temp))
+    {
+        ErrCode = GetLastError();
+        _ASSERTE(!("VirtualProtect() failed."));
+        return false;
+    }
+
+
+    // Success 
+
+    return true;
+
+}
+
+//
+//
+bool EnforceFilter(bool bEnforce)
+{
+    DWORD ErrCode = 0;
+
+
+    // Obtain the address of SetUnhandledExceptionFilter 
+
+    HMODULE hLib = GetModuleHandle(("kernel32.dll"));
+
+    if (hLib == NULL)
+    {
+        ErrCode = GetLastError();
+        _ASSERTE(!("GetModuleHandle(kernel32.dll) failed."));
+        return false;
+    }
+
+    BYTE* pTarget = (BYTE*)GetProcAddress(hLib, "SetUnhandledExceptionFilter");
+
+    if (pTarget == 0)
+    {
+        ErrCode = GetLastError();
+        _ASSERTE(!("GetProcAddress(SetUnhandledExceptionFilter) failed."));
+        return false;
+    }
+
+    if (IsBadReadPtr(pTarget, sizeof(OriginalBytes)))
+    {
+        _ASSERTE(!("Target is unreadable."));
+        return false;
+    }
+
+
+    if (bEnforce)
+    {
+        // Save the original contents of SetUnhandledExceptionFilter 
+
+        memcpy(OriginalBytes, pTarget, sizeof(OriginalBytes));
+
+
+        // Patch SetUnhandledExceptionFilter 
+
+        if (!WriteMemory(pTarget, PatchBytes, sizeof(PatchBytes)))
+            return false;
+
+    }
+    else
+    {
+        // Restore the original behavior of SetUnhandledExceptionFilter 
+
+        if (!WriteMemory(pTarget, OriginalBytes, sizeof(OriginalBytes)))
+            return false;
+
+    }
+
+
+    // Success 
+
+    return true;
+
+}
+
 
 #if HAS_BUGSPLAT
     // Prevent other threads from hijacking the Exception filter, and allocate 4MB up-front that may be useful in
     // low-memory scenarios.
-    static const DWORD BUG_SPLAT_FLAGS = MDSF_PREVENTHIJACKING | MDSF_USEGUARDMEMORY;
+    static const DWORD BUG_SPLAT_FLAGS = MDSF_PREVENTHIJACKING | MDSF_USEGUARDMEMORY | MDSF_CUSTOMEXCEPTIONFILTER;
     static const char* BUG_SPLAT_DATABASE = "interface_alpha";
     static const char* BUG_SPLAT_APPLICATION_NAME = "Interface";
-    MiniDmpSender mpSender { BUG_SPLAT_DATABASE, BUG_SPLAT_APPLICATION_NAME, qPrintable(BuildInfo::VERSION),
-                             nullptr, BUG_SPLAT_FLAGS };
+    static MiniDmpSender mpSender { BUG_SPLAT_DATABASE, BUG_SPLAT_APPLICATION_NAME, qPrintable(BuildInfo::VERSION) };
+//                             nullptr, BUG_SPLAT_FLAGS };
 #endif
+
+
+#include <csignal>
+
+namespace crash {
+        
+    void doubleFree() {
+        int* blah = new int(200);
+        free(blah);
+        free(blah);
+        free(blah);
+        free(blah);
+        free(blah);
+        free(blah);
+        free(blah);
+
+        blah = 0;
+
+    //    *blah = 3;
+    }
+}
+void handleSignal(int signal) {
+    qDebug() << "Got signal: " << signal;
+    mpSender.unhandledExceptionHandler(nullptr);
+}
+
+LONG WINAPI TopLevelExceptionHandler(PEXCEPTION_POINTERS pExceptionInfo) {
+    qDebug() << "Got exception";
+    mpSender.unhandledExceptionHandler(pExceptionInfo);
+
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+LONG WINAPI
+VectoredHandler(
+struct _EXCEPTION_POINTERS *ExceptionInfo
+    )
+{
+    std::cout << "In vectoredHandelr";
+
+    mpSender.unhandledExceptionHandler(nullptr);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+void myterminate() {
+    mpSender.unhandledExceptionHandler(nullptr);
+}
+
+int main(int argc, const char* argv[]) {
+    disableQtBearerPoll(); // Fixes wifi ping spikes
     
     QString applicationName = "High Fidelity Interface - " + qgetenv("USERNAME");
 
@@ -160,6 +350,25 @@ int main(int argc, const char* argv[]) {
             }
         }
 
+
+        SetUnhandledExceptionFilter(TopLevelExceptionHandler);
+//        AddVectoredExceptionHandler(0, VectoredHandler);
+        SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
+        _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+
+        std::set_terminate(myterminate);
+        signal(SIGSEGV, handleSignal);
+        signal(SIGABRT, handleSignal);
+
+        bool s = EnforceFilter(true);
+        qDebug() << "SUCCESS " << s;
+
+
+        crash::doubleFree();
+
+//        mpSender.unhandledExceptionHandler(nullptr);
+        //mpSender.createReportAndExit();
+
         // Setup local server
         QLocalServer server { &app };
 
@@ -172,7 +381,7 @@ int main(int argc, const char* argv[]) {
 #ifdef HAS_BUGSPLAT
         AccountManager& accountManager = AccountManager::getInstance();
         mpSender.setDefaultUserName(qPrintable(accountManager.getAccountInfo().getUsername()));
-        QObject::connect(&accountManager, &AccountManager::usernameChanged, &app, [&mpSender](const QString& newUsername) {
+        QObject::connect(&accountManager, &AccountManager::usernameChanged, &app, [](const QString& newUsername) {
             mpSender.setDefaultUserName(qPrintable(newUsername));
         });
 
