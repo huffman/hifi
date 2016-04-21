@@ -14,6 +14,7 @@
 #include "Resource.h"
 
 #include <algorithm> //min max and more
+#include <bitset>
 
 #include <QUrl>
 
@@ -137,7 +138,61 @@ protected:
 };
 
 class Texture : public Resource {
+    static std::atomic<uint32_t> _textureCPUCount;
+    static std::atomic<Size> _textureCPUMemoryUsage;
+    static void updateTextureCPUMemoryUsage(Size prevObjectSize, Size newObjectSize);
 public:
+    static uint32_t getTextureCPUCount();
+    static Size getTextureCPUMemoryUsage();
+    static uint32_t getTextureGPUCount();
+    static Size getTextureGPUMemoryUsage();
+
+    class Usage {
+    public:
+        enum FlagBit {
+            COLOR = 0,   // Texture is a color map
+            NORMAL,      // Texture is a normal map
+            ALPHA,      // Texture has an alpha channel
+            ALPHA_MASK,       // Texture alpha channel is a Mask 0/1
+
+            NUM_FLAGS,  
+        };
+        typedef std::bitset<NUM_FLAGS> Flags;
+
+        // The key is the Flags
+        Flags _flags;
+
+        Usage() : _flags(0) {}
+        Usage(const Flags& flags) : _flags(flags) {}
+
+        bool operator== (const Usage& rhs) const { return _flags == rhs._flags; }
+        bool operator!= (const Usage& rhs) const { return _flags != rhs._flags; }
+
+        class Builder {
+            friend class Usage;
+            Flags _flags{ 0 };
+        public:
+            Builder() {}
+
+            Usage build() const { return Usage(_flags); }
+
+            Builder& withColor() { _flags.set(COLOR); return (*this); }
+            Builder& withNormal() { _flags.set(NORMAL); return (*this); }
+            Builder& withAlpha() { _flags.set(ALPHA); return (*this); }
+            Builder& withAlphaMask() { _flags.set(ALPHA_MASK); return (*this); }
+        };
+        Usage(const Builder& builder) : Usage(builder._flags) {}
+
+        bool isColor() const { return _flags[COLOR]; }
+        bool isNormal() const { return _flags[NORMAL]; }
+
+        bool isAlpha() const { return _flags[ALPHA]; }
+        bool isAlphaMask() const { return _flags[ALPHA_MASK]; }
+
+
+        bool operator==(const Usage& usage) { return (_flags == usage._flags); }
+        bool operator!=(const Usage& usage) { return (_flags != usage._flags); }
+    };
 
     class Pixels {
     public:
@@ -146,9 +201,21 @@ public:
         Pixels(const Element& format, Size size, const Byte* bytes);
         ~Pixels();
 
-        Sysmem _sysmem;
+        const Byte* readData() const { return _sysmem.readData(); }
+        Size getSize() const { return _sysmem.getSize(); }
+        Size resize(Size pSize);
+        Size setData(const Element& format, Size size, const Byte* bytes );
+        
+        const Element& getFormat() const { return _format; }
+        
+        void notifyGPULoaded();
+        
+    protected:
         Element _format;
+        Sysmem _sysmem;
         bool _isGPULoaded;
+        
+        friend class Texture;
     };
     typedef std::shared_ptr< Pixels > PixelsPointer;
 
@@ -221,8 +288,11 @@ public:
     Stamp getStamp() const { return _stamp; }
     Stamp getDataStamp() const { return _storage->getStamp(); }
 
-    // The size in bytes of data stored in the texture
+    // The theoretical size in bytes of data stored in the texture
     Size getSize() const { return _size; }
+
+    // The actual size in bytes of data stored in the texture
+    Size getStoredSize() const;
 
     // Resize, unless auto mips mode would destroy all the sub mips
     Size resize1D(uint16 width, uint16 numSamples);
@@ -343,6 +413,10 @@ public:
  
     bool isDefined() const { return _defined; }
 
+    // Usage is a a set of flags providing Semantic about the usage of the Texture.
+    void setUsage(const Usage& usage) { _usage = usage; }
+    Usage getUsage() const { return _usage; }
+
     // For Cube Texture, it's possible to generate the irradiance spherical harmonics and make them availalbe with the texture
     bool generateIrradiance();
     const SHPointer& getIrradiance(uint16 slice = 0) const { return _irradiance; }
@@ -355,6 +429,8 @@ public:
 
     // Only callable by the Backend
     void notifyMipFaceGPULoaded(uint16 level, uint8 face) const { return _storage->notifyMipFaceGPULoaded(level, face); }
+
+    const GPUObjectPointer gpuObject {};
 
 protected:
     std::unique_ptr< Storage > _storage;
@@ -378,6 +454,8 @@ protected:
  
     Type _type = TEX_1D;
 
+    Usage _usage;
+
     SHPointer _irradiance;
     bool _autoGenerateMips = false;
     bool _isIrradianceValid = false;
@@ -386,20 +464,13 @@ protected:
     static Texture* create(Type type, const Element& texelFormat, uint16 width, uint16 height, uint16 depth, uint16 numSamples, uint16 numSlices, const Sampler& sampler);
 
     Size resize(Type type, const Element& texelFormat, uint16 width, uint16 height, uint16 depth, uint16 numSamples, uint16 numSlices);
-
-    // This shouldn't be used by anything else than the Backend class with the proper casting.
-    mutable GPUObject* _gpuObject = NULL;
-    void setGPUObject(GPUObject* gpuObject) const { _gpuObject = gpuObject; }
-    GPUObject* getGPUObject() const { return _gpuObject; }
-
-    friend class Backend;
 };
 
 typedef std::shared_ptr<Texture> TexturePointer;
 typedef std::vector< TexturePointer > Textures;
 
 
- // TODO: For now TextureView works with Buffer as a place holder for the Texture.
+ // TODO: For now TextureView works with Texture as a place holder for the Texture.
  // The overall logic should be about the same except that the Texture will be a real GL Texture under the hood
 class TextureView {
 public:
@@ -407,7 +478,7 @@ public:
 
     TexturePointer _texture = TexturePointer(NULL);
     uint16 _subresource = 0;
-    Element _element = Element(gpu::VEC4, gpu::UINT8, gpu::RGBA);
+    Element _element = Element(gpu::VEC4, gpu::NUINT8, gpu::RGBA);
 
     TextureView() {};
 

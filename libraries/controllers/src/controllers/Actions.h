@@ -52,8 +52,15 @@ enum class Action {
     CONTEXT_MENU,
     TOGGLE_MUTE,
     CYCLE_CAMERA,
+    TOGGLE_OVERLAY,
 
     SHIFT,
+
+    UI_NAV_LATERAL,
+    UI_NAV_VERTICAL,
+    UI_NAV_GROUP,
+    UI_NAV_SELECT,
+    UI_NAV_BACK,
 
     // Pointer/Reticle control
     RETICLE_CLICK,
@@ -90,6 +97,7 @@ enum class Action {
     BOOM_IN,
     BOOM_OUT,
 
+
     NUM_ACTIONS,
 };
 
@@ -103,7 +111,7 @@ class ActionsDevice : public QObject, public InputDevice {
 public:
     virtual EndpointPointer createEndpoint(const Input& input) const override;
     virtual Input::NamedVector getAvailableInputs() const override;
-    virtual void update(float deltaTime, bool jointsCaptured) override;
+    virtual void update(float deltaTime, const InputCalibrationData& inputCalibrationData, bool jointsCaptured) override;
     virtual void focusOutEvent() override;
 
     ActionsDevice();

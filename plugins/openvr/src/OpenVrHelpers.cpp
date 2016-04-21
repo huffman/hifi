@@ -14,8 +14,10 @@
 #include <QtCore/QTimer>
 #include <QtCore/QLoggingCategory>
 
+#include <Windows.h>
 
 Q_DECLARE_LOGGING_CATEGORY(displayplugins)
+Q_LOGGING_CATEGORY(displayplugins, "hifi.plugins.display")
 
 using Mutex = std::mutex;
 using Lock = std::unique_lock<Mutex>;
@@ -23,23 +25,41 @@ using Lock = std::unique_lock<Mutex>;
 static int refCount { 0 };
 static Mutex mutex;
 static vr::IVRSystem* activeHmd { nullptr };
-static bool hmdPresent = vr::VR_IsHmdPresent();
 
 static const uint32_t RELEASE_OPENVR_HMD_DELAY_MS = 5000;
 
+bool isOculusPresent() {
+    bool result = false;
+#if defined(Q_OS_WIN32) 
+    HANDLE oculusServiceEvent = ::OpenEventW(SYNCHRONIZE, FALSE, L"OculusHMDConnected");
+    // The existence of the service indicates a running Oculus runtime
+    if (oculusServiceEvent) {
+        // A signaled event indicates a connected HMD
+        if (WAIT_OBJECT_0 == ::WaitForSingleObject(oculusServiceEvent, 0)) {
+            result = true;
+        }
+        ::CloseHandle(oculusServiceEvent);
+    }
+#endif 
+    return result;
+}
+
 vr::IVRSystem* acquireOpenVrSystem() {
+    bool hmdPresent = vr::VR_IsHmdPresent();
     if (hmdPresent) {
         Lock lock(mutex);
         if (!activeHmd) {
             qCDebug(displayplugins) << "openvr: No vr::IVRSystem instance active, building";
             vr::EVRInitError eError = vr::VRInitError_None;
-            activeHmd = vr::VR_Init(&eError);
+            activeHmd = vr::VR_Init(&eError, vr::VRApplication_Scene);
             qCDebug(displayplugins) << "openvr display: HMD is " << activeHmd << " error is " << eError;
         }
         if (activeHmd) {
             qCDebug(displayplugins) << "openvr: incrementing refcount";
             ++refCount;
         }
+    } else {
+        qCDebug(displayplugins) << "openvr: no hmd present";
     }
     return activeHmd;
 }
@@ -51,24 +71,8 @@ void releaseOpenVrSystem() {
         --refCount;
         if (0 == refCount) {
             qCDebug(displayplugins) << "openvr: zero refcount, deallocate VR system";
-            // Avoid spamming the VR system with activate/deactivate calls at system startup by
-            // putting in a delay before we destory the shutdown the VR subsystem
-
-            // FIXME releasing the VR system at all seems to trigger an exception deep inside the Oculus DLL.  
-            // disabling for now.
-            //QTimer* releaseTimer = new QTimer();
-            //releaseTimer->singleShot(RELEASE_OPENVR_HMD_DELAY_MS, [releaseTimer] {
-            //    Lock lock(mutex);
-            //    qDebug() << "Delayed openvr destroy activated";
-            //    if (0 == refCount && nullptr != activeHmd) {
-            //        qDebug() << "Delayed openvr destroy: releasing resources";
-            //        activeHmd = nullptr;
-            //        vr::VR_Shutdown();
-            //    } else {
-            //        qDebug() << "Delayed openvr destroy: HMD still in use";
-            //    }
-            //    releaseTimer->deleteLater();
-            //});
+            vr::VR_Shutdown();
+            activeHmd = nullptr;
         }
     }
 }

@@ -11,7 +11,6 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include <DependencyManager.h>
-#include <DeferredLightingEffect.h>
 #include <PerfStat.h>
 #include <GeometryCache.h>
 #include <AbstractViewStateInterface.h>
@@ -180,6 +179,7 @@ void RenderableParticleEffectEntityItem::removeFromScene(EntityItemPointer self,
                                                          render::PendingChanges& pendingChanges) {
     pendingChanges.removeItem(_renderItemId);
     _scene = nullptr;
+    render::Item::clearID(_renderItemId);
 };
 
 void RenderableParticleEffectEntityItem::update(const quint64& now) {
@@ -200,7 +200,8 @@ void RenderableParticleEffectEntityItem::update(const quint64& now) {
 }
 
 void RenderableParticleEffectEntityItem::updateRenderItem() {
-    if (!_scene) {
+    // this 2 tests are synonyms for this class, but we would like to get rid of the _scene pointer ultimately
+    if (!_scene || !render::Item::isValidID(_renderItemId)) { 
         return;
     }
     if (!getVisible()) {
@@ -223,10 +224,10 @@ void RenderableParticleEffectEntityItem::updateRenderItem() {
     particleUniforms.radius.middle = getParticleRadius();
     particleUniforms.radius.finish = getRadiusFinish();
     particleUniforms.radius.spread = getRadiusSpread();
-    particleUniforms.color.start = toGlm(getColorStart(), getAlphaStart());
-    particleUniforms.color.middle = toGlm(getXColor(), getAlpha());
-    particleUniforms.color.finish = toGlm(getColorFinish(), getAlphaFinish());
-    particleUniforms.color.spread = toGlm(getColorSpread(), getAlphaSpread());
+    particleUniforms.color.start = glm::vec4(getColorStartRGB(), getAlphaStart());
+    particleUniforms.color.middle = glm::vec4(getColorRGB(), getAlpha());
+    particleUniforms.color.finish = glm::vec4(getColorFinishRGB(), getAlphaFinish());
+    particleUniforms.color.spread = glm::vec4(getColorSpreadRGB(), getAlphaSpread());
     particleUniforms.lifespan = getLifespan();
     
     // Build particle primitives
@@ -235,13 +236,21 @@ void RenderableParticleEffectEntityItem::updateRenderItem() {
     for (auto& particle : _particles) {
         particlePrimitives->emplace_back(particle.position, glm::vec2(particle.lifetime, particle.seed));
     }
-    
-    auto bounds = getAABox();
-    auto position = getPosition();
-    auto rotation = getRotation();
+
+    bool successb, successp, successr;
+    auto bounds = getAABox(successb);
+    auto position = getPosition(successp);
+    auto rotation = getOrientation(successr);
+    bool success = successb && successp && successr;
+    if (!success) {
+        return;
+    }
     Transform transform;
-    transform.setTranslation(position);
-    transform.setRotation(rotation);
+    if (!getEmitterShouldTrail()) {
+        transform.setTranslation(position);
+        transform.setRotation(rotation);
+    }
+
 
     render::PendingChanges pendingChanges;
     pendingChanges.updateItem<ParticlePayloadData>(_renderItemId, [=](ParticlePayloadData& payload) {
@@ -302,4 +311,15 @@ void RenderableParticleEffectEntityItem::createPipelines() {
         auto program = gpu::Shader::createProgram(vertShader, fragShader);
         _texturedPipeline = gpu::Pipeline::create(program, state);
     }
+}
+
+void RenderableParticleEffectEntityItem::notifyBoundChanged() {
+    if (!render::Item::isValidID(_renderItemId)) {
+        return;
+    }
+    render::PendingChanges pendingChanges;
+    pendingChanges.updateItem<ParticlePayloadData>(_renderItemId, [](ParticlePayloadData& payload) {
+    });
+
+    _scene->enqueuePendingChanges(pendingChanges);
 }

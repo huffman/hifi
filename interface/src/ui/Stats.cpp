@@ -116,8 +116,6 @@ void Stats::updateStats(bool force) {
     auto avatarManager = DependencyManager::get<AvatarManager>();
     // we need to take one avatar out so we don't include ourselves
     STAT_UPDATE(avatarCount, avatarManager->size() - 1);
-    STAT_UPDATE(avatarRenderableCount, avatarManager->getNumberInRenderRange());
-    STAT_UPDATE(avatarRenderDistance, (int) round(avatarManager->getRenderDistance())); // deliberately truncating
     STAT_UPDATE(serverCount, (int)nodeList->size());
     STAT_UPDATE(renderrate, (int)qApp->getFps());
     if (qApp->getActiveDisplayPlugin()) {
@@ -138,10 +136,12 @@ void Stats::updateStats(bool force) {
     SharedNodePointer audioMixerNode = nodeList->soloNodeOfType(NodeType::AudioMixer);
     SharedNodePointer avatarMixerNode = nodeList->soloNodeOfType(NodeType::AvatarMixer);
     SharedNodePointer assetServerNode = nodeList->soloNodeOfType(NodeType::AssetServer);
+    SharedNodePointer messageMixerNode = nodeList->soloNodeOfType(NodeType::MessagesMixer);
     STAT_UPDATE(audioPing, audioMixerNode ? audioMixerNode->getPingMs() : -1);
     STAT_UPDATE(avatarPing, avatarMixerNode ? avatarMixerNode->getPingMs() : -1);
     STAT_UPDATE(assetPing, assetServerNode ? assetServerNode->getPingMs() : -1);
-    
+    STAT_UPDATE(messagePing, messageMixerNode ? messageMixerNode->getPingMs() : -1);
+
     //// Now handle entity servers, since there could be more than one, we average their ping times
     int totalPingOctree = 0;
     int octreeServerCount = 0;
@@ -156,7 +156,7 @@ void Stats::updateStats(bool force) {
             }
         }
     });
-    
+
     // update the entities ping with the average for all connected entity servers
     STAT_UPDATE(entitiesPing, octreeServerCount ? totalPingOctree / octreeServerCount : -1);
 
@@ -164,7 +164,7 @@ void Stats::updateStats(bool force) {
     MyAvatar* myAvatar = avatarManager->getMyAvatar();
     glm::vec3 avatarPos = myAvatar->getPosition();
     STAT_UPDATE(position, QVector3D(avatarPos.x, avatarPos.y, avatarPos.z));
-    STAT_UPDATE_FLOAT(velocity, glm::length(myAvatar->getVelocity()), 0.1f);
+    STAT_UPDATE_FLOAT(speed, glm::length(myAvatar->getVelocity()), 0.01f);
     STAT_UPDATE_FLOAT(yaw, myAvatar->getBodyYaw(), 0.1f);
     if (_expanded || force) {
         SharedNodePointer avatarMixer = nodeList->soloNodeOfType(NodeType::AvatarMixer);
@@ -192,8 +192,29 @@ void Stats::updateStats(bool force) {
             STAT_UPDATE(audioMixerPps, -1);
         }
 
-        STAT_UPDATE(downloads, ResourceCache::getLoadingRequests().size());
+        QList<Resource*> loadingRequests = ResourceCache::getLoadingRequests();
+        STAT_UPDATE(downloads, loadingRequests.size());
+        STAT_UPDATE(downloadLimit, ResourceCache::getRequestLimit())
         STAT_UPDATE(downloadsPending, ResourceCache::getPendingRequestCount());
+
+        // See if the active download urls have changed
+        bool shouldUpdateUrls = _downloads != _downloadUrls.size();
+        if (!shouldUpdateUrls) {
+            for (int i = 0; i < _downloads; i++) {
+                if (loadingRequests[i]->getURL().toString() != _downloadUrls[i]) {
+                    shouldUpdateUrls = true;
+                    break;
+                }
+            }
+        }
+        // If the urls have changed, update the list
+        if (shouldUpdateUrls) {
+            _downloadUrls.clear();
+            foreach (Resource* resource, loadingRequests) {
+                _downloadUrls << resource->getURL().toString();
+            }
+            emit downloadUrlsChanged();
+        }
         // TODO fix to match original behavior
         //stringstream downloads;
         //downloads << "Downloads: ";
@@ -225,6 +246,12 @@ void Stats::updateStats(bool force) {
                 movingServerCount++;
             } else {
                 sendingModeStream << "S";
+            }
+            if (stats.isFullScene()) {
+                sendingModeStream << "F";
+            }
+            else {
+                sendingModeStream << "p";
             }
         }
 
@@ -299,7 +326,7 @@ void Stats::updateStats(bool force) {
         // we will also include room for 1 line per timing record and a header of 4 lines
         // Timing details...
 
-        // First iterate all the records, and for the ones that should be included, insert them into 
+        // First iterate all the records, and for the ones that should be included, insert them into
         // a new Map sorted by average time...
         bool onlyDisplayTopTen = Menu::getInstance()->isOptionChecked(MenuOption::OnlyDisplayTopTen);
         QMap<float, QString> sortedRecords;
@@ -344,18 +371,14 @@ void Stats::setRenderDetails(const RenderDetails& details) {
     STAT_UPDATE(triangles, details._trianglesRendered);
     STAT_UPDATE(materialSwitches, details._materialSwitches);
     if (_expanded) {
-        STAT_UPDATE(opaqueConsidered, (int)details._opaque._considered);
-        STAT_UPDATE(opaqueOutOfView, details._opaque._outOfView);
-        STAT_UPDATE(opaqueTooSmall, details._opaque._tooSmall);
-        STAT_UPDATE(opaqueRendered, (int)details._opaque._rendered);
-        STAT_UPDATE(translucentConsidered, (int)details._translucent._considered);
-        STAT_UPDATE(translucentOutOfView, details._translucent._outOfView);
-        STAT_UPDATE(translucentTooSmall, details._translucent._tooSmall);
-        STAT_UPDATE(translucentRendered, (int)details._translucent._rendered);
-        STAT_UPDATE(otherConsidered, (int)details._other._considered);
-        STAT_UPDATE(otherOutOfView, details._other._outOfView);
-        STAT_UPDATE(otherTooSmall, details._other._tooSmall);
-        STAT_UPDATE(otherRendered, (int)details._other._rendered);
+        STAT_UPDATE(itemConsidered, details._item._considered);
+        STAT_UPDATE(itemOutOfView, details._item._outOfView);
+        STAT_UPDATE(itemTooSmall, details._item._tooSmall);
+        STAT_UPDATE(itemRendered, details._item._rendered);
+        STAT_UPDATE(shadowConsidered, details._shadow._considered);
+        STAT_UPDATE(shadowOutOfView, details._shadow._outOfView);
+        STAT_UPDATE(shadowTooSmall, details._shadow._tooSmall);
+        STAT_UPDATE(shadowRendered, details._shadow._rendered);
     }
 }
 
@@ -363,7 +386,7 @@ void Stats::setRenderDetails(const RenderDetails& details) {
 /*
 // display expanded or contracted stats
 void Stats::display(
-        int voxelPacketsToProcess) 
+        int voxelPacketsToProcess)
 {
     // iterate all the current voxel stats, and list their sending modes, and total voxel counts
 

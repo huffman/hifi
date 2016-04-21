@@ -19,6 +19,11 @@ public:
     /// \return human-readable name
     virtual const QString& getName() const = 0;
 
+    typedef enum { STANDARD, ADVANCED, DEVELOPER } grouping;
+
+    /// \return human-readable grouping for the plugin, STANDARD, ADVANCED, or DEVELOPER
+    virtual grouping getGrouping() const { return STANDARD; }
+
     /// \return string ID (not necessarily human-readable)
     virtual const QString& getID() const { assert(false); return UNKNOWN_PLUGIN_ID; }
 
@@ -33,8 +38,10 @@ public:
     virtual void deinit();
 
     /// Called when a plugin is being activated for use.  May be called multiple times.
-    virtual void activate() {
+    /// Returns true if plugin was successfully activated.
+    virtual bool activate() {
         _active = true;
+        return _active;
     }
 
     /// Called when a plugin is no longer being used.  May be called multiple times.

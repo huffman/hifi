@@ -21,6 +21,7 @@
 #include <Octree.h> // for EncodeBitstreamParams class
 #include <OctreeElement.h> // for OctreeElement::AppendState
 #include <OctreePacketData.h>
+#include <PhysicsCollisionGroups.h>
 #include <ShapeInfo.h>
 #include <Transform.h>
 #include <SpatiallyNestable.h>
@@ -56,6 +57,7 @@ namespace render {
 #define debugTimeOnly(T) qPrintable(QString("%1").arg(T, 16, 10))
 #define debugTreeVector(V) V << "[" << V << " in meters ]"
 
+
 /// EntityItem class this is the base class for all entity types. It handles the basic properties and functionality available
 /// to all other entity types. In particular: postion, size, rotation, age, lifetime, velocity, gravity. You can not instantiate
 /// one directly, instead you must only construct one of it's derived classes with additional features.
@@ -73,7 +75,9 @@ public:
     EntityItem(const EntityItemID& entityItemID);
     virtual ~EntityItem();
 
-    inline EntityItemPointer getThisPointer() { return std::static_pointer_cast<EntityItem>(shared_from_this()); }
+    inline EntityItemPointer getThisPointer() const {
+        return std::static_pointer_cast<EntityItem>(std::const_pointer_cast<SpatiallyNestable>(shared_from_this()));
+    }
 
     EntityItemID getEntityItemID() const { return EntityItemID(_id); }
 
@@ -82,6 +86,8 @@ public:
 
     /// returns true if something changed
     virtual bool setProperties(const EntityItemProperties& properties);
+    // Update properties with empty parent id and globalized/absolute values (applying offset), and apply (non-empty) log template to args id, name-or-type, parent id.
+    void globalizeProperties(EntityItemProperties& properties, const QString& messageTemplate = QString(), const glm::vec3& offset = glm::vec3(0.0f)) const;
 
     /// Override this in your derived class if you'd like to be informed when something about the state of the entity
     /// has changed. This will be called with properties change or when new data is loaded from a stream
@@ -102,7 +108,7 @@ public:
     quint64 getLastBroadcast() const { return _lastBroadcast; }
     void setLastBroadcast(quint64 lastBroadcast) { _lastBroadcast = lastBroadcast; }
 
-    void markAsChangedOnServer() {  _changedOnServer = usecTimestampNow();  }
+    void markAsChangedOnServer() { _changedOnServer = usecTimestampNow();  }
     quint64 getLastChangedOnServer() const { return _changedOnServer; }
 
     // TODO: eventually only include properties changed since the params.lastViewFrustumSent time
@@ -161,17 +167,16 @@ public:
     // attributes applicable to all entity types
     EntityTypes::EntityType getType() const { return _type; }
 
-    inline glm::vec3 getCenterPosition() const { return getTransformToCenter().getTranslation(); }
+    inline glm::vec3 getCenterPosition(bool& success) const { return getTransformToCenter(success).getTranslation(); }
     void setCenterPosition(const glm::vec3& position);
 
-    const Transform getTransformToCenter() const;
-    void setTranformToCenter(const Transform& transform);
+    const Transform getTransformToCenter(bool& success) const;
 
     inline void requiresRecalcBoxes() { _recalcAABox = true; _recalcMinAACube = true; _recalcMaxAACube = true; }
 
     // Hyperlink related getters and setters
     QString getHref() const { return _href; }
-    void setHref(QString value) { _href = value; }
+    void setHref(QString value);
 
     QString getDescription() const { return _description; }
     void setDescription(QString value) { _description = value; }
@@ -192,9 +197,8 @@ public:
 
     float getDensity() const { return _density; }
 
-    const glm::vec3& getVelocity() const { return _velocity; } /// get velocity in meters
-    void setVelocity(const glm::vec3& value) { _velocity = value; } /// velocity in meters
-    bool hasVelocity() const { return _velocity != ENTITY_ITEM_ZERO_VEC3; }
+    bool hasVelocity() const { return getVelocity() != ENTITY_ITEM_ZERO_VEC3; }
+    bool hasLocalVelocity() const { return getLocalVelocity() != ENTITY_ITEM_ZERO_VEC3; }
 
     const glm::vec3& getGravity() const { return _gravity; } /// get gravity in meters
     void setGravity(const glm::vec3& value) { _gravity = value; } /// gravity in meters
@@ -232,9 +236,12 @@ public:
     quint64 getExpiry() const;
 
     // position, size, and bounds related helpers
-    const AACube& getMaximumAACube() const;
-    const AACube& getMinimumAACube() const;
-    const AABox& getAABox() const; /// axis aligned bounding box in world-frame (meters)
+    virtual AACube getMaximumAACube(bool& success) const override;
+    AACube getMinimumAACube(bool& success) const;
+    AABox getAABox(bool& success) const; /// axis aligned bounding box in world-frame (meters)
+
+    using SpatiallyNestable::getQueryAACube;
+    virtual AACube getQueryAACube(bool& success) const override;
 
     const QString& getScript() const { return _script; }
     void setScript(const QString& value) { _script = value; }
@@ -248,12 +255,12 @@ public:
     const glm::vec3& getRegistrationPoint() const { return _registrationPoint; } /// registration point as ratio of entity
 
     /// registration point as ratio of entity
-    void setRegistrationPoint(const glm::vec3& value)
-            { _registrationPoint = glm::clamp(value, 0.0f, 1.0f); requiresRecalcBoxes(); }
+    void setRegistrationPoint(const glm::vec3& value) {
+        _registrationPoint = glm::clamp(value, 0.0f, 1.0f); dimensionsChanged(); // Registration Point affects the bounding box
+    }
 
-    const glm::vec3& getAngularVelocity() const { return _angularVelocity; }
-    void setAngularVelocity(const glm::vec3& value) { _angularVelocity = value; }
-    bool hasAngularVelocity() const { return _angularVelocity != ENTITY_ITEM_ZERO_VEC3; }
+    bool hasAngularVelocity() const { return getAngularVelocity() != ENTITY_ITEM_ZERO_VEC3; }
+    bool hasLocalAngularVelocity() const { return getLocalAngularVelocity() != ENTITY_ITEM_ZERO_VEC3; }
 
     float getAngularDamping() const { return _angularDamping; }
     void setAngularDamping(float value) { _angularDamping = value; }
@@ -267,11 +274,16 @@ public:
     bool isVisible() const { return _visible; }
     bool isInvisible() const { return !_visible; }
 
-    bool getIgnoreForCollisions() const { return _ignoreForCollisions; }
-    void setIgnoreForCollisions(bool value) { _ignoreForCollisions = value; }
+    bool getCollisionless() const { return _collisionless; }
+    void setCollisionless(bool value) { _collisionless = value; }
 
-    bool getCollisionsWillMove() const { return _collisionsWillMove; }
-    void setCollisionsWillMove(bool value) { _collisionsWillMove = value; }
+    uint8_t getCollisionMask() const { return _collisionMask; }
+    void setCollisionMask(uint8_t value) { _collisionMask = value; }
+
+    void computeCollisionGroupAndFinalMask(int16_t& group, int16_t& mask) const;
+
+    bool getDynamic() const { return _dynamic; }
+    void setDynamic(bool value) { _dynamic = value; }
 
     virtual bool shouldBePhysical() const { return false; }
 
@@ -297,9 +309,10 @@ public:
     // TODO: get rid of users of getRadius()...
     float getRadius() const;
 
+    virtual void adjustShapeInfoByRegistration(ShapeInfo& info) const;
     virtual bool contains(const glm::vec3& point) const;
 
-    virtual bool isReadyToComputeShape() { return true; }
+    virtual bool isReadyToComputeShape() { return !isDead(); }
     virtual void computeShapeInfo(ShapeInfo& info);
     virtual float getVolumeEstimate() const { return getDimensions().x * getDimensions().y * getDimensions().z; }
 
@@ -311,20 +324,26 @@ public:
     virtual void setRotation(glm::quat orientation) { setOrientation(orientation); }
 
     // updateFoo() methods to be used when changes need to be accumulated in the _dirtyFlags
+    virtual void updateRegistrationPoint(const glm::vec3& value);
     void updatePosition(const glm::vec3& value);
+    void updatePositionFromNetwork(const glm::vec3& value);
     void updateDimensions(const glm::vec3& value);
     void updateRotation(const glm::quat& rotation);
+    void updateRotationFromNetwork(const glm::quat& rotation);
     void updateDensity(float value);
     void updateMass(float value);
     void updateVelocity(const glm::vec3& value);
+    void updateVelocityFromNetwork(const glm::vec3& value);
     void updateDamping(float value);
     void updateRestitution(float value);
     void updateFriction(float value);
     void updateGravity(const glm::vec3& value);
     void updateAngularVelocity(const glm::vec3& value);
+    void updateAngularVelocityFromNetwork(const glm::vec3& value);
     void updateAngularDamping(float value);
-    void updateIgnoreForCollisions(bool value);
-    void updateCollisionsWillMove(bool value);
+    void updateCollisionless(bool value);
+    void updateCollisionMask(uint8_t value);
+    void updateDynamic(bool value);
     void updateLifetime(float value);
     void updateCreated(uint64_t value);
     virtual void updateShapeType(ShapeType type) { /* do nothing */ }
@@ -333,24 +352,29 @@ public:
     void clearDirtyFlags(uint32_t mask = 0xffffffff) { _dirtyFlags &= ~mask; }
 
     bool isMoving() const;
+    bool isMovingRelativeToParent() const;
+
+    bool isSimulated() const { return _simulated; }
 
     void* getPhysicsInfo() const { return _physicsInfo; }
 
     void setPhysicsInfo(void* data) { _physicsInfo = data; }
     EntityTreeElementPointer getElement() const { return _element; }
     EntityTreePointer getTree() const;
-    bool wantTerseEditLogging();
+    virtual SpatialParentTree* getParentTree() const;
+    bool wantTerseEditLogging() const;
 
     glm::mat4 getEntityToWorldMatrix() const;
     glm::mat4 getWorldToEntityMatrix() const;
     glm::vec3 worldToEntity(const glm::vec3& point) const;
     glm::vec3 entityToWorld(const glm::vec3& point) const;
 
-    quint64 getLastEditedFromRemote() { return _lastEditedFromRemote; }
+    quint64 getLastEditedFromRemote() const { return _lastEditedFromRemote; }
 
     void getAllTerseUpdateProperties(EntityItemProperties& properties) const;
 
-    void flagForOwnership() { _dirtyFlags |= Simulation::DIRTY_SIMULATOR_OWNERSHIP; }
+    void pokeSimulationOwnership() { _dirtyFlags |= Simulation::DIRTY_SIMULATION_OWNERSHIP_FOR_POKE; }
+    void grabSimulationOwnership() { _dirtyFlags |= Simulation::DIRTY_SIMULATION_OWNERSHIP_FOR_GRAB; }
     void flagForMotionStateChange() { _dirtyFlags |= Simulation::DIRTY_MOTION_TYPE; }
 
     bool addAction(EntitySimulation* simulation, EntityActionPointer action);
@@ -359,8 +383,8 @@ public:
     bool clearActions(EntitySimulation* simulation);
     void setActionData(QByteArray actionData);
     const QByteArray getActionData() const;
-    bool hasActions() { return !_objectActions.empty(); }
-    QList<QUuid> getActionIDs() { return _objectActions.keys(); }
+    bool hasActions() const { return !_objectActions.empty(); }
+    QList<QUuid> getActionIDs() const { return _objectActions.keys(); }
     QVariantMap getActionArguments(const QUuid& actionID) const;
     void deserializeActions();
 
@@ -381,15 +405,36 @@ public:
     // these are in the frame of this object
     virtual glm::quat getAbsoluteJointRotationInObjectFrame(int index) const override { return glm::quat(); }
     virtual glm::vec3 getAbsoluteJointTranslationInObjectFrame(int index) const override { return glm::vec3(0.0f); }
+    virtual bool setAbsoluteJointRotationInObjectFrame(int index, const glm::quat& rotation) override { return false; }
+    virtual bool setAbsoluteJointTranslationInObjectFrame(int index, const glm::vec3& translation) override { return false; }
+
+    virtual int getJointIndex(const QString& name) const { return -1; }
+    virtual QStringList getJointNames() const { return QStringList(); }
 
     virtual void loader() {} // called indirectly when urls for geometry are updated
 
+    /// Should the external entity script mechanism call a preload for this entity.
+    /// Due to the asyncronous nature of signals for add entity and script changing
+    /// it's possible for two similar signals to cross paths. This method allows the
+    /// entity to definitively state if the preload signal should be sent.
+    ///
+    /// We only want to preload if:
+    ///    there is some script, and either the script value or the scriptTimestamp 
+    ///    value have changed since our last preload
+    bool shouldPreloadScript() const { return !_script.isEmpty() && 
+                                              ((_loadedScript != _script) || (_loadedScriptTimestamp != _scriptTimestamp)); }
+    void scriptHasPreloaded() { _loadedScript = _script; _loadedScriptTimestamp = _scriptTimestamp; }
+
 protected:
+
+    void setSimulated(bool simulated) { _simulated = simulated; }
 
     const QByteArray getActionDataInternal() const;
     void setActionDataInternal(QByteArray actionData);
 
     virtual void locationChanged() override;
+    virtual void dimensionsChanged() override;
+
     EntityTypes::EntityType _type;
     quint64 _lastSimulated; // last time this entity called simulate(), this includes velocity, angular velocity,
                             // and physics changes
@@ -416,22 +461,28 @@ protected:
     // rather than in all of the derived classes.  If we ever collapse these classes to one we could do it a
     // different way.
     float _volumeMultiplier = 1.0f;
-    glm::vec3 _velocity;
     glm::vec3 _gravity;
     glm::vec3 _acceleration;
     float _damping;
     float _restitution;
     float _friction;
     float _lifetime;
-    QString _script;
-    quint64 _scriptTimestamp;
+
+    QString _script; /// the value of the script property
+    QString _loadedScript; /// the value of _script when the last preload signal was sent
+    quint64 _scriptTimestamp{ ENTITY_ITEM_DEFAULT_SCRIPT_TIMESTAMP }; /// the script loaded property used for forced reload
+
+    /// the value of _scriptTimestamp when the last preload signal was sent
+    // NOTE: on construction we want this to be different from _scriptTimestamp so we intentionally bump it
+    quint64 _loadedScriptTimestamp{ ENTITY_ITEM_DEFAULT_SCRIPT_TIMESTAMP + 1 };
+
     QString _collisionSoundURL;
     glm::vec3 _registrationPoint;
-    glm::vec3 _angularVelocity;
     float _angularDamping;
     bool _visible;
-    bool _ignoreForCollisions;
-    bool _collisionsWillMove;
+    bool _collisionless;
+    uint8_t _collisionMask { ENTITY_COLLISION_MASK_DEFAULT };
+    bool _dynamic;
     bool _locked;
     QString _userData;
     SimulationOwner _simulationOwner;

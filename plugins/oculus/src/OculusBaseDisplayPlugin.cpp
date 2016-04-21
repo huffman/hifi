@@ -11,120 +11,66 @@
 
 #include "OculusHelpers.h"
 
-uvec2 OculusBaseDisplayPlugin::getRecommendedRenderSize() const {
-    return _desiredFramebufferSize;
-}
-
-glm::mat4 OculusBaseDisplayPlugin::getProjection(Eye eye, const glm::mat4& baseProjection) const {
-    return _eyeProjections[eye];
-}
-
 void OculusBaseDisplayPlugin::resetSensors() {
-    ovr_RecenterPose(_session);
+    ovr_RecenterTrackingOrigin(_session);
 }
 
-glm::mat4 OculusBaseDisplayPlugin::getEyeToHeadTransform(Eye eye) const {
-    return glm::translate(mat4(), toGlm(_eyeOffsets[eye]));
-}
+void OculusBaseDisplayPlugin::beginFrameRender(uint32_t frameIndex) {
+    FrameInfo frame;
+    frame.sensorSampleTime = ovr_GetTimeInSeconds();;
+    frame.predictedDisplayTime = ovr_GetPredictedDisplayTime(_session, frameIndex);
+    auto trackingState = ovr_GetTrackingState(_session, frame.predictedDisplayTime, ovrTrue);
+    frame.headPose = toGlm(trackingState.HeadPose.ThePose);
 
-glm::mat4 OculusBaseDisplayPlugin::getHeadPose(uint32_t frameIndex) const {
-    static uint32_t lastFrameSeen = 0;
-    auto displayTime = ovr_GetPredictedDisplayTime(_session, frameIndex);
-    auto trackingState = ovr_GetTrackingState(_session, displayTime, frameIndex > lastFrameSeen);
-    if (frameIndex > lastFrameSeen) {
-        lastFrameSeen = frameIndex;
-    }
-    return toGlm(trackingState.HeadPose.ThePose);
+    _currentRenderFrameInfo.set(frame);
+    Lock lock(_mutex);
+    _frameInfos[frameIndex] = frame;
 }
 
 bool OculusBaseDisplayPlugin::isSupported() const {
-    if (!OVR_SUCCESS(ovr_Initialize(nullptr))) {
-        return false;
-    }
-
-    ovrSession session { nullptr };
-    ovrGraphicsLuid luid;
-    auto result = ovr_Create(&session, &luid);
-    if (!OVR_SUCCESS(result)) {
-        ovrErrorInfo error;
-        ovr_GetLastErrorInfo(&error);
-        ovr_Shutdown();
-        return false;
-    }
-
-    auto hmdDesc = ovr_GetHmdDesc(session);
-    if (hmdDesc.Type == ovrHmd_None) {
-        ovr_Destroy(session);
-        ovr_Shutdown();
-        return false;
-    }
-
-    ovr_Shutdown();
-    return true;
+    return oculusAvailable();
 }
 
 // DLL based display plugins MUST initialize GLEW inside the DLL code.
 void OculusBaseDisplayPlugin::customizeContext() {
     glewExperimental = true;
     GLenum err = glewInit();
-    glGetError();
-    WindowOpenGLDisplayPlugin::customizeContext();
+    glGetError(); // clear the potential error from glewExperimental
+    Parent::customizeContext();
 }
 
-void OculusBaseDisplayPlugin::init() {
-}
-
-void OculusBaseDisplayPlugin::deinit() {
-}
-
-void OculusBaseDisplayPlugin::activate() {
-    WindowOpenGLDisplayPlugin::activate();
-    if (!OVR_SUCCESS(ovr_Initialize(nullptr))) {
-        qFatal("Could not init OVR");
-    }
-
-    if (!OVR_SUCCESS(ovr_Create(&_session, &_luid))) {
-        qFatal("Failed to acquire HMD");
+bool OculusBaseDisplayPlugin::internalActivate() {
+    _session = acquireOculusSession();
+    if (!_session) {
+        return false;
     }
 
     _hmdDesc = ovr_GetHmdDesc(_session);
 
-    _ipd = ovr_GetFloat(_session, OVR_KEY_IPD, _ipd);
-
     glm::uvec2 eyeSizes[2];
+    _viewScaleDesc.HmdSpaceToWorldScaleInMeters = 1.0f;
+
+    _ipd = 0;
     ovr_for_each_eye([&](ovrEyeType eye) {
         _eyeFovs[eye] = _hmdDesc.DefaultEyeFov[eye];
         ovrEyeRenderDesc& erd = _eyeRenderDescs[eye] = ovr_GetRenderDesc(_session, eye, _eyeFovs[eye]);
         ovrMatrix4f ovrPerspectiveProjection =
-            ovrMatrix4f_Projection(erd.Fov, DEFAULT_NEAR_CLIP, DEFAULT_FAR_CLIP, ovrProjection_RightHanded);
+            ovrMatrix4f_Projection(erd.Fov, DEFAULT_NEAR_CLIP, DEFAULT_FAR_CLIP, ovrProjection_ClipRangeOpenGL);
         _eyeProjections[eye] = toGlm(ovrPerspectiveProjection);
-
-        ovrPerspectiveProjection =
-            ovrMatrix4f_Projection(erd.Fov, 0.001f, 10.0f, ovrProjection_RightHanded);
-        _compositeEyeProjections[eye] = toGlm(ovrPerspectiveProjection);
-
-        _eyeOffsets[eye] = erd.HmdToEyeViewOffset;
+        _eyeOffsets[eye] = glm::translate(mat4(), toGlm(erd.HmdToEyeOffset));
         eyeSizes[eye] = toGlm(ovr_GetFovTextureSize(_session, eye, erd.Fov, 1.0f));
+        _viewScaleDesc.HmdToEyeOffset[eye] = erd.HmdToEyeOffset;
+        _ipd += glm::abs(glm::length(toGlm(erd.HmdToEyeOffset)));
     });
-    ovrFovPort combined = _eyeFovs[Left];
-    combined.LeftTan = std::max(_eyeFovs[Left].LeftTan, _eyeFovs[Right].LeftTan);
-    combined.RightTan = std::max(_eyeFovs[Left].RightTan, _eyeFovs[Right].RightTan);
-    ovrMatrix4f ovrPerspectiveProjection =
-        ovrMatrix4f_Projection(combined, DEFAULT_NEAR_CLIP, DEFAULT_FAR_CLIP, ovrProjection_RightHanded);
-    _eyeProjections[Mono] = toGlm(ovrPerspectiveProjection);
 
+    auto combinedFov = _eyeFovs[0];
+    combinedFov.LeftTan = combinedFov.RightTan = std::max(combinedFov.LeftTan, combinedFov.RightTan);
+    _cullingProjection = toGlm(ovrMatrix4f_Projection(combinedFov, DEFAULT_NEAR_CLIP, DEFAULT_FAR_CLIP, ovrProjection_ClipRangeOpenGL));
 
-
-    _desiredFramebufferSize = uvec2(
+    _renderTargetSize = uvec2(
         eyeSizes[0].x + eyeSizes[1].x,
         std::max(eyeSizes[0].y, eyeSizes[1].y));
 
-    if (!OVR_SUCCESS(ovr_ConfigureTracking(_session,
-        ovrTrackingCap_Orientation | ovrTrackingCap_Position | ovrTrackingCap_MagYawCorrection, 0))) {
-        qFatal("Could not attach to sensor device");
-    }
-
-    // Parent class relies on our _session intialization, so it must come after that.
     memset(&_sceneLayer, 0, sizeof(ovrLayerEyeFov));
     _sceneLayer.Header.Type = ovrLayerType_EyeFov;
     _sceneLayer.Header.Flags = ovrLayerFlag_TextureOriginAtBottomLeft;
@@ -134,27 +80,14 @@ void OculusBaseDisplayPlugin::activate() {
         _sceneLayer.Viewport[eye].Pos = { eye == ovrEye_Left ? 0 : size.w, 0 };
     });
 
-    if (!OVR_SUCCESS(ovr_ConfigureTracking(_session,
-        ovrTrackingCap_Orientation | ovrTrackingCap_Position | ovrTrackingCap_MagYawCorrection, 0))) {
-        qFatal("Could not attach to sensor device");
-    }
+    // This must come after the initialization, so that the values calculated 
+    // above are available during the customizeContext call (when not running
+    // in threaded present mode)
+    return Parent::internalActivate();
 }
 
-void OculusBaseDisplayPlugin::deactivate() {
-    WindowOpenGLDisplayPlugin::deactivate();
-
-#if (OVR_MAJOR_VERSION >= 6)
-    ovr_Destroy(_session);
+void OculusBaseDisplayPlugin::internalDeactivate() {
+    Parent::internalDeactivate();
+    releaseOculusSession();
     _session = nullptr;
-    ovr_Shutdown();
-#endif
-}
-
-
-float OculusBaseDisplayPlugin::getIPD() const {
-    float result = OVR_DEFAULT_IPD;
-#if (OVR_MAJOR_VERSION >= 6)
-    result = ovr_GetFloat(_session, OVR_KEY_IPD, result);
-#endif
-    return result;
 }

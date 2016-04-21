@@ -23,7 +23,6 @@
 
 #include <AnimationCache.h>
 #include <AnimVariant.h>
-#include <AssetClient.h>
 #include <AvatarData.h>
 #include <AvatarHashMap.h>
 #include <LimitedNodeList.h>
@@ -32,8 +31,10 @@
 
 #include "MouseEvent.h"
 #include "ArrayBufferClass.h"
+#include "AssetScriptingInterface.h"
 #include "AudioScriptingInterface.h"
 #include "Quat.h"
+#include "Mat4.h"
 #include "ScriptCache.h"
 #include "ScriptUUID.h"
 #include "Vec3.h"
@@ -42,7 +43,14 @@ const QString NO_SCRIPT("");
 
 const unsigned int SCRIPT_DATA_CALLBACK_USECS = floor(((1.0f / 60.0f) * 1000 * 1000) + 0.5f);
 
-typedef QHash<QString, QScriptValueList> RegisteredEventHandlers;
+class CallbackData {
+public:
+    QScriptValue function;
+    EntityItemID definingEntityIdentifier;
+};
+
+typedef QList<CallbackData> CallbackList;
+typedef QHash<QString, CallbackList> RegisteredEventHandlers;
 
 class EntityScriptDetails {
 public:
@@ -129,7 +137,6 @@ public:
     bool isRunning() const { return _isRunning; } // used by ScriptWidget
 
     void disconnectNonEssentialSignals();
-    static void stopAllScripts(QObject* application); // used by Application on shutdown
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // NOTE - These are the callback implementations for ScriptUser the get called by ScriptCache when the contents
@@ -170,7 +177,7 @@ protected:
     std::atomic<bool> _isRunning { false };
     int _evaluatesPending { 0 };
     bool _isInitialized { false };
-    QHash<QTimer*, QScriptValue> _timerFunctionMap;
+    QHash<QTimer*, CallbackData> _timerFunctionMap;
     QSet<QUrl> _includedURLs;
     bool _wantSignals { true };
     QHash<EntityItemID, EntityScriptDetails> _entityScripts;
@@ -182,6 +189,7 @@ protected:
     bool evaluatePending() const { return _evaluatesPending > 0; }
     void timerFired();
     void stopAllTimers();
+    void stopAllTimersForEntityScript(const EntityItemID& entityID);
     void refreshFileScript(const EntityItemID& entityID);
 
     void setParentURL(const QString& parentURL) { _parentURL = parentURL; }
@@ -192,6 +200,7 @@ protected:
     QString _fileNameString;
     Quat _quatLibrary;
     Vec3 _vec3Library;
+    Mat4 _mat4Library;
     ScriptUUID _uuidLibrary;
     std::atomic<bool> _isUserLoaded { false };
     bool _isReloading { false };
@@ -204,8 +213,11 @@ protected:
     void forwardHandlerCall(const EntityItemID& entityID, const QString& eventName, QScriptValueList eventHanderArgs);
     Q_INVOKABLE void entityScriptContentAvailable(const EntityItemID& entityID, const QString& scriptOrURL, const QString& contents, bool isURL, bool success);
 
-    static QSet<ScriptEngine*> _allKnownScriptEngines;
-    static QMutex _allScriptsMutex;
+    EntityItemID currentEntityIdentifier {}; // Contains the defining entity script entity id during execution, if any. Empty for interface script execution.
+    void doWithEnvironment(const EntityItemID& entityID, std::function<void()> operation);
+    void callWithEnvironment(const EntityItemID& entityID, QScriptValue function, QScriptValue thisObject, QScriptValueList args);
+
+    friend class ScriptEngines;
     static std::atomic<bool> _stoppingAllScripts;
 };
 

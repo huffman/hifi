@@ -104,8 +104,8 @@ public:
     const QUuid& getSessionUUID() const { return _sessionUUID; }
     void setSessionUUID(const QUuid& sessionUUID);
 
-    bool getThisNodeCanAdjustLocks() const { return _thisNodeCanAdjustLocks; }
-    void setThisNodeCanAdjustLocks(bool canAdjustLocks);
+    bool isAllowedEditor() const { return _isAllowedEditor; }
+    void setIsAllowedEditor(bool isAllowedEditor);
 
     bool getThisNodeCanRez() const { return _thisNodeCanRez; }
     void setThisNodeCanRez(bool canRez);
@@ -129,7 +129,7 @@ public:
     qint64 sendPacketList(std::unique_ptr<NLPacketList> packetList, const HifiSockAddr& sockAddr);
     qint64 sendPacketList(std::unique_ptr<NLPacketList> packetList, const Node& destinationNode);
 
-    void (*linkedDataCreateCallback)(Node *);
+    std::function<void(Node*)> linkedDataCreateCallback;
 
     size_t size() const { return _nodeHash.size(); }
 
@@ -137,12 +137,13 @@ public:
 
     SharedNodePointer addOrUpdateNode(const QUuid& uuid, NodeType_t nodeType,
                                       const HifiSockAddr& publicSocket, const HifiSockAddr& localSocket,
-                                      bool canAdjustLocks = false, bool canRez = false,
+                                      bool isAllowedEditor = false, bool canRez = false,
                                       const QUuid& connectionSecret = QUuid());
 
     bool hasCompletedInitialSTUN() const { return _hasCompletedInitialSTUN; }
 
     const HifiSockAddr& getLocalSockAddr() const { return _localSockAddr; }
+    const HifiSockAddr& getPublicSockAddr() const { return _publicSockAddr; }
     const HifiSockAddr& getSTUNSockAddr() const { return _stunSockAddr; }
 
     void processKillNode(ReceivedMessage& message);
@@ -161,7 +162,6 @@ public:
     std::unique_ptr<NLPacket> constructICEPingPacket(PingType_t pingType, const QUuid& iceID);
     std::unique_ptr<NLPacket> constructICEPingReplyPacket(ReceivedMessage& message, const QUuid& iceID);
 
-    void sendHeartbeatToIceServer(const HifiSockAddr& iceServerSockAddr);
     void sendPeerQueryToIceServer(const HifiSockAddr& iceServerSockAddr, const QUuid& clientID, const QUuid& peerID);
 
     SharedNodePointer findNodeWithAddr(const HifiSockAddr& addr);
@@ -219,13 +219,15 @@ public:
 
     udt::Socket::StatsVector sampleStatsForAllConnections() { return _nodeSocket.sampleStatsForAllConnections(); }
 
+    void setConnectionMaxBandwidth(int maxBandwidth) { _nodeSocket.setConnectionMaxBandwidth(maxBandwidth); }
+
 public slots:
     void reset();
     void eraseAllNodes();
 
     void removeSilentNodes();
 
-    void updateLocalSockAddr();
+    void updateLocalSocket();
 
     void startSTUNPublicSocketUpdate();
     virtual void sendSTUNRequest();
@@ -244,8 +246,12 @@ signals:
     void localSockAddrChanged(const HifiSockAddr& localSockAddr);
     void publicSockAddrChanged(const HifiSockAddr& publicSockAddr);
 
-    void canAdjustLocksChanged(bool canAdjustLocks);
+    void isAllowedEditorChanged(bool isAllowedEditor);
     void canRezChanged(bool canRez);
+
+protected slots:
+    void connectedForLocalSocketTest();
+    void errorTestingLocalSocket();
 
 protected:
     LimitedNodeList(unsigned short socketListenPort = 0, unsigned short dtlsListenPort = 0);
@@ -258,6 +264,8 @@ protected:
                        const QUuid& connectionSecret = QUuid());
     void collectPacketStats(const NLPacket& packet);
     void fillPacketHeader(const NLPacket& packet, const QUuid& connectionSecret = QUuid());
+
+    void setLocalSocket(const HifiSockAddr& sockAddr);
     
     bool isPacketVerified(const udt::Packet& packet);
     bool packetVersionMatch(const udt::Packet& packet);
@@ -271,8 +279,6 @@ protected:
     void sendPacketToIceServer(PacketType packetType, const HifiSockAddr& iceServerSockAddr, const QUuid& clientID,
                                const QUuid& peerRequestID = QUuid());
 
-
-
     QUuid _sessionUUID;
     NodeHash _nodeHash;
     QReadWriteLock _nodeMutex;
@@ -281,6 +287,7 @@ protected:
     HifiSockAddr _localSockAddr;
     HifiSockAddr _publicSockAddr;
     HifiSockAddr _stunSockAddr;
+    bool _hasTCPCheckedLocalSocket { false };
 
     PacketReceiver* _packetReceiver;
 
@@ -289,10 +296,11 @@ protected:
     int _numCollectedBytes;
 
     QElapsedTimer _packetStatTimer;
-    bool _thisNodeCanAdjustLocks;
+    bool _isAllowedEditor { false };
     bool _thisNodeCanRez;
 
     QPointer<QTimer> _initialSTUNTimer;
+
     int _numInitialSTUNRequests = 0;
     bool _hasCompletedInitialSTUN = false;
     quint64 _firstSTUNTime = 0;

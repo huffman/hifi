@@ -376,6 +376,15 @@ glm::mat4 createMatFromQuatAndPos(const glm::quat& q, const glm::vec3& p) {
     return m;
 }
 
+// create matrix from a non-uniform scale, orientation and position
+glm::mat4 createMatFromScaleQuatAndPos(const glm::vec3& scale, const glm::quat& rot, const glm::vec3& trans) {
+    glm::vec3 xAxis = rot * glm::vec3(scale.x, 0.0f, 0.0f);
+    glm::vec3 yAxis = rot * glm::vec3(0.0f, scale.y, 0.0f);
+    glm::vec3 zAxis = rot * glm::vec3(0.0f, 0.0f, scale.z);
+    return glm::mat4(glm::vec4(xAxis, 0.0f), glm::vec4(yAxis, 0.0f),
+                     glm::vec4(zAxis, 0.0f), glm::vec4(trans, 1.0f));
+}
+
 // cancel out roll and pitch
 glm::quat cancelOutRollAndPitch(const glm::quat& q) {
     glm::vec3 zAxis = q * glm::vec3(0.0f, 0.0f, 1.0f);
@@ -407,7 +416,14 @@ glm::vec3 transformPoint(const glm::mat4& m, const glm::vec3& p) {
     return glm::vec3(temp.x / temp.w, temp.y / temp.w, temp.z / temp.w);
 }
 
-glm::vec3 transformVector(const glm::mat4& m, const glm::vec3& v) {
+// does not handle non-uniform scale correctly, but it's faster then transformVectorFull
+glm::vec3 transformVectorFast(const glm::mat4& m, const glm::vec3& v) {
+    glm::mat3 rot(m);
+    return rot * v;
+}
+
+// handles non-uniform scale.
+glm::vec3 transformVectorFull(const glm::mat4& m, const glm::vec3& v) {
     glm::mat3 rot(m);
     return glm::inverse(glm::transpose(rot)) * v;
 }
@@ -425,3 +441,41 @@ void generateBasisVectors(const glm::vec3& primaryAxis, const glm::vec3& seconda
     vAxisOut = glm::cross(wAxisOut, uAxisOut);
 }
 
+glm::vec2 getFacingDir2D(const glm::quat& rot) {
+    glm::vec3 facing3D = rot * Vectors::UNIT_NEG_Z;
+    glm::vec2 facing2D(facing3D.x, facing3D.z);
+    const float ALMOST_ZERO = 0.0001f;
+    if (glm::length(facing2D) < ALMOST_ZERO) {
+        return glm::vec2(1.0f, 0.0f);
+    } else {
+        return glm::normalize(facing2D);
+    }
+}
+
+glm::vec2 getFacingDir2D(const glm::mat4& m) {
+    glm::vec3 facing3D = transformVectorFast(m, Vectors::UNIT_NEG_Z);
+    glm::vec2 facing2D(facing3D.x, facing3D.z);
+    const float ALMOST_ZERO = 0.0001f;
+    if (glm::length(facing2D) < ALMOST_ZERO) {
+        return glm::vec2(1.0f, 0.0f);
+    } else {
+        return glm::normalize(facing2D);
+    }
+}
+
+bool isNaN(glm::vec3 value) {
+    return isNaN(value.x) || isNaN(value.y) || isNaN(value.z);
+}
+
+bool isNaN(glm::quat value) {
+    return isNaN(value.w) || isNaN(value.x) || isNaN(value.y) || isNaN(value.z);
+}
+
+glm::mat4 orthoInverse(const glm::mat4& m) {
+    glm::mat4 r = m;
+    r[3] = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+    r = glm::transpose(r);
+    r[3] = -(r * m[3]);
+    r[3][3] = 1.0f;
+    return r;
+}

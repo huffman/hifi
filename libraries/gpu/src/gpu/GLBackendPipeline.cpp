@@ -231,6 +231,7 @@ void GLBackend::releaseResourceTexture(uint32_t slot) {
     }
 }
 
+
 void GLBackend::resetResourceStage() {
     for (uint32_t i = 0; i < _resource._textures.size(); i++) {
         releaseResourceTexture(i);
@@ -250,8 +251,11 @@ void GLBackend::do_setResourceTexture(Batch& batch, size_t paramOffset) {
         return;
     }
 
+    // One more True texture bound
+    _stats._RSNumTextureBounded++;
+
     // Always make sure the GLObject is in sync
-    GLTexture* object = GLBackend::syncGPUObject(*resourceTexture);
+    GLTexture* object = GLBackend::syncGPUObject(resourceTexture);
     if (object) {
         GLuint to = object->_texture;
         GLuint target = object->_target;
@@ -266,5 +270,15 @@ void GLBackend::do_setResourceTexture(Batch& batch, size_t paramOffset) {
         releaseResourceTexture(slot);
         return;
     }
+}
+
+int GLBackend::ResourceStageState::findEmptyTextureSlot() const {
+    // start from the end of the slots, try to find an empty one that can be used
+    for (auto i = MAX_NUM_RESOURCE_TEXTURES - 1; i > 0; i--) {
+        if (!_textures[i]) {
+            return i;
+        }
+    }
+    return -1;
 }
 

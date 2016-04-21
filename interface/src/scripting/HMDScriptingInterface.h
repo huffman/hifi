@@ -23,19 +23,28 @@ class QScriptEngine;
 
 class HMDScriptingInterface : public AbstractHMDScriptingInterface, public Dependency {
     Q_OBJECT
-    Q_PROPERTY(bool magnifier READ getMagnifier)
     Q_PROPERTY(glm::vec3 position READ getPosition)
     Q_PROPERTY(glm::quat orientation READ getOrientation)
+    Q_PROPERTY(bool mounted READ isMounted)
+
+public:
+    Q_INVOKABLE glm::vec3 calculateRayUICollisionPoint(const glm::vec3& position, const glm::vec3& direction) const;
+    Q_INVOKABLE glm::vec2 overlayFromWorldPoint(const glm::vec3& position) const;
+    Q_INVOKABLE glm::vec3 worldPointFromOverlay(const glm::vec2& overlay) const;
+
+    Q_INVOKABLE glm::vec2 sphericalToOverlay(const glm::vec2 & sphericalPos) const;
+    Q_INVOKABLE glm::vec2 overlayToSpherical(const glm::vec2 & overlayPos) const;
+    Q_INVOKABLE QString preferredAudioInput() const;
+    Q_INVOKABLE QString preferredAudioOutput() const;
+
 public:
     HMDScriptingInterface();
     static QScriptValue getHUDLookAtPosition2D(QScriptContext* context, QScriptEngine* engine);
     static QScriptValue getHUDLookAtPosition3D(QScriptContext* context, QScriptEngine* engine);
 
-public slots:
-    void toggleMagnifier();
+    bool isMounted() const;
 
 private:
-    bool getMagnifier() const; 
     // Get the position of the HMD
     glm::vec3 getPosition() const;
     

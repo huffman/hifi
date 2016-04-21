@@ -15,13 +15,15 @@
 #include <QtQuick/QQuickItem>
 #include <QtQuick/QQuickWindow>
 #include <QtQuick/QQuickRenderControl>
-#include <QtCore/QWaitCondition>
+#include <QtCore/QThread>
 #include <QtCore/QMutex>
+#include <QtCore/QWaitCondition>
 
 #include <shared/NsightHelpers.h>
 #include <PerfStat.h>
 #include <DependencyManager.h>
 #include <NumericalConstants.h>
+#include <Finally.h>
 
 #include "OffscreenGLCanvas.h"
 #include "GLEscrow.h"
@@ -47,10 +49,9 @@ protected:
 
 private:
     QWindow* _renderWindow{ nullptr };
-    friend class OffscreenQmlRenderer;
+    friend class OffscreenQmlRenderThread;
     friend class OffscreenQmlSurface;
 };
-
 
 Q_DECLARE_LOGGING_CATEGORY(offscreenFocus)
 Q_LOGGING_CATEGORY(offscreenFocus, "hifi.offscreen.focus")
@@ -60,76 +61,139 @@ static const QEvent::Type RENDER = QEvent::Type(QEvent::User + 2);
 static const QEvent::Type RESIZE = QEvent::Type(QEvent::User + 3);
 static const QEvent::Type STOP = QEvent::Type(QEvent::User + 4);
 
-class OffscreenQmlRenderer : public OffscreenGLCanvas {
-    friend class OffscreenQmlSurface;
+class OffscreenQmlRenderThread : public QThread {
 public:
+    OffscreenQmlRenderThread(OffscreenQmlSurface* surface, QOpenGLContext* shareContext);
+    virtual ~OffscreenQmlRenderThread() = default;
 
-    OffscreenQmlRenderer(OffscreenQmlSurface* surface, QOpenGLContext* shareContext) : _surface(surface) {
-        OffscreenGLCanvas::create(shareContext);
+    virtual void run() override;
+    virtual bool event(QEvent *e) override;
 
-        _renderControl = new QMyQuickRenderControl();
+protected:
+    class Queue : private QQueue<QEvent*> {
+    public:
+        void add(QEvent::Type type);
+        QEvent* take();
 
-        // Create a QQuickWindow that is associated with out render control. Note that this
-        // window never gets created or shown, meaning that it will never get an underlying
-        // native (platform) window.
-        QQuickWindow::setDefaultAlphaBuffer(true);
-        // Weirdness...  QQuickWindow NEEDS to be created on the rendering thread, or it will refuse to render
-        // because it retains an internal 'context' object that retains the thread it was created on, 
-        // regardless of whether you later move it to another thread.
-        _quickWindow = new QQuickWindow(_renderControl);
-        _quickWindow->setColor(QColor(255, 255, 255, 0));
-        _quickWindow->setFlags(_quickWindow->flags() | static_cast<Qt::WindowFlags>(Qt::WA_TranslucentBackground));
+    private:
+        QMutex _mutex;
+        QWaitCondition _waitCondition;
+        bool _isWaiting{ false };
+    };
 
-        // Qt 5.5
-        _renderControl->prepareThread(&_thread);
-        getContextObject()->moveToThread(&_thread);
-        moveToThread(&_thread);
-        _thread.setObjectName("QML Thread");
-        _thread.start();
-        post(INIT);
-    }
-
-    bool event(QEvent *e) {
-        switch (int(e->type())) {
-        case INIT:
-            {
-                QMutexLocker lock(&_mutex);
-                init();
-            }
-            return true;
-        case RENDER:
-            {
-                QMutexLocker lock(&_mutex);
-                render(&lock);
-            }
-            return true;
-        case RESIZE:
-            {
-                QMutexLocker lock(&_mutex);
-                resize();
-            }
-            return true;
-        case STOP:
-            {
-                QMutexLocker lock(&_mutex);
-                cleanup();
-            }
-            return true;
-        default:
-            return QObject::event(e);
-        }
-    }
-
-    void post(const QEvent::Type& type) {
-        QCoreApplication::postEvent(this, new QEvent(type));
-    }
-
+    friend class OffscreenQmlSurface;
+    Queue _queue;
+    QMutex _mutex;
+    QWaitCondition _waitCondition;
+    std::atomic<bool> _rendering { false };
 
 private:
+    // Event-driven methods
+    void init();
+    void render();
+    void resize();
+    void cleanup();
 
-    void setupFbo() {
-        using namespace oglplus;
-        _textures.setSize(_size);
+    // Helper methods
+    void setupFbo();
+    bool allowNewFrame(uint8_t fps);
+
+    // Rendering members
+    OffscreenGLCanvas _canvas;
+    OffscreenQmlSurface* _surface{ nullptr };
+    QQuickWindow* _quickWindow{ nullptr };
+    QMyQuickRenderControl* _renderControl{ nullptr };
+    FramebufferPtr _fbo;
+    RenderbufferPtr _depthStencil;
+    TextureRecycler _textures;
+    GLTextureEscrow _escrow;
+
+    uint64_t _lastRenderTime{ 0 };
+    uvec2 _size{ 1920, 1080 };
+    QSize _newSize;
+    bool _quit{ false };
+};
+
+void OffscreenQmlRenderThread::Queue::add(QEvent::Type type) {
+    QMutexLocker locker(&_mutex);
+    enqueue(new QEvent(type));
+    if (_isWaiting) {
+        _waitCondition.wakeOne();
+    }
+}
+
+QEvent* OffscreenQmlRenderThread::Queue::take() {
+    QMutexLocker locker(&_mutex);
+    while (isEmpty()) {
+        _isWaiting = true;
+        _waitCondition.wait(&_mutex);
+        _isWaiting = false;
+    }
+    QEvent* e = dequeue();
+    return e;
+}
+
+OffscreenQmlRenderThread::OffscreenQmlRenderThread(OffscreenQmlSurface* surface, QOpenGLContext* shareContext) : _surface(surface) {
+    qDebug() << "Building QML Renderer";
+    if (!_canvas.create(shareContext)) {
+        qWarning("Failed to create OffscreenGLCanvas");
+        _quit = true;
+        return;
+    };
+
+    _renderControl = new QMyQuickRenderControl();
+    QQuickWindow::setDefaultAlphaBuffer(true);
+    // Create a QQuickWindow that is associated with our render control.
+    // This window never gets created or shown, meaning that it will never get an underlying native (platform) window.
+    // NOTE: Must be created on the main thread so that OffscreenQmlSurface can send it events
+    // NOTE: Must be created on the rendering thread or it will refuse to render,
+    //       so we wait until after its ctor to move object/context to this thread.
+    _quickWindow = new QQuickWindow(_renderControl);
+    _quickWindow->setColor(QColor(255, 255, 255, 0));
+    _quickWindow->setFlags(_quickWindow->flags() | static_cast<Qt::WindowFlags>(Qt::WA_TranslucentBackground));
+
+    // We can prepare, but we must wait to start() the thread until after the ctor
+    _renderControl->prepareThread(this);
+    _canvas.getContextObject()->moveToThread(this);
+    moveToThread(this);
+
+    _queue.add(INIT);
+}
+
+void OffscreenQmlRenderThread::run() {
+    qDebug() << "Starting QML Renderer thread";
+
+    while (!_quit) {
+        QEvent* e = _queue.take();
+        event(e);
+        delete e;
+    }
+}
+
+bool OffscreenQmlRenderThread::event(QEvent *e) {
+    switch (int(e->type())) {
+    case INIT:
+        init();
+        return true;
+    case RENDER:
+        render();
+        return true;
+    case RESIZE:
+        resize();
+        return true;
+    case STOP:
+        cleanup();
+        return true;
+    default:
+        return QObject::event(e);
+    }
+}
+
+void OffscreenQmlRenderThread::setupFbo() {
+    using namespace oglplus;
+    _textures.setSize(_size);
+
+    try {
         _depthStencil.reset(new Renderbuffer());
         Context::Bound(Renderbuffer::Target::Renderbuffer, *_depthStencil)
             .Storage(
@@ -138,47 +202,51 @@ private:
 
         _fbo.reset(new Framebuffer());
         _fbo->Bind(Framebuffer::Target::Draw);
-        _fbo->AttachRenderbuffer(Framebuffer::Target::Draw, 
+        _fbo->AttachRenderbuffer(Framebuffer::Target::Draw,
             FramebufferAttachment::Depth, *_depthStencil);
         DefaultFramebuffer().Bind(Framebuffer::Target::Draw);
+    } catch (oglplus::Error& error) {
+        qWarning() << "OpenGL error in QML render setup: " << error.what();
+    }
+}
+
+void OffscreenQmlRenderThread::init() {
+    qDebug() << "Initializing QML Renderer";
+
+    connect(_renderControl, &QQuickRenderControl::renderRequested, _surface, &OffscreenQmlSurface::requestRender);
+    connect(_renderControl, &QQuickRenderControl::sceneChanged, _surface, &OffscreenQmlSurface::requestUpdate);
+
+    if (!_canvas.makeCurrent()) {
+        qWarning("Failed to make context current on QML Renderer Thread");
+        _quit = true;
+        return;
     }
 
+    _renderControl->initialize(_canvas.getContext());
+    setupFbo();
+    _escrow.setRecycler([this](GLuint texture){
+        _textures.recycleTexture(texture);
+    });
+}
 
+void OffscreenQmlRenderThread::cleanup() {
+    _renderControl->invalidate();
 
-    void init() {
-        connect(_renderControl, &QQuickRenderControl::renderRequested, _surface, &OffscreenQmlSurface::requestRender);
-        connect(_renderControl, &QQuickRenderControl::sceneChanged, _surface, &OffscreenQmlSurface::requestUpdate);
+    _fbo.reset();
+    _depthStencil.reset();
+    _textures.clear();
 
-        if (!makeCurrent()) {
-            qWarning("Failed to make context current on render thread");
-            return;
-        }
-        _renderControl->initialize(_context);
-        setupFbo();
-        _escrow.setRecycler([this](GLuint texture){
-            _textures.recycleTexture(texture);
-        });
-        doneCurrent();
-    }
+    _canvas.doneCurrent();
+    _canvas.getContextObject()->moveToThread(QCoreApplication::instance()->thread());
 
-    void cleanup() {
-        if (!makeCurrent()) {
-            qFatal("Failed to make context current on render thread");
-            return;
-        }
-        _renderControl->invalidate();
+    _quit = true;
+}
 
-        _fbo.reset();
-        _depthStencil.reset();
-        _textures.clear();
+void OffscreenQmlRenderThread::resize() {
+    // Lock _newSize changes
+    {
+        QMutexLocker locker(&_mutex);
 
-        doneCurrent();
-
-        getContextObject()->moveToThread(QCoreApplication::instance()->thread());
-        _cond.wakeOne();
-    }
-
-    void resize() {
         // Update our members
         if (_quickWindow) {
             _quickWindow->setGeometry(QRect(QPoint(), _newSize));
@@ -190,114 +258,121 @@ private:
         qreal pixelRatio = 1.0;
         if (_renderControl && _renderControl->_renderWindow) {
             pixelRatio = _renderControl->_renderWindow->devicePixelRatio();
-        } 
+        }
 
         uvec2 newOffscreenSize = toGlm(_newSize * pixelRatio);
-        _textures.setSize(newOffscreenSize);
         if (newOffscreenSize == _size) {
-            return;
-        }
-        _size = newOffscreenSize;
-
-        // Clear out any fbos with the old size
-        if (!makeCurrent()) {
-            qWarning("Failed to make context current on render thread");
             return;
         }
 
         qDebug() << "Offscreen UI resizing to " << _newSize.width() << "x" << _newSize.height() << " with pixel ratio " << pixelRatio;
-        setupFbo();
-        doneCurrent();
+        _size = newOffscreenSize;
     }
 
-    void render(QMutexLocker *lock) {
-        if (_surface->_paused) {
-            return;
-        }
+    _textures.setSize(_size);
+    setupFbo();
+}
 
-        if (!makeCurrent()) {
-            qWarning("Failed to make context current on render thread");
-            return;
-        }
+void OffscreenQmlRenderThread::render() {
+    // Ensure we always release the main thread
+    Finally releaseMainThread([this] {
+        _waitCondition.wakeOne();
+    });
 
+    if (_surface->_paused) {
+        return;
+    }
+
+    _rendering = true;
+    Finally unmarkRenderingFlag([this] {
+        _rendering = false;
+    });
+
+    {
+        QMutexLocker locker(&_mutex);
         _renderControl->sync();
-        _cond.wakeOne();
-        lock->unlock();
+        releaseMainThread.trigger();
+    }
 
-        using namespace oglplus;
+    using namespace oglplus;
 
-        _quickWindow->setRenderTarget(GetName(*_fbo), QSize(_size.x, _size.y));
+    _quickWindow->setRenderTarget(GetName(*_fbo), QSize(_size.x, _size.y));
 
-        {
-            PROFILE_RANGE("qml_render")
-            TexturePtr texture = _textures.getNextTexture();
+    try {
+        PROFILE_RANGE("qml_render")
+
+        TexturePtr texture = _textures.getNextTexture();
+
+        try {
             _fbo->Bind(Framebuffer::Target::Draw);
             _fbo->AttachTexture(Framebuffer::Target::Draw, FramebufferAttachment::Color, *texture, 0);
             _fbo->Complete(Framebuffer::Target::Draw);
-            {
-                _renderControl->render();
-                // FIXME The web browsers seem to be leaving GL in an error state.
-                // Need a debug context with sync logging to figure out why.
-                // for now just clear the errors
-                glGetError();
-            }
-            // FIXME probably unecessary
-            DefaultFramebuffer().Bind(Framebuffer::Target::Draw);
-            _quickWindow->resetOpenGLState();
-            _escrow.submit(GetName(*texture));
+        } catch (oglplus::Error& error) {
+            qWarning() << "OpenGL error in QML render: " << error.what();
+
+            // In case we are failing from a failed setupFbo, reset fbo before next render
+            setupFbo();
+            throw;
         }
+
+        {
+            PROFILE_RANGE("qml_render->rendercontrol")
+            _renderControl->render();
+            // FIXME The web browsers seem to be leaving GL in an error state.
+            // Need a debug context with sync logging to figure out why.
+            // for now just clear the errors
+            glGetError();
+        }
+
+        // FIXME probably unecessary
+        DefaultFramebuffer().Bind(Framebuffer::Target::Draw);
+        _quickWindow->resetOpenGLState();
+        _escrow.submit(GetName(*texture));
         _lastRenderTime = usecTimestampNow();
+    } catch (std::runtime_error& error) {
+        qWarning() << "Failed to render QML: " << error.what();
     }
+}
 
-    void aboutToQuit() {
-        QMutexLocker lock(&_quitMutex);
-        _quit = true;
-    }
-
-    void stop() {
-        QMutexLocker lock(&_mutex);
-        post(STOP);
-        _cond.wait(&_mutex);
-    }
-
-    bool allowNewFrame(uint8_t fps) {
-        auto minRenderInterval = USECS_PER_SECOND / fps;
-        auto lastInterval = usecTimestampNow() - _lastRenderTime;
-        return (lastInterval > minRenderInterval);
-    }
-
-    OffscreenQmlSurface* _surface{ nullptr };
-    QQuickWindow* _quickWindow{ nullptr };
-    QMyQuickRenderControl* _renderControl{ nullptr };
-
-    QThread _thread;
-    QMutex _mutex;
-    QWaitCondition _cond;
-    QMutex _quitMutex;
-
-    QSize _newSize;
-    bool _quit;
-    FramebufferPtr _fbo;
-    RenderbufferPtr _depthStencil;
-    uvec2 _size{ 1920, 1080 };
-    uint64_t _lastRenderTime{ 0 };
-    TextureRecycler _textures;
-    GLTextureEscrow _escrow;
-};
+bool OffscreenQmlRenderThread::allowNewFrame(uint8_t fps) {
+    auto minRenderInterval = USECS_PER_SECOND / fps;
+    auto lastInterval = usecTimestampNow() - _lastRenderTime;
+    return (lastInterval > minRenderInterval);
+}
 
 OffscreenQmlSurface::OffscreenQmlSurface() {
 }
 
+static const uint64_t MAX_SHUTDOWN_WAIT_SECS = 2;
 OffscreenQmlSurface::~OffscreenQmlSurface() {
-    _renderer->stop();
+    QObject::disconnect(&_updateTimer);
+    QObject::disconnect(qApp);
 
+    qDebug() << "Stopping QML Renderer Thread " << _renderer->currentThreadId();
+    _renderer->_queue.add(STOP);
+    if (!_renderer->wait(MAX_SHUTDOWN_WAIT_SECS * USECS_PER_SECOND)) {
+        qWarning() << "Failed to shut down the QML Renderer Thread";
+    }
+
+    delete _rootItem;
     delete _renderer;
     delete _qmlComponent;
     delete _qmlEngine;
 }
 
+void OffscreenQmlSurface::onAboutToQuit() {
+    QObject::disconnect(&_updateTimer);
+}
+
 void OffscreenQmlSurface::create(QOpenGLContext* shareContext) {
-    _renderer = new OffscreenQmlRenderer(this, shareContext);
+    qDebug() << "Building QML surface";
+
+    _renderer = new OffscreenQmlRenderThread(this, shareContext);
+    _renderer->moveToThread(_renderer);
+    _renderer->setObjectName("QML Renderer Thread");
+    _renderer->start();
+
+    _renderer->_renderControl->_renderWindow = _proxyWindow;
 
     // Create a QML engine.
     _qmlEngine = new QQmlEngine;
@@ -308,22 +383,34 @@ void OffscreenQmlSurface::create(QOpenGLContext* shareContext) {
     // When Quick says there is a need to render, we will not render immediately. Instead,
     // a timer with a small interval is used to get better performance.
     _updateTimer.setInterval(MIN_TIMER_MS);
-    connect(&_updateTimer, &QTimer::timeout, this, &OffscreenQmlSurface::updateQuick);
-    QObject::connect(qApp, &QCoreApplication::aboutToQuit, [this]{
-        disconnect(&_updateTimer, &QTimer::timeout, this, &OffscreenQmlSurface::updateQuick);
-    });
+    QObject::connect(&_updateTimer, &QTimer::timeout, this, &OffscreenQmlSurface::updateQuick);
+    QObject::connect(qApp, &QCoreApplication::aboutToQuit, this, &OffscreenQmlSurface::onAboutToQuit);
     _updateTimer.start();
-
     _qmlComponent = new QQmlComponent(_qmlEngine);
+    _qmlEngine->rootContext()->setContextProperty("offscreenWindow", QVariant::fromValue(getWindow()));
 }
 
-void OffscreenQmlSurface::resize(const QSize& newSize) {
+void OffscreenQmlSurface::resize(const QSize& newSize_) {
 
     if (!_renderer || !_renderer->_quickWindow) {
-        QSize currentSize = _renderer->_quickWindow->geometry().size();
-        if (newSize == currentSize) {
-            return;
-        }
+        return;
+    }
+
+    const float MAX_OFFSCREEN_DIMENSION = 4096;
+    QSize newSize = newSize_;
+
+    if (newSize.width() > MAX_OFFSCREEN_DIMENSION || newSize.height() > MAX_OFFSCREEN_DIMENSION) {
+        float scale = std::min(
+                ((float)newSize.width() / MAX_OFFSCREEN_DIMENSION),
+                ((float)newSize.height() / MAX_OFFSCREEN_DIMENSION));
+        newSize = QSize(
+                std::max(static_cast<int>(scale * newSize.width()), 10),
+                std::max(static_cast<int>(scale * newSize.height()), 10));
+    }
+
+    QSize currentSize = _renderer->_quickWindow->geometry().size();
+    if (newSize == currentSize) {
+        return;
     }
 
     _qmlEngine->rootContext()->setContextProperty("surfaceSize", newSize);
@@ -333,11 +420,11 @@ void OffscreenQmlSurface::resize(const QSize& newSize) {
     }
 
     {
-        QMutexLocker _locker(&(_renderer->_mutex));
+        QMutexLocker locker(&(_renderer->_mutex));
         _renderer->_newSize = newSize;
     }
 
-    _renderer->post(RESIZE);
+    _renderer->_queue.add(RESIZE);
 }
 
 QQuickItem* OffscreenQmlSurface::getRootItem() {
@@ -349,7 +436,11 @@ void OffscreenQmlSurface::setBaseUrl(const QUrl& baseUrl) {
 }
 
 QObject* OffscreenQmlSurface::load(const QUrl& qmlSource, std::function<void(QQmlContext*, QObject*)> f) {
-    _qmlComponent->loadUrl(qmlSource);
+    // Synchronous loading may take a while; restart the deadlock timer
+    QMetaObject::invokeMethod(qApp, "updateHeartbeat", Qt::DirectConnection);
+
+    _qmlComponent->loadUrl(qmlSource, QQmlComponent::PreferSynchronous);
+
     if (_qmlComponent->isLoading()) {
         connect(_qmlComponent, &QQmlComponent::statusChanged, this, 
             [this, f](QQmlComponent::Status){
@@ -427,7 +518,12 @@ QObject* OffscreenQmlSurface::finishQmlLoad(std::function<void(QQmlContext*, QOb
 }
 
 void OffscreenQmlSurface::updateQuick() {
-    if (!_renderer || !_renderer->allowNewFrame(_maxFps)) {
+    // If we're 
+    //   a) not set up
+    //   b) already rendering a frame
+    //   c) rendering too fast
+    // then skip this 
+    if (!_renderer || _renderer->_rendering || !_renderer->allowNewFrame(_maxFps)) {
         return;
     }
 
@@ -437,16 +533,15 @@ void OffscreenQmlSurface::updateQuick() {
     }
 
     if (_render) {
-        _renderer->post(RENDER);
+        PROFILE_RANGE(__FUNCTION__);
+        // Lock the GUI size while syncing
+        QMutexLocker locker(&(_renderer->_mutex));
+        _renderer->_queue.add(RENDER);
+        _renderer->_waitCondition.wait(&(_renderer->_mutex));
         _render = false;
     }
 
-    GLuint newTexture = _renderer->_escrow.fetch();
-    if (newTexture) {
-        if (_currentTexture) {
-            _renderer->_escrow.release(_currentTexture);
-        }
-        _currentTexture = newTexture;
+    if (_renderer->_escrow.fetchSignaledAndRelease(_currentTexture)) {
         emit textureUpdated(_currentTexture);
     }
 }
@@ -568,7 +663,10 @@ bool OffscreenQmlSurface::isPaused() const {
 }
 
 void OffscreenQmlSurface::setProxyWindow(QWindow* window) {
-    _renderer->_renderControl->_renderWindow = window;
+    _proxyWindow = window;
+    if (_renderer && _renderer->_renderControl) {
+        _renderer->_renderControl->_renderWindow = window;
+    }
 }
 
 QObject* OffscreenQmlSurface::getEventHandler() {
@@ -587,3 +685,30 @@ QQmlContext* OffscreenQmlSurface::getRootContext() {
     return _qmlEngine->rootContext();
 }
 
+Q_DECLARE_METATYPE(std::function<void()>);
+static auto VoidLambdaType = qRegisterMetaType<std::function<void()>>();
+Q_DECLARE_METATYPE(std::function<QVariant()>);
+static auto VariantLambdaType = qRegisterMetaType<std::function<QVariant()>>();
+
+
+void OffscreenQmlSurface::executeOnUiThread(std::function<void()> function, bool blocking ) {
+    if (QThread::currentThread() != thread()) {
+        QMetaObject::invokeMethod(this, "executeOnUiThread", blocking ? Qt::BlockingQueuedConnection : Qt::QueuedConnection,
+            Q_ARG(std::function<void()>, function));
+        return;
+    }
+
+    function();
+}
+
+QVariant OffscreenQmlSurface::returnFromUiThread(std::function<QVariant()> function) {
+    if (QThread::currentThread() != thread()) {
+        QVariant result;
+        QMetaObject::invokeMethod(this, "returnFromUiThread", Qt::BlockingQueuedConnection,
+            Q_RETURN_ARG(QVariant, result),
+            Q_ARG(std::function<QVariant()>, function));
+        return result;
+    }
+
+    return function();
+}

@@ -61,6 +61,7 @@ namespace controller {
             makeButtonPair(Action::CONTEXT_MENU, "ContextMenu"),
             makeButtonPair(Action::TOGGLE_MUTE, "ToggleMute"),
             makeButtonPair(Action::CYCLE_CAMERA, "CycleCamera"),
+            makeButtonPair(Action::TOGGLE_OVERLAY, "ToggleOverlay"),
 
             makeAxisPair(Action::RETICLE_CLICK, "ReticleClick"),
             makeAxisPair(Action::RETICLE_X, "ReticleX"),
@@ -69,6 +70,12 @@ namespace controller {
             makeAxisPair(Action::RETICLE_RIGHT, "ReticleRight"),
             makeAxisPair(Action::RETICLE_UP, "ReticleUp"),
             makeAxisPair(Action::RETICLE_DOWN, "ReticleDown"),
+
+            makeAxisPair(Action::UI_NAV_LATERAL, "UiNavLateral"),
+            makeAxisPair(Action::UI_NAV_VERTICAL, "UiNavVertical"),
+            makeAxisPair(Action::UI_NAV_GROUP, "UiNavGroup"),
+            makeAxisPair(Action::UI_NAV_SELECT, "UiNavSelect"),
+            makeAxisPair(Action::UI_NAV_BACK, "UiNavBack"),
 
             // Aliases and bisected versions
             makeAxisPair(Action::LONGITUDINAL_BACKWARD, "Backward"),
@@ -114,7 +121,7 @@ namespace controller {
         return availableInputs;
     }
 
-    void ActionsDevice::update(float deltaTime, bool jointsCaptured) {
+    void ActionsDevice::update(float deltaTime, const InputCalibrationData& inpuCalibrationData, bool jointsCaptured) {
     }
 
     void ActionsDevice::focusOutEvent() {

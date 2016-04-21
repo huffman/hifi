@@ -15,12 +15,13 @@
 #include <QSet>
 #include <QStack>
 
-#include <EntityTree.h>
+#include <AbstractAudioInterface.h>
 #include <EntityScriptingInterface.h> // for RayToEntityIntersectionResult
+#include <EntityTree.h>
 #include <MouseEvent.h>
 #include <OctreeRenderer.h>
 #include <ScriptCache.h>
-#include <AbstractAudioInterface.h>
+#include <TextureCache.h>
 
 class AbstractScriptingServicesInterface;
 class AbstractViewStateInterface;
@@ -28,6 +29,9 @@ class Model;
 class ScriptEngine;
 class ZoneEntityItem;
 
+class Model;
+using ModelPointer = std::shared_ptr<Model>;
+using ModelWeakPointer = std::weak_ptr<Model>;
 
 // Generic client side Octree renderer class.
 class EntityTreeRenderer : public OctreeRenderer, public EntityItemFBXService, public Dependency {
@@ -40,8 +44,6 @@ public:
     virtual char getMyNodeType() const { return NodeType::EntityServer; }
     virtual PacketType getMyQueryMessageType() const { return PacketType::EntityQuery; }
     virtual PacketType getExpectedPacketType() const { return PacketType::EntityData; }
-    virtual float getSizeScale() const;
-    virtual int getBoundaryLevelAdjust() const;
     virtual void setTree(OctreePointer newTree);
 
     void shutdown();
@@ -54,7 +56,7 @@ public:
     virtual void init();
 
     virtual const FBXGeometry* getGeometryForEntity(EntityItemPointer entityItem);
-    virtual const Model* getModelForEntityItem(EntityItemPointer entityItem);
+    virtual ModelPointer getModelForEntityItem(EntityItemPointer entityItem);
     virtual const FBXGeometry* getCollisionGeometryForEntity(EntityItemPointer entityItem);
     
     /// clears the tree
@@ -64,20 +66,20 @@ public:
     void reloadEntityScripts();
 
     /// if a renderable entity item needs a model, we will allocate it for them
-    Q_INVOKABLE Model* allocateModel(const QString& url, const QString& collisionUrl);
+    Q_INVOKABLE ModelPointer allocateModel(const QString& url, const QString& collisionUrl);
     
     /// if a renderable entity item needs to update the URL of a model, we will handle that for the entity
-    Q_INVOKABLE Model* updateModel(Model* original, const QString& newUrl, const QString& collisionUrl);
+    Q_INVOKABLE ModelPointer updateModel(ModelPointer original, const QString& newUrl, const QString& collisionUrl);
 
     /// if a renderable entity item is done with a model, it should return it to us
-    void releaseModel(Model* model);
+    void releaseModel(ModelPointer model);
     
     void deleteReleasedModels();
     
     // event handles which may generate entity related events
-    void mouseReleaseEvent(QMouseEvent* event, unsigned int deviceID);
-    void mousePressEvent(QMouseEvent* event, unsigned int deviceID);
-    void mouseMoveEvent(QMouseEvent* event, unsigned int deviceID);
+    void mouseReleaseEvent(QMouseEvent* event);
+    void mousePressEvent(QMouseEvent* event);
+    void mouseMoveEvent(QMouseEvent* event);
 
     /// connect our signals to anEntityScriptingInterface for firing of events related clicking,
     /// hovering over, and entering entities
@@ -87,10 +89,10 @@ public:
     QList<EntityItemID>& getEntitiesLastInScene() { return _entityIDsLastInScene; }
 
 signals:
-    void mousePressOnEntity(const RayToEntityIntersectionResult& intersection, const QMouseEvent* event, unsigned int deviceId);
-    void mousePressOffEntity(const RayToEntityIntersectionResult& intersection, const QMouseEvent* event, unsigned int deviceId);
-    void mouseMoveOnEntity(const RayToEntityIntersectionResult& intersection, const QMouseEvent* event, unsigned int deviceId);
-    void mouseReleaseOnEntity(const RayToEntityIntersectionResult& intersection, const QMouseEvent* event, unsigned int deviceId);
+    void mousePressOnEntity(const RayToEntityIntersectionResult& intersection, const QMouseEvent* event);
+    void mousePressOffEntity(const RayToEntityIntersectionResult& intersection, const QMouseEvent* event);
+    void mouseMoveOnEntity(const RayToEntityIntersectionResult& intersection, const QMouseEvent* event);
+    void mouseReleaseOnEntity(const RayToEntityIntersectionResult& intersection, const QMouseEvent* event);
 
     void clickDownOnEntity(const EntityItemID& entityItemID, const MouseEvent& event);
     void holdingClickOnEntity(const EntityItemID& entityItemID, const MouseEvent& event);
@@ -110,6 +112,7 @@ public slots:
     void entitySciptChanging(const EntityItemID& entityID, const bool reload);
     void entityCollisionWithEntity(const EntityItemID& idA, const EntityItemID& idB, const Collision& collision);
     void updateEntityRenderStatus(bool shouldRenderEntities);
+    void updateZone(const EntityItemID& id);
 
     // optional slots that can be wired to menu items
     void setDisplayModelBounds(bool value) { _displayModelBounds = value; }
@@ -124,28 +127,38 @@ protected:
 
 private:
     void addEntityToScene(EntityItemPointer entity);
+    bool findBestZoneAndMaybeContainingEntities(const glm::vec3& avatarPosition, QVector<EntityItemID>* entitiesContainingAvatar);
 
     void applyZonePropertiesToScene(std::shared_ptr<ZoneEntityItem> zone);
     void checkAndCallPreload(const EntityItemID& entityID, const bool reload = false);
 
-    QList<Model*> _releasedModels;
+    QList<ModelPointer> _releasedModels;
     RayToEntityIntersectionResult findRayIntersectionWorker(const PickRay& ray, Octree::lockType lockType,
-                                                                bool precisionPicking, const QVector<EntityItemID>& entityIdsToInclude = QVector<EntityItemID>());
+                                                                bool precisionPicking, const QVector<EntityItemID>& entityIdsToInclude = QVector<EntityItemID>(),
+                                                                const QVector<EntityItemID>& entityIdsToDiscard = QVector<EntityItemID>());
 
     EntityItemID _currentHoverOverEntityID;
     EntityItemID _currentClickingOnEntityID;
 
     QScriptValueList createEntityArgs(const EntityItemID& entityID);
-    void checkEnterLeaveEntities();
+    bool checkEnterLeaveEntities();
     void leaveAllEntities();
     void forceRecheckEntities();
 
-    glm::vec3 _lastAvatarPosition;
-    bool _pendingSkyboxTextureDownload = false;
+    glm::vec3 _lastAvatarPosition { 0.0f };
     QVector<EntityItemID> _currentEntitiesInside;
-    
+
+    bool _pendingSkyboxTexture { false };
+    NetworkTexturePointer _skyboxTexture;
+
+    bool _pendingAmbientTexture { false };
+    NetworkTexturePointer _ambientTexture;
+
     bool _wantScripts;
     ScriptEngine* _entitiesScriptEngine;
+
+    bool isCollisionOwner(const QUuid& myNodeID, EntityTreePointer entityTree,
+                          const EntityItemID& id, const Collision& collision);
 
     void playEntityCollisionSound(const QUuid& myNodeID, EntityTreePointer entityTree,
                                   const EntityItemID& id, const Collision& collision);
@@ -157,13 +170,17 @@ private:
     bool _displayModelBounds;
     bool _dontDoPrecisionPicking;
     
-    bool _shuttingDown = false;
+    bool _shuttingDown { false };
 
     QMultiMap<QUrl, EntityItemID> _waitingOnPreload;
 
-    bool _hasPreviousZone = false;
+    bool _hasPreviousZone { false };
     std::shared_ptr<ZoneEntityItem> _bestZone;
     float _bestZoneVolume;
+
+    quint64 _lastZoneCheck { 0 };
+    const quint64 ZONE_CHECK_INTERVAL = USECS_PER_MSEC * 100; // ~10hz
+    const float ZONE_CHECK_DISTANCE = 0.001f;
 
     glm::vec3 _previousKeyLightColor;
     float _previousKeyLightIntensity;

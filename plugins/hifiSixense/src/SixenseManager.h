@@ -29,14 +29,14 @@ public:
     // Plugin functions
     virtual bool isSupported() const override;
     virtual bool isJointController() const override { return true; }
-    const QString& getName() const override { return NAME; }
-    const QString& getID() const override { return HYDRA_ID_STRING; }
+    virtual const QString& getName() const override { return NAME; }
+    virtual const QString& getID() const override { return HYDRA_ID_STRING; }
 
-    virtual void activate() override;
+    virtual bool activate() override;
     virtual void deactivate() override;
 
     virtual void pluginFocusOutEvent() override { _inputDevice->focusOutEvent(); }
-    virtual void pluginUpdate(float deltaTime, bool jointsCaptured) override;
+    virtual void pluginUpdate(float deltaTime, const controller::InputCalibrationData& inputCalibrationData, bool jointsCaptured) override;
 
     virtual void saveSettings() const override;
     virtual void loadSettings() override;
@@ -49,13 +49,8 @@ private:
     static const int CALIBRATION_STATE_IDLE = 0;
     static const int CALIBRATION_STATE_IN_PROGRESS = 1;
     static const int CALIBRATION_STATE_COMPLETE = 2;
-    static const glm::vec3 DEFAULT_AVATAR_POSITION; 
+    static const glm::vec3 DEFAULT_AVATAR_POSITION;
     static const float CONTROLLER_THRESHOLD;
-    
-    template<typename T>
-    using SampleAverage = MovingAverage<T, MAX_NUM_AVERAGING_SAMPLES>;
-    using Samples = std::pair<SampleAverage<glm::vec3>, SampleAverage<glm::vec4>>;
-    using MovingAverageMap = std::map<int, Samples>;
 
     class InputDevice : public controller::InputDevice {
     public:
@@ -66,22 +61,20 @@ private:
         // Device functions
         virtual controller::Input::NamedVector getAvailableInputs() const override;
         virtual QString getDefaultMappingConfig() const override;
-        virtual void update(float deltaTime, bool jointsCaptured) override;
+        virtual void update(float deltaTime, const controller::InputCalibrationData& inputCalibrationData, bool jointsCaptured) override;
         virtual void focusOutEvent() override;
 
         void handleButtonEvent(unsigned int buttons, bool left);
-        void handlePoseEvent(float deltaTime, glm::vec3 position, glm::quat rotation, bool left);
+        void handlePoseEvent(float deltaTime, const controller::InputCalibrationData& inputCalibrationData, const glm::vec3& position, const glm::quat& rotation, bool left);
         void updateCalibration(SixenseControllerData* controllers);
 
         friend class SixenseManager;
-
-        MovingAverageMap _collectedSamples;
 
         int _calibrationState { CALIBRATION_STATE_IDLE };
         // these are calibration results
         glm::vec3 _avatarPosition { DEFAULT_AVATAR_POSITION }; // in hydra-frame
         glm::quat _avatarRotation; // in hydra-frame
-    
+
         float _lastDistance;
         bool _requestReset { false };
         bool _debugDrawRaw { false };
@@ -98,6 +91,8 @@ private:
 
     static const QString NAME;
     static const QString HYDRA_ID_STRING;
+
+    static bool _sixenseLoaded;
 };
 
 #endif // hifi_SixenseManager_h

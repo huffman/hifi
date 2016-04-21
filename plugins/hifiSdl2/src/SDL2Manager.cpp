@@ -99,15 +99,19 @@ void SDL2Manager::deinit() {
 #endif
 }
 
-void SDL2Manager::activate() {
+bool SDL2Manager::activate() {
+    InputPlugin::activate();
+
 #ifdef HAVE_SDL2
     auto userInputMapper = DependencyManager::get<controller::UserInputMapper>();
     for (auto joystick : _openJoysticks) {
         userInputMapper->registerDevice(joystick);
         emit joystickAdded(joystick.get());
     }
+    return true;
+#else
+    return false;
 #endif
-    InputPlugin::activate();
 }
 
 void SDL2Manager::deactivate() {
@@ -138,12 +142,12 @@ void SDL2Manager::pluginFocusOutEvent() {
 #endif
 }
 
-void SDL2Manager::pluginUpdate(float deltaTime, bool jointsCaptured) {
+void SDL2Manager::pluginUpdate(float deltaTime, const controller::InputCalibrationData& inputCalibrationData, bool jointsCaptured) {
 #ifdef HAVE_SDL2
     if (_isInitialized) {
         auto userInputMapper = DependencyManager::get<controller::UserInputMapper>();
         for (auto joystick : _openJoysticks) {
-            joystick->update(deltaTime, jointsCaptured);
+            joystick->update(deltaTime, inputCalibrationData, jointsCaptured);
         }
         
         PerformanceTimer perfTimer("SDL2Manager::update");

@@ -15,6 +15,8 @@
 #include "AbstractLoggerInterface.h"
 #include <GenericQueueThread.h>
 
+#include <QtCore/QFile>
+
 class FileLogger : public AbstractLoggerInterface {
     Q_OBJECT
 
@@ -22,14 +24,36 @@ public:
     FileLogger(QObject* parent = NULL);
     virtual ~FileLogger();
 
+    QString getFilename() { return _fileName; }
     virtual void addMessage(const QString&) override;
     virtual QString getLogData() override;
     virtual void locateLog() override;
+
+signals:
+    void rollingLogFile(QString newFilename);
 
 private:
     const QString _fileName;
     friend class FilePersistThread;
 };
+
+class FilePersistThread : public GenericQueueThread < QString > {
+    Q_OBJECT
+public:
+    FilePersistThread(const FileLogger& logger);
+
+signals:
+    void rollingLogFile(QString newFilename);
+
+protected:
+    void rollFileIfNecessary(QFile& file, bool notifyListenersIfRolled = true);
+    virtual bool processQueueItems(const Queue& messages);
+
+private:
+    const FileLogger& _logger;
+    uint64_t _lastRollTime;
+};
+
 
 
 

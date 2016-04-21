@@ -110,12 +110,25 @@ Tool = function(properties, selectable, selected) { // selectable and selected a
     }
     
     this.select(selected);
-    
+
+    this.isButtonDown = false;
+    this.buttonDown = function (down) {
+        if (down !== this.isButtonDown) {
+            properties.subImage.y = (down ? 0 : 1) * properties.subImage.height;
+            Overlays.editOverlay(this.overlay(), { subImage: properties.subImage });
+            this.isButtonDown = down;
+        }
+    }
+
     this.baseClicked = this.clicked;
     this.clicked = function(clickedOverlay, update) {
         if (this.baseClicked(clickedOverlay)) {
-            if (selectable && update) {
-                this.toggle();
+            if (update) {
+                if (selectable) {
+                    this.toggle();
+                } else if (properties.showButtonDown) {
+                    this.buttonDown(true);
+                }
             }
             return true;
         }
@@ -131,15 +144,16 @@ ToolBar = function(x, y, direction, optionalPersistenceKey, optionalInitialPosit
     this.x = x;
     this.y = y;
     this.width = 0;
-    this.height = ToolBar.TITLE_BAR_HEIGHT;
-    this.back = this.back = Overlays.addOverlay("text", {
-                    backgroundColor: { red: 255, green: 255, blue: 255 },
+    this.height = 0
+    this.backAlpha = 1.0;
+    this.back = Overlays.addOverlay("rectangle", {
+                    color: { red: 255, green: 255, blue: 255 },
                     x: this.x,
                     y: this.y,
+                    radius: 4,
                     width: this.width,
                     height: this.height,
-                    alpha: 1.0,
-                    backgroundAlpha: 1.0,
+                    alpha: this.backAlpha,
                     visible: false
                 });
     this.spacing = [];
@@ -246,10 +260,8 @@ ToolBar = function(x, y, direction, optionalPersistenceKey, optionalInitialPosit
                 this.tools[tool].setAlpha(alpha);
             }
             if (this.back != null) {
-                Overlays.editOverlay(this.back, {
-                    alpha: alpha,
-                    backgroundAlpha: alpha
-                });
+                this.backAlpha = alpha;
+                Overlays.editOverlay(this.back, { alpha: alpha });
             }
         } else {
             this.tools[tool].setAlpha(alpha);
@@ -258,9 +270,7 @@ ToolBar = function(x, y, direction, optionalPersistenceKey, optionalInitialPosit
     
     this.setBack = function(color, alpha) {
         if (color == null) {
-            Overlays.editOverlay(this.back, {
-                                 visible: false
-                                 });
+            Overlays.editOverlay(this.back, { visible: false });
         } else {
             Overlays.editOverlay(this.back, {
                                  width: this.width +
@@ -268,8 +278,8 @@ ToolBar = function(x, y, direction, optionalPersistenceKey, optionalInitialPosit
                                  height: this.height +
                                  ((direction == ToolBar.VERTICAL) ? 1 : 2) * ToolBar.SPACING,
                                  visible: true,
-                                 backgroundColor: color,
-                                 backgroundAlpha: alpha
+                                 color: color,
+                                 alpha: alpha
                                  });
         }
     }
@@ -330,21 +340,18 @@ ToolBar = function(x, y, direction, optionalPersistenceKey, optionalInitialPosit
     }
 
     var that = this;
-    this.contains = function (xOrPoint, optionalY) {
+    this.contains = function (xOrPoint, optionalY) {  // All four margins are draggable.
         var x = (optionalY === undefined) ? xOrPoint.x : xOrPoint,
             y = (optionalY === undefined) ? xOrPoint.y : optionalY;
-        return (that.x <= x) && (x <= (that.x + that.width)) &&
-            (that.y <= y) && (y <= (that.y + that.height));
+        return ((that.x - ToolBar.SPACING) <= x) && (x <= (that.x + that.width + ToolBar.SPACING)) &&
+            ((that.y - ToolBar.SPACING) <= y) && (y <= (that.y + that.height));
     }
-    that.hover = function (enable) { // Can be overriden or extended by clients.
+    that.hover = function (enable) {  // Can be overridden or extended by clients.
         that.isHovering = enable;
         if (that.back) {
-            if (enable) {
-                that.oldAlpha = Overlays.getProperty(that.back, 'backgroundAlpha');
-            }
             Overlays.editOverlay(this.back, {
                 visible: enable,
-                backgroundAlpha: enable ? 0.5 : that.oldAlpha
+                alpha: enable ? 0.5 : that.backAlpha
             });
         }
     };
@@ -382,6 +389,11 @@ ToolBar = function(x, y, direction, optionalPersistenceKey, optionalInitialPosit
             that.mightBeDragging = false;
         }
     };
+    this.mouseReleaseEvent = function (event) {
+        for (var tool in that.tools) {
+            that.tools[tool].buttonDown(false);
+        }
+    }
     this.mouseMove  = function (event) {
         if (!that.mightBeDragging || !event.isLeftButton) {
             that.mightBeDragging = false;
@@ -405,6 +417,7 @@ ToolBar = function(x, y, direction, optionalPersistenceKey, optionalInitialPosit
         }
     };
     Controller.mousePressEvent.connect(this.mousePressEvent);
+    Controller.mouseReleaseEvent.connect(this.mouseReleaseEvent);
     Controller.mouseMoveEvent.connect(this.mouseMove);
     Script.update.connect(that.checkResize);
     // This compatability hack breaks the model, but makes converting existing scripts easier:
@@ -437,7 +450,6 @@ ToolBar = function(x, y, direction, optionalPersistenceKey, optionalInitialPosit
         }
     }
 }
-ToolBar.SPACING = 4;
+ToolBar.SPACING = 6;
 ToolBar.VERTICAL = 0;
 ToolBar.HORIZONTAL = 1;
-ToolBar.TITLE_BAR_HEIGHT = 10;

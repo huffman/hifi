@@ -36,7 +36,7 @@ AnimationPointer AnimationCache::getAnimation(const QUrl& url) {
 
 QSharedPointer<Resource> AnimationCache::createResource(const QUrl& url, const QSharedPointer<Resource>& fallback,
         bool delayLoad, const void* extra) {
-    return QSharedPointer<Resource>(new Animation(url), &Resource::allReferencesCleared);
+    return QSharedPointer<Resource>(new Animation(url), &Resource::deleter);
 }
 
 Animation::Animation(const QUrl& url) : Resource(url) {}
@@ -47,6 +47,11 @@ AnimationReader::AnimationReader(const QUrl& url, const QByteArray& data) :
 }
 
 void AnimationReader::run() {
+    auto originalPriority = QThread::currentThread()->priority();
+    if (originalPriority == QThread::InheritPriority) {
+        originalPriority = QThread::NormalPriority;
+    }
+    QThread::currentThread()->setPriority(QThread::LowPriority);
     try {
         if (_data.isEmpty()) {
             throw QString("Reply is NULL ?!");
@@ -73,6 +78,7 @@ void AnimationReader::run() {
     } catch (const QString& error) {
         emit onError(299, error);
     }
+    QThread::currentThread()->setPriority(originalPriority);
 }
 
 bool Animation::isLoaded() const {
@@ -126,6 +132,7 @@ void Animation::animationParseSuccess(FBXGeometry* geometry) {
 void Animation::animationParseError(int error, QString str) {
     qCCritical(animation) << "Animation failure parsing " << _url.toDisplayString() << "code =" << error << str;
     emit failed(QNetworkReply::UnknownContentError);
+    finishedLoading(false);
 }
 
 AnimationDetails::AnimationDetails() :

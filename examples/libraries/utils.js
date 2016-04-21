@@ -28,7 +28,6 @@ colorMix = function(colorA, colorB, mix) {
     }
     return result;
 }
-
 scaleLine = function (start, end, scale) {
     var v = Vec3.subtract(end, start);
     var length = Vec3.length(v);
@@ -199,7 +198,7 @@ pointInExtents = function(point, minPoint, maxPoint) {
  * @param   Number  l       The lightness
  * @return  Array           The RGB representation
  */
-hslToRgb = function(hsl, hueOffset) {
+hslToRgb = function(hsl) {
     var r, g, b;
     if (hsl.s == 0) {
         r = g = b = hsl.l; // achromatic
@@ -262,6 +261,16 @@ randInt = function(low, high) {
     return Math.floor(randFloat(low, high));
 }
 
+
+randomColor = function() {
+    return {
+                red: randInt(0, 255),
+                green: randInt(0, 255),
+                blue: randInt(0, 255)
+            }
+}
+
+
 hexToRgb = function(hex) {
     var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return result ? {
@@ -270,4 +279,35 @@ hexToRgb = function(hex) {
         blue: parseInt(result[3], 16)
     } : null;
 }
+
+calculateHandSizeRatio = function() {
+    // Get the ratio of the current avatar's hand to Owen's hand
+
+    var standardCenterHandPoint = 0.11288;
+    var jointNames = MyAvatar.getJointNames();
+    //get distance from handJoint up to leftHandIndex3 as a proxy for center of hand
+    var wristToFingertipDistance = 0;;
+    for (var i = 0; i < jointNames.length; i++) {
+        var jointName = jointNames[i];
+        print(jointName)
+        if (jointName.indexOf("LeftHandIndex") !== -1) {
+            // translations are relative to parent joint, so simply add them together
+            // joints face down the y-axis
+            var translation = MyAvatar.getDefaultJointTranslation(i).y;
+            wristToFingertipDistance += translation;
+        }
+    }
+    // Right now units are in cm, so convert to meters
+    wristToFingertipDistance /= 100;
+
+    var centerHandPoint = wristToFingertipDistance/2;
+
+    // Compare against standard hand (Owen)
+    var handSizeRatio = centerHandPoint/standardCenterHandPoint;
+    return handSizeRatio;
+}
+
+clamp = function(val, min, max){
+     return Math.max(min, Math.min(max, val))
+ } 
 

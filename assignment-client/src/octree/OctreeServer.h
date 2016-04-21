@@ -21,7 +21,6 @@
 #include <HTTPManager.h>
 
 #include <ThreadedAssignment.h>
-#include <EnvironmentData.h>
 
 #include "OctreePersistThread.h"
 #include "OctreeSendThread.h"
@@ -124,13 +123,12 @@ public:
     bool handleHTTPRequest(HTTPConnection* connection, const QUrl& url, bool skipSubHandler);
 
     virtual void aboutToFinish();
-    void forceNodeShutdown(SharedNodePointer node);
 
 public slots:
     /// runs the octree server assignment
     void run();
-    void nodeAdded(SharedNodePointer node);
-    void nodeKilled(SharedNodePointer node);
+    virtual void nodeAdded(SharedNodePointer node);
+    virtual void nodeKilled(SharedNodePointer node);
     void sendStatsPacket();
 
 private slots:
@@ -138,8 +136,12 @@ private slots:
     void handleOctreeQueryPacket(QSharedPointer<ReceivedMessage> message, SharedNodePointer senderNode);
     void handleOctreeDataNackPacket(QSharedPointer<ReceivedMessage> message, SharedNodePointer senderNode);
     void handleJurisdictionRequestPacket(QSharedPointer<ReceivedMessage> message, SharedNodePointer senderNode);
+    void removeSendThread();
 
 protected:
+    using UniqueSendThread = std::unique_ptr<OctreeSendThread>;
+    using SendThreads = std::unordered_map<QUuid, UniqueSendThread>;
+    
     virtual OctreePointer createTree() = 0;
     bool readOptionBool(const QString& optionName, const QJsonObject& settingsSectionObject, bool& result);
     bool readOptionInt(const QString& optionName, const QJsonObject& settingsSectionObject, int& result);
@@ -153,6 +155,8 @@ protected:
     QString getFileLoadTime();
     QString getConfiguration();
     QString getStatusLink();
+    
+    UniqueSendThread createSendThread(const SharedNodePointer& node);
 
     int _argc;
     const char** _argv;
@@ -165,7 +169,7 @@ protected:
     int _statusPort;
     QString _statusHost;
 
-    char _persistFilename[MAX_FILENAME_LENGTH];
+    QString _persistFilePath;
     QString _persistAsFileType;
     int _packetsPerClientPerInterval;
     int _packetsTotalPerInterval;
@@ -187,11 +191,11 @@ protected:
     int _backupInterval;
     int _maxBackupVersions;
 
-    static OctreeServer* _instance;
-
     time_t _started;
     quint64 _startedUSecs;
     QString _safeServerName;
+    
+    SendThreads _sendThreads;
 
     static int _clientCount;
     static SimpleMovingAverage _averageLoopTime;

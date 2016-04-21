@@ -32,16 +32,16 @@ public:
     // TODO: eventually only include properties changed since the params.lastViewFrustumSent time
     virtual EntityPropertyFlags getEntityProperties(EncodeBitstreamParams& params) const;
 
-    virtual void appendSubclassData(OctreePacketData* packetData, EncodeBitstreamParams& params, 
+    virtual void appendSubclassData(OctreePacketData* packetData, EncodeBitstreamParams& params,
                                     EntityTreeElementExtraEncodeData* entityTreeElementExtraEncodeData,
                                     EntityPropertyFlags& requestedProperties,
                                     EntityPropertyFlags& propertyFlags,
                                     EntityPropertyFlags& propertiesDidntFit,
-                                    int& propertyCount, 
+                                    int& propertyCount,
                                     OctreeElement::AppendState& appendState) const;
 
 
-    virtual int readEntitySubclassDataFromBuffer(const unsigned char* data, int bytesLeftToRead, 
+    virtual int readEntitySubclassDataFromBuffer(const unsigned char* data, int bytesLeftToRead,
                                                 ReadBitstreamToTreeParams& args,
                                                 EntityPropertyFlags& propertyFlags, bool overwriteLocalData,
                                                 bool& somethingChanged);
@@ -92,43 +92,62 @@ public:
 
     void setAnimationLoop(bool loop) { _animationLoop.setLoop(loop); }
     bool getAnimationLoop() const { return _animationLoop.getLoop(); }
-    
+
     void setAnimationHold(bool hold) { _animationLoop.setHold(hold); }
     bool getAnimationHold() const { return _animationLoop.getHold(); }
-    
+
     void setAnimationFirstFrame(float firstFrame) { _animationLoop.setFirstFrame(firstFrame); }
     float getAnimationFirstFrame() const { return _animationLoop.getFirstFrame(); }
-    
+
     void setAnimationLastFrame(float lastFrame) { _animationLoop.setLastFrame(lastFrame); }
     float getAnimationLastFrame() const { return _animationLoop.getLastFrame(); }
-    
+
     void mapJoints(const QStringList& modelJointNames);
-    void getAnimationFrame(bool& newFrame, QVector<glm::quat>& rotationsResult, QVector<glm::vec3>& translationsResult);
     bool jointsMapped() const { return _jointMappingURL == getAnimationURL() && _jointMappingCompleted; }
-    
+
     bool getAnimationIsPlaying() const { return _animationLoop.getRunning(); }
     float getAnimationCurrentFrame() const { return _animationLoop.getCurrentFrame(); }
     float getAnimationFPS() const { return _animationLoop.getFPS(); }
 
     static const QString DEFAULT_TEXTURES;
-    const QString& getTextures() const { return _textures; }
-    void setTextures(const QString& textures) { _textures = textures; }
+    const QString getTextures() const;
+    void setTextures(const QString& textures);
 
     virtual bool shouldBePhysical() const;
-    
+
     static void cleanupLoadedAnimations();
-    
+
     virtual glm::vec3 getJointPosition(int jointIndex) const { return glm::vec3(); }
     virtual glm::quat getJointRotation(int jointIndex) const { return glm::quat(); }
+
+    virtual void setJointRotations(const QVector<glm::quat>& rotations);
+    virtual void setJointRotationsSet(const QVector<bool>& rotationsSet);
+    virtual void setJointTranslations(const QVector<glm::vec3>& translations);
+    virtual void setJointTranslationsSet(const QVector<bool>& translationsSet);
+    QVector<glm::quat> getJointRotations() const;
+    QVector<bool> getJointRotationsSet() const;
+    QVector<glm::vec3> getJointTranslations() const;
+    QVector<bool> getJointTranslationsSet() const;
 
 private:
     void setAnimationSettings(const QString& value); // only called for old bitstream format
 
 protected:
-    QVector<glm::quat> _lastKnownFrameDataRotations;
-    QVector<glm::vec3> _lastKnownFrameDataTranslations;
+    // these are used:
+    // - to bounce joint data from an animation into the model/rig.
+    // - to relay changes from scripts to model/rig.
+    // - to relay between network and model/rig
+    // they aren't currently updated from data in the model/rig, and they don't have a direct effect
+    // on what's rendered.
+    ReadWriteLockable _jointDataLock;
+    QVector<glm::quat> _absoluteJointRotationsInObjectFrame;
+    QVector<bool> _absoluteJointRotationsInObjectFrameSet; // ever set?
+    QVector<bool> _absoluteJointRotationsInObjectFrameDirty; // needs a relay to model/rig?
+    QVector<glm::vec3> _absoluteJointTranslationsInObjectFrame;
+    QVector<bool> _absoluteJointTranslationsInObjectFrameSet; // ever set?
+    QVector<bool> _absoluteJointTranslationsInObjectFrameDirty; // needs a relay to model/rig?
     int _lastKnownCurrentFrame;
-
+    virtual void resizeJointArrays(int newSize = -1);
 
     bool isAnimatingSomething() const;
 
@@ -140,12 +159,14 @@ protected:
     AnimationPropertyGroup _animationProperties;
     AnimationLoop _animationLoop;
 
+    mutable QReadWriteLock _texturesLock;
     QString _textures;
+
     ShapeType _shapeType = SHAPE_TYPE_NONE;
 
     // used on client side
     bool _jointMappingCompleted;
-    QVector<int> _jointMapping;
+    QVector<int> _jointMapping; // domain is index into model-joints, range is index into animation-joints
     QString _jointMappingURL;
 
     static AnimationPointer getAnimation(const QString& url);

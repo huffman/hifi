@@ -15,13 +15,12 @@
 
 #include <gpu/Batch.h>
 
-#include <DeferredLightingEffect.h>
 #include <GeometryCache.h>
 #include <ObjectMotionState.h>
 #include <PerfStat.h>
 
-#include "../render-utils/simple_vert.h"
-#include "../render-utils/simple_frag.h"
+#include <render-utils/simple_vert.h>
+#include <render-utils/simple_frag.h>
 
 EntityItemPointer RenderableBoxEntityItem::factory(const EntityItemID& entityID, const EntityItemProperties& properties) {
     EntityItemPointer entity{ new RenderableBoxEntityItem(entityID) };
@@ -32,7 +31,9 @@ EntityItemPointer RenderableBoxEntityItem::factory(const EntityItemID& entityID,
 void RenderableBoxEntityItem::setUserData(const QString& value) {
     if (value != getUserData()) {
         BoxEntityItem::setUserData(value);
-        _procedural.reset();
+        if (_procedural) {
+            _procedural->parse(value);
+        }
     }
 }
 
@@ -40,7 +41,6 @@ void RenderableBoxEntityItem::render(RenderArgs* args) {
     PerformanceTimer perfTimer("RenderableBoxEntityItem::render");
     Q_ASSERT(getType() == EntityTypes::Box);
     Q_ASSERT(args->_batch);
-
 
     if (!_procedural) {
         _procedural.reset(new Procedural(this->getUserData()));
@@ -56,14 +56,20 @@ void RenderableBoxEntityItem::render(RenderArgs* args) {
     gpu::Batch& batch = *args->_batch;
     glm::vec4 cubeColor(toGlm(getXColor()), getLocalRenderAlpha());
 
+    bool success;
+    auto transToCenter = getTransformToCenter(success);
+    if (!success) {
+        return;
+    }
+
+    batch.setModelTransform(transToCenter); // we want to include the scale as well
     if (_procedural->ready()) {
-        batch.setModelTransform(getTransformToCenter()); // we want to include the scale as well
         _procedural->prepare(batch, getPosition(), getDimensions());
         auto color = _procedural->getColor(cubeColor);
         batch._glColor4f(color.r, color.g, color.b, color.a);
         DependencyManager::get<GeometryCache>()->renderCube(batch);
     } else {
-        DependencyManager::get<DeferredLightingEffect>()->renderSolidCubeInstance(batch, getTransformToCenter(), cubeColor);
+        DependencyManager::get<GeometryCache>()->renderSolidCubeInstance(batch, cubeColor);
     }
     static const auto triCount = DependencyManager::get<GeometryCache>()->getCubeTriangleCount();
     args->_details._trianglesRendered += (int)triCount;

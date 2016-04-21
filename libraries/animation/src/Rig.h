@@ -67,14 +67,23 @@ public:
     struct HandParameters {
         bool isLeftEnabled;
         bool isRightEnabled;
+        float bodyCapsuleRadius;
+        float bodyCapsuleHalfHeight;
+        glm::vec3 bodyCapsuleLocalOffset;
         glm::vec3 leftPosition = glm::vec3();     // rig space
         glm::quat leftOrientation = glm::quat();  // rig space (z forward)
         glm::vec3 rightPosition = glm::vec3();    // rig space
         glm::quat rightOrientation = glm::quat(); // rig space (z forward)
-        float leftTrigger = 0.0f;
-        float rightTrigger = 0.0f;
     };
 
+    enum class CharacterControllerState {
+        Ground = 0,
+        Takeoff,
+        InAir,
+        Hover
+    };
+
+    Rig() {}
     virtual ~Rig() {}
 
     void destroyAnimGraph();
@@ -91,6 +100,7 @@ public:
     bool jointStatesEmpty();
     int getJointStateCount() const;
     int indexOfJoint(const QString& jointName) const;
+    QString nameOfJoint(int jointIndex) const;
 
     void setModelOffset(const glm::mat4& modelOffsetMat);
 
@@ -142,7 +152,7 @@ public:
     glm::mat4 getJointTransform(int jointIndex) const;
 
     // Start or stop animations as needed.
-    void computeMotionAnimationState(float deltaTime, const glm::vec3& worldPosition, const glm::vec3& worldVelocity, const glm::quat& worldRotation);
+    void computeMotionAnimationState(float deltaTime, const glm::vec3& worldPosition, const glm::vec3& worldVelocity, const glm::quat& worldRotation, CharacterControllerState ccState);
 
     // Regardless of who started the animations or how many, update the joints.
     void updateAnimations(float deltaTime, glm::mat4 rootTransform);
@@ -209,6 +219,10 @@ public:
 
     void computeAvatarBoundingCapsule(const FBXGeometry& geometry, float& radiusOut, float& heightOut, glm::vec3& offsetOut) const;
 
+    void setEnableInverseKinematics(bool enable);
+
+    const glm::mat4& getGeometryToRigTransform() const { return _geometryToRigTransform; }
+
  protected:
     bool isIndexValid(int index) const { return _animSkeleton && index >= 0 && index < _animSkeleton->getNumJoints(); }
     void updateAnimationStateHandlers();
@@ -221,8 +235,6 @@ public:
                                  glm::vec3& neckPositionOut, glm::quat& neckOrientationOut) const;
     void updateEyeJoint(int index, const glm::vec3& modelTranslation, const glm::quat& modelRotation, const glm::quat& worldHeadOrientation, const glm::vec3& lookAt, const glm::vec3& saccade);
     void calcAnimAlpha(float speed, const std::vector<float>& referenceSpeeds, float* alphaOut) const;
-
-    void computeEyesInRootFrame(const AnimPoseVec& poses);
 
     AnimPose _modelOffset;  // model to rig space
     AnimPose _geometryOffset; // geometry to model space (includes unit offset & fst offsets)
@@ -269,7 +281,10 @@ public:
     enum class RigRole {
         Idle = 0,
         Turn,
-        Move
+        Move,
+        Hover,
+        Takeoff,
+        InAir
     };
     RigRole _state { RigRole::Idle };
     RigRole _desiredState { RigRole::Idle };
@@ -289,6 +304,11 @@ public:
 
     std::map<QString, AnimNode::Pointer> _origRoleAnimations;
     std::vector<AnimNode::Pointer> _prefetchedAnimations;
+
+    bool _lastEnableInverseKinematics { true };
+    bool _enableInverseKinematics { true };
+
+    mutable uint32_t _jointNameWarningCount { 0 };
 
 private:
     QMap<int, StateHandler> _stateHandlers;

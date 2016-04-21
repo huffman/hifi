@@ -16,6 +16,7 @@
 #include "Format.h"
 
 #include <vector>
+#include <atomic>
 
 #include <memory>
 #ifdef _DEBUG
@@ -109,7 +110,15 @@ protected:
 };
 
 class Buffer : public Resource {
+    static std::atomic<uint32_t> _bufferCPUCount;
+    static std::atomic<Size> _bufferCPUMemoryUsage;
+    static void updateBufferCPUMemoryUsage(Size prevObjectSize, Size newObjectSize);
+
 public:
+    static uint32_t getBufferCPUCount();
+    static Size getBufferCPUMemoryUsage();
+    static uint32_t getBufferGPUCount();
+    static Size getBufferGPUMemoryUsage();
 
     Buffer();
     Buffer(Size size, const Byte* bytes);
@@ -153,16 +162,11 @@ public:
     const Sysmem& getSysmem() const { assert(_sysmem); return (*_sysmem); }
     Sysmem& editSysmem() { assert(_sysmem); return (*_sysmem); }
 
+    const GPUObjectPointer gpuObject {};
+    
 protected:
 
     Sysmem* _sysmem = NULL;
-
-
-    // This shouldn't be used by anything else than the Backend class with the proper casting.
-    mutable GPUObject* _gpuObject = NULL;
-    void setGPUObject(GPUObject* gpuObject) const { _gpuObject = gpuObject; }
-    GPUObject* getGPUObject() const { return _gpuObject; }
-    friend class Backend;
 };
 
 typedef std::shared_ptr<Buffer> BufferPointer;

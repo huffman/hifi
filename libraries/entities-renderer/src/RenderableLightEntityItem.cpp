@@ -36,22 +36,23 @@ void RenderableLightEntityItem::render(RenderArgs* args) {
     glm::vec3 color = toGlm(getXColor());
 
     float intensity = getIntensity();
+    float falloffRadius = getFalloffRadius();
     float exponent = getExponent();
     float cutoff = glm::radians(getCutoff());
 
     if (_isSpotlight) {
         DependencyManager::get<DeferredLightingEffect>()->addSpotLight(position, largestDiameter / 2.0f,
-            color, intensity, rotation, exponent, cutoff);
+            color, intensity, falloffRadius, rotation, exponent, cutoff);
     } else {
         DependencyManager::get<DeferredLightingEffect>()->addPointLight(position, largestDiameter / 2.0f,
-            color, intensity);
+            color, intensity, falloffRadius);
     }
     
 #ifdef WANT_DEBUG
     Q_ASSERT(args->_batch);
     gpu::Batch& batch = *args->_batch;
     batch.setModelTransform(getTransformToCenter());
-    DependencyManager::get<DeferredLightingEffect>()->renderWireSphere(batch, 0.5f, 15, 15, glm::vec4(color, 1.0f));
+    DependencyManager::get<GeometryCache>()->renderWireSphere(batch, 0.5f, 15, 15, glm::vec4(color, 1.0f));
 #endif
 };
 

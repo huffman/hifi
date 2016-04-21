@@ -80,10 +80,19 @@ void Connection::resetRTT() {
     _rttVariance = _rtt / 2;
 }
 
+void Connection::setMaxBandwidth(int maxBandwidth) {
+    _congestionControl->setMaxBandwidth(maxBandwidth);
+}
+
 SendQueue& Connection::getSendQueue() {
     if (!_sendQueue) {
+
+        // we may have a sequence number from the previous inactive queue - re-use that so that the
+        // receiver is getting the sequence numbers it expects (given that the connection must still be active)
+
         // Lasily create send queue
         _sendQueue = SendQueue::create(_parentSocket, _destination);
+        _lastReceivedACK = _sendQueue->getCurrentSequenceNumber();
 
 #ifdef UDT_CONNECTION_DEBUG
         qCDebug(networking) << "Created SendQueue for connection to" << _destination;
@@ -93,12 +102,17 @@ SendQueue& Connection::getSendQueue() {
         QObject::connect(_sendQueue.get(), &SendQueue::packetSent, this, &Connection::recordSentPackets);
         QObject::connect(_sendQueue.get(), &SendQueue::packetRetransmitted, this, &Connection::recordRetransmission);
         QObject::connect(_sendQueue.get(), &SendQueue::queueInactive, this, &Connection::queueInactive);
+        QObject::connect(_sendQueue.get(), &SendQueue::timeout, this, &Connection::queueTimeout);
+        QObject::connect(_sendQueue.get(), &SendQueue::shortCircuitLoss, this, &Connection::queueShortCircuitLoss);
         
         // set defaults on the send queue from our congestion control object and estimatedTimeout()
         _sendQueue->setPacketSendPeriod(_congestionControl->_packetSendPeriod);
         _sendQueue->setSyncInterval(_synInterval);
         _sendQueue->setEstimatedTimeout(estimatedTimeout());
         _sendQueue->setFlowWindowSize(std::min(_flowWindowSize, (int) _congestionControl->_congestionWindowSize));
+
+        // give the randomized sequence number to the congestion control object
+        _congestionControl->setInitialSendSequenceNumber(_sendQueue->getCurrentSequenceNumber());
     }
     
     return *_sendQueue;
@@ -119,6 +133,18 @@ void Connection::queueInactive() {
         
         deactivate();
     }
+}
+
+void Connection::queueTimeout() {
+    updateCongestionControlAndSendQueue([this]{
+        _congestionControl->onTimeout();
+    });
+}
+
+void Connection::queueShortCircuitLoss(quint32 sequenceNumber) {
+    updateCongestionControlAndSendQueue([this, sequenceNumber]{
+        _congestionControl->onLoss(SequenceNumber { sequenceNumber }, SequenceNumber { sequenceNumber });
+    });
 }
 
 void Connection::sendReliablePacket(std::unique_ptr<Packet> packet) {
@@ -277,7 +303,7 @@ void Connection::sendACK(bool wasCausedBySyncTimeout) {
         // grab the up to date packet receive speed and estimated bandwidth
         int32_t packetReceiveSpeed = _receiveWindow.getPacketReceiveSpeed();
         int32_t estimatedBandwidth = _receiveWindow.getEstimatedBandwidth();
-        
+
         // update those values in our connection stats
         _stats.recordReceiveRate(packetReceiveSpeed);
         _stats.recordEstimatedBandwidth(estimatedBandwidth);
@@ -403,7 +429,15 @@ SequenceNumber Connection::nextACK() const {
 bool Connection::processReceivedSequenceNumber(SequenceNumber sequenceNumber, int packetSize, int payloadSize) {
     
     if (!_hasReceivedHandshake) {
-        // refuse to process any packets until we've received the handshake
+        // Refuse to process any packets until we've received the handshake
+        // Send handshake request to re-request a handshake
+        auto handshakeRequestPacket = ControlPacket::create(ControlPacket::HandshakeRequest, 0);
+        _parentSocket->writeBasePacket(*handshakeRequestPacket, _destination);
+
+#ifdef UDT_CONNECTION_DEBUG
+        qCDebug(networking) << "Received packet before receiving handshake, sending HandshakeRequest";
+#endif
+
         return false;
     }
     
@@ -529,6 +563,17 @@ void Connection::processControl(std::unique_ptr<ControlPacket> controlPacket) {
                 processProbeTail(move(controlPacket));
             }
             break;
+        case ControlPacket::HandshakeRequest:
+            if (_hasReceivedHandshakeACK) {
+                // We're already in a state where we've received a handshake ack, so we are likely in a state
+                // where the other end expired our connection. Let's reset.
+
+#ifdef UDT_CONNECTION_DEBUG
+                qCDebug(networking) << "Got handshake request, stopping SendQueue";
+#endif
+                stopSendQueue();
+            }
+            break;
     }
 }
 
@@ -536,7 +581,7 @@ void Connection::processACK(std::unique_ptr<ControlPacket> controlPacket) {
     // read the ACK sub-sequence number
     SequenceNumber currentACKSubSequenceNumber;
     controlPacket->readPrimitive(&currentACKSubSequenceNumber);
-    
+
     // Check if we need send an ACK2 for this ACK
     // This will be the case if it has been longer than the sync interval OR
     // it looks like they haven't received our ACK2 for this ACK
@@ -720,15 +765,28 @@ void Connection::processNAK(std::unique_ptr<ControlPacket> controlPacket) {
 }
 
 void Connection::processHandshake(std::unique_ptr<ControlPacket> controlPacket) {
+    SequenceNumber initialSequenceNumber;
+    controlPacket->readPrimitive(&initialSequenceNumber);
     
-    if (!_hasReceivedHandshake || _isReceivingData) {
+    if (!_hasReceivedHandshake || initialSequenceNumber != _initialReceiveSequenceNumber) {
         // server sent us a handshake - we need to assume this means state should be reset
         // as long as we haven't received a handshake yet or we have and we've received some data
+
+#ifdef UDT_CONNECTION_DEBUG
+        if (initialSequenceNumber != _initialReceiveSequenceNumber) {
+            qCDebug(networking) << "Resetting receive state, received a new initial sequence number in handshake";
+        }
+#endif
         resetReceiveState();
+        _initialReceiveSequenceNumber = initialSequenceNumber;
+        _lastReceivedSequenceNumber = initialSequenceNumber - 1;
+        _lastSentACK = initialSequenceNumber - 1;
     }
     
     // immediately respond with a handshake ACK
-    static auto handshakeACK = ControlPacket::create(ControlPacket::HandshakeACK, 0);
+    static auto handshakeACK = ControlPacket::create(ControlPacket::HandshakeACK, sizeof(SequenceNumber));
+    handshakeACK->seek(0);
+    handshakeACK->writePrimitive(initialSequenceNumber);
     _parentSocket->writeBasePacket(*handshakeACK, _destination);
     
     // indicate that handshake has been received
@@ -738,8 +796,11 @@ void Connection::processHandshake(std::unique_ptr<ControlPacket> controlPacket) 
 void Connection::processHandshakeACK(std::unique_ptr<ControlPacket> controlPacket) {
     // if we've decided to clean up the send queue then this handshake ACK should be ignored, it's useless
     if (_sendQueue) {
+        SequenceNumber initialSequenceNumber;
+        controlPacket->readPrimitive(&initialSequenceNumber);
+
         // hand off this handshake ACK to the send queue so it knows it can start sending
-        getSendQueue().handshakeACK();
+        getSendQueue().handshakeACK(initialSequenceNumber);
         
         // indicate that handshake ACK was received
         _hasReceivedHandshakeACK = true;

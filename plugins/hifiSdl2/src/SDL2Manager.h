@@ -29,18 +29,18 @@ public:
     // Plugin functions
     virtual bool isSupported() const override;
     virtual bool isJointController() const override { return false; }
-    const QString& getName() const override { return NAME; }
+    virtual const QString& getName() const override { return NAME; }
 
     virtual void init() override;
     virtual void deinit() override;
 
     /// Called when a plugin is being activated for use.  May be called multiple times.
-    virtual void activate() override;
+    virtual bool activate() override;
     /// Called when a plugin is no longer being used.  May be called multiple times.
     virtual void deactivate() override;
 
     virtual void pluginFocusOutEvent() override;
-    virtual void pluginUpdate(float deltaTime, bool jointsCaptured) override;
+    virtual void pluginUpdate(float deltaTime, const controller::InputCalibrationData& inputCalibrationData, bool jointsCaptured) override;
     
 signals:
     void joystickAdded(Joystick* joystick);

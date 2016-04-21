@@ -8,6 +8,7 @@
 #pragma once
 
 #include <functional>
+#include <atomic>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -23,8 +24,7 @@ class QImage;
 
 enum Eye {
     Left,
-    Right,
-    Mono
+    Right
 };
 
 /*
@@ -50,9 +50,17 @@ class QWindow;
 
 #define AVERAGE_HUMAN_IPD 0.064f
 
+namespace gpu {
+    class Texture;
+    using TexturePointer = std::shared_ptr<Texture>;
+}
+
 class DisplayPlugin : public Plugin {
     Q_OBJECT
+    using Parent = Plugin;
 public:
+    bool activate() override;
+    void deactivate() override;
     virtual bool isHmd() const { return false; }
     virtual int getHmdScreen() const { return -1; }
     /// By default, all HMDs are stereo
@@ -60,22 +68,26 @@ public:
     virtual bool isThrottled() const { return false; }
     virtual float getTargetFrameRate() { return 0.0f; }
 
-    // Rendering support
+    /// Returns a boolean value indicating whether the display is currently visible 
+    /// to the user.  For monitor displays, false might indicate that a screensaver,
+    /// or power-save mode is active.  For HMDs it may reflect a sensor indicating
+    /// whether the HMD is being worn
+    virtual bool isDisplayVisible() const { return false; }
 
-    // Stop requesting renders, but don't do full deactivation
-    // needed to work around the issues caused by Oculus 
-    // processing messages in the middle of submitFrame
-    virtual void stop() = 0;
+    virtual QString getPreferredAudioInDevice() const { return QString(); }
+    virtual QString getPreferredAudioOutDevice() const { return QString(); }
+
+    // Rendering support
 
     /**
      *  Sends the scene texture to the display plugin.
      */
-    virtual void submitSceneTexture(uint32_t frameIndex, uint32_t sceneTexture, const glm::uvec2& sceneSize) = 0;
+    virtual void submitSceneTexture(uint32_t frameIndex, const gpu::TexturePointer& sceneTexture) = 0;
 
     /**
     *  Sends the scene texture to the display plugin.
     */
-    virtual void submitOverlayTexture(uint32_t overlayTexture, const glm::uvec2& overlaySize) = 0;
+    virtual void submitOverlayTexture(const gpu::TexturePointer& overlayTexture) = 0;
 
     // Does the rendering surface have current focus?
     virtual bool hasFocus() const = 0;
@@ -94,9 +106,14 @@ public:
     }
 
     // Stereo specific methods
-    virtual glm::mat4 getProjection(Eye eye, const glm::mat4& baseProjection) const {
+    virtual glm::mat4 getEyeProjection(Eye eye, const glm::mat4& baseProjection) const {
         return baseProjection;
     }
+
+    virtual glm::mat4 getCullingProjection(const glm::mat4& baseProjection) const {
+        return baseProjection;
+    }
+
 
     // Fetch the most recently displayed image as a QImage
     virtual QImage getScreenshot() const = 0;
@@ -107,8 +124,12 @@ public:
         static const glm::mat4 transform; return transform;
     }
 
-    virtual glm::mat4 getHeadPose(uint32_t frameIndex) const {
-        static const glm::mat4 pose; return pose;
+    // will query the underlying hmd api to compute the most recent head pose
+    virtual void beginFrameRender(uint32_t frameIndex) {}
+
+    // returns a copy of the most recent head pose, computed via updateHeadPose
+    virtual glm::mat4 getHeadPose() const {
+        return glm::mat4();
     }
 
     // Needed for timewarp style features
@@ -122,10 +143,19 @@ public:
     virtual void resetSensors() {}
     virtual float devicePixelRatio() { return 1.0f; }
     virtual float presentRate() { return -1.0f; }
+    uint32_t presentCount() const { return _presentedFrameIndex; }
+
+    virtual void cycleDebugOutput() {}
 
     static const QString& MENU_PATH();
+
 signals:
     void recommendedFramebufferSizeChanged(const QSize & size);
-    void requestRender();
+
+protected:
+    void incrementPresentCount() { ++_presentedFrameIndex; }
+
+private:
+    std::atomic<uint32_t> _presentedFrameIndex;
 };
 

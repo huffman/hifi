@@ -13,6 +13,9 @@
 
 #ifdef HAVE_SIXENSE
 #include <sixense.h>
+#else
+#define SIXENSE_FAILURE -1
+#define SIXENSE_SUCCESS 0
 #endif
 
 #include <QCoreApplication>
@@ -43,11 +46,19 @@ static const unsigned int BUTTON_TRIGGER = 1U << 8;
 
 const glm::vec3 SixenseManager::DEFAULT_AVATAR_POSITION { -0.25f, -0.35f, -0.3f }; // in hydra frame
 const float SixenseManager::CONTROLLER_THRESHOLD { 0.35f };
+bool SixenseManager::_sixenseLoaded = false;
+
+#define BAIL_IF_NOT_LOADED \
+    if (!_sixenseLoaded) { \
+        return; \
+    }
+
+
 
 const QString SixenseManager::NAME = "Sixense";
 const QString SixenseManager::HYDRA_ID_STRING = "Razer Hydra";
 
-const QString MENU_PARENT = "Avatar";
+const QString MENU_PARENT = "Developer";
 const QString MENU_NAME = "Sixense";
 const QString MENU_PATH = MENU_PARENT + ">" + MENU_NAME;
 const QString TOGGLE_SMOOTH = "Smooth Sixense Movement";
@@ -62,15 +73,15 @@ bool SixenseManager::isSupported() const {
 #else
     return true;
 #endif
-    
+
 #else
     return false;
 #endif
 }
 
-void SixenseManager::activate() {
+bool SixenseManager::activate() {
     InputPlugin::activate();
-    
+
 #ifdef HAVE_SIXENSE
     _container->addMenu(MENU_PATH);
     _container->addMenuItem(PluginType::INPUT_PLUGIN, MENU_PATH, TOGGLE_SMOOTH,
@@ -89,11 +100,15 @@ void SixenseManager::activate() {
     userInputMapper->registerDevice(_inputDevice);
 
     loadSettings();
-    sixenseInit();
+    _sixenseLoaded = (sixenseInit() == SIXENSE_SUCCESS);
+    return _sixenseLoaded;
+#else
+    return false;
 #endif
 }
 
 void SixenseManager::deactivate() {
+    BAIL_IF_NOT_LOADED
     InputPlugin::deactivate();
 
 #ifdef HAVE_SIXENSE
@@ -101,7 +116,6 @@ void SixenseManager::deactivate() {
     _container->removeMenu(MENU_PATH);
 
     _inputDevice->_poseStateMap.clear();
-    _inputDevice->_collectedSamples.clear();
 
     if (_inputDevice->_deviceID != controller::Input::INVALID_DEVICE) {
         auto userInputMapper = DependencyManager::get<controller::UserInputMapper>();
@@ -114,20 +128,23 @@ void SixenseManager::deactivate() {
 }
 
 void SixenseManager::setSixenseFilter(bool filter) {
+    BAIL_IF_NOT_LOADED
 #ifdef HAVE_SIXENSE
     sixenseSetFilterEnabled(filter ? 1 : 0);
 #endif
 }
 
-void SixenseManager::pluginUpdate(float deltaTime, bool jointsCaptured) {
-    _inputDevice->update(deltaTime, jointsCaptured);
+void SixenseManager::pluginUpdate(float deltaTime, const controller::InputCalibrationData& inputCalibrationData, bool jointsCaptured) {
+    BAIL_IF_NOT_LOADED
+    _inputDevice->update(deltaTime, inputCalibrationData, jointsCaptured);
     if (_inputDevice->_requestReset) {
         _container->requestReset();
         _inputDevice->_requestReset = false;
     }
 }
 
-void SixenseManager::InputDevice::update(float deltaTime, bool jointsCaptured) {
+void SixenseManager::InputDevice::update(float deltaTime, const controller::InputCalibrationData& inputCalibrationData, bool jointsCaptured) {
+    BAIL_IF_NOT_LOADED
 #ifdef HAVE_SIXENSE
     _buttonPressedMap.clear();
 
@@ -143,7 +160,6 @@ void SixenseManager::InputDevice::update(float deltaTime, bool jointsCaptured) {
             _axisStateMap.clear();
             _buttonPressedMap.clear();
             _poseStateMap.clear();
-            _collectedSamples.clear();
         }
         return;
     }
@@ -190,17 +206,14 @@ void SixenseManager::InputDevice::update(float deltaTime, bool jointsCaptured) {
             if (!jointsCaptured) {
                 //  Rotation of Palm
                 glm::quat rotation(data->rot_quat[3], data->rot_quat[0], data->rot_quat[1], data->rot_quat[2]);
-                handlePoseEvent(deltaTime, position, rotation, left);
-                rawPoses[i] = controller::Pose(position, rotation, glm::vec3(0), glm::quat());
+                handlePoseEvent(deltaTime, inputCalibrationData, position, rotation, left);
+                rawPoses[i] = controller::Pose(position, rotation, Vectors::ZERO, Vectors::ZERO);
             } else {
                 _poseStateMap.clear();
-                _collectedSamples.clear();
             }
         } else {
             auto hand = left ? controller::StandardPoseChannel::LEFT_HAND : controller::StandardPoseChannel::RIGHT_HAND;
             _poseStateMap[hand] = controller::Pose();
-            _collectedSamples[hand].first.clear();
-            _collectedSamples[hand].second.clear();
         }
     }
 
@@ -246,6 +259,7 @@ void SixenseManager::InputDevice::update(float deltaTime, bool jointsCaptured) {
 }
 
 void SixenseManager::InputDevice::setDebugDrawRaw(bool flag) {
+    BAIL_IF_NOT_LOADED
     _debugDrawRaw = flag;
     if (!flag) {
         DebugDraw::getInstance().removeMyAvatarMarker("SIXENSE_RAW_LEFT");
@@ -254,6 +268,7 @@ void SixenseManager::InputDevice::setDebugDrawRaw(bool flag) {
 }
 
 void SixenseManager::InputDevice::setDebugDrawCalibrated(bool flag) {
+    BAIL_IF_NOT_LOADED
     _debugDrawCalibrated = flag;
     if (!flag) {
         DebugDraw::getInstance().removeMyAvatarMarker("SIXENSE_CALIBRATED_LEFT");
@@ -265,8 +280,8 @@ void SixenseManager::InputDevice::setDebugDrawCalibrated(bool flag) {
 
 // the calibration sequence is:
 // (1) reach arm straight out to the sides (xAxis is to the left)
-// (2) press BUTTON_FWD on both hands and hold for one second
-// (3) release both BUTTON_FWDs
+// (2) press either BUTTON_1 or BUTTON_2 on both hands and hold for one second
+// (3) release both buttons
 //
 // The code will:
 // (4) assume that the orb is on a flat surface (yAxis is UP)
@@ -277,10 +292,12 @@ static const float MAXIMUM_NOISE_LEVEL = 0.05f; // meters
 static const quint64 LOCK_DURATION = USECS_PER_SECOND / 4; // time for lock to be acquired
 
 static bool calibrationRequested(SixenseControllerData* controllers) {
-    return (controllers[0].buttons == BUTTON_FWD && controllers[1].buttons == BUTTON_FWD);
+    return (((controllers[0].buttons == BUTTON_1) || (controllers[0].buttons == BUTTON_2)) &&
+            ((controllers[1].buttons == BUTTON_1) || (controllers[1].buttons == BUTTON_2)));
 }
 
 void SixenseManager::InputDevice::updateCalibration(SixenseControllerData* controllers) {
+    BAIL_IF_NOT_LOADED
     const SixenseControllerData* dataLeft = controllers;
     const SixenseControllerData* dataRight = controllers + 1;
 
@@ -289,7 +306,7 @@ void SixenseManager::InputDevice::updateCalibration(SixenseControllerData* contr
         switch (_calibrationState) {
             case CALIBRATION_STATE_IDLE:
                 return;
-                
+
             case CALIBRATION_STATE_COMPLETE: {
                     // compute calibration results
                     _avatarPosition = -0.5f * (_reachLeft + _reachRight); // neck is midway between right and left hands
@@ -365,11 +382,13 @@ void SixenseManager::InputDevice::updateCalibration(SixenseControllerData* contr
 #endif  // HAVE_SIXENSE
 
 void SixenseManager::InputDevice::focusOutEvent() {
+    BAIL_IF_NOT_LOADED
     _axisStateMap.clear();
     _buttonPressedMap.clear();
 };
 
 void SixenseManager::InputDevice::handleButtonEvent(unsigned int buttons, bool left) {
+    BAIL_IF_NOT_LOADED
     using namespace controller;
     if (buttons & BUTTON_0) {
         _buttonPressedMap.insert(left ? BACK : START);
@@ -394,7 +413,8 @@ void SixenseManager::InputDevice::handleButtonEvent(unsigned int buttons, bool l
     }
 }
 
-void SixenseManager::InputDevice::handlePoseEvent(float deltaTime, glm::vec3 position, glm::quat rotation, bool left) {
+void SixenseManager::InputDevice::handlePoseEvent(float deltaTime, const controller::InputCalibrationData& inputCalibrationData, const glm::vec3& position, const glm::quat& rotation, bool left) {
+    BAIL_IF_NOT_LOADED
 #ifdef HAVE_SIXENSE
     auto hand = left ? controller::StandardPoseChannel::LEFT_HAND : controller::StandardPoseChannel::RIGHT_HAND;
 
@@ -415,7 +435,7 @@ void SixenseManager::InputDevice::handlePoseEvent(float deltaTime, glm::vec3 pos
     auto prevPose = _poseStateMap[hand];
 
     // Transform the measured position into body frame.
-    position = _avatarRotation * (position + _avatarPosition);
+    vec3 pos = _avatarRotation * (position + _avatarPosition);
 
     // From ABOVE the hand canonical axes look like this:
     //
@@ -454,34 +474,29 @@ void SixenseManager::InputDevice::handlePoseEvent(float deltaTime, glm::vec3 pos
     //     rotation = postOffset * Qsh^ * (measuredRotation * preOffset) * Qsh
     //
     // TODO: find a shortcut with fewer rotations.
-    rotation = _avatarRotation * postOffset * glm::inverse(sixenseToHand) * rotation * preOffset * sixenseToHand;
+    glm::quat rot = _avatarRotation * postOffset * glm::inverse(sixenseToHand) * rotation * preOffset * sixenseToHand;
 
     glm::vec3 velocity(0.0f);
-    glm::quat angularVelocity;
+    glm::vec3 angularVelocity(0.0f);
 
-    if (prevPose.isValid() && deltaTime > std::numeric_limits<float>::epsilon()) {
+    glm::mat4 controllerToAvatar = glm::inverse(inputCalibrationData.avatarMat) * inputCalibrationData.sensorToWorldMat;
 
-        velocity = (position - prevPose.getTranslation()) / deltaTime;
+    // transform pose into avatar frame.
+    auto nextPose = controller::Pose(pos, rot, velocity, angularVelocity).transform(controllerToAvatar);
 
-        auto deltaRot = rotation * glm::conjugate(prevPose.getRotation());
-        auto axis = glm::axis(deltaRot);
-        auto angle = glm::angle(deltaRot);
-        angularVelocity = glm::angleAxis(angle / deltaTime, axis);
+    if (prevPose.isValid() && (deltaTime > std::numeric_limits<float>::epsilon())) {
+        nextPose.velocity = (nextPose.getTranslation() - prevPose.getTranslation()) / deltaTime;
 
-        // Average
-        auto& samples = _collectedSamples[hand];
-        samples.first.addSample(velocity);
-        velocity = samples.first.average;
-     
-        // FIXME: // Not using quaternion average yet for angular velocity because it s probably wrong but keep the MovingAverage in place
-        //samples.second.addSample(glm::vec4(angularVelocity.x, angularVelocity.y, angularVelocity.z, angularVelocity.w));
-        //angularVelocity = glm::quat(samples.second.average.w, samples.second.average.x, samples.second.average.y, samples.second.average.z);
-    } else if (!prevPose.isValid()) {
-        _collectedSamples[hand].first.clear();
-        _collectedSamples[hand].second.clear();
+        glm::quat deltaRotation = nextPose.getRotation() * glm::inverse(prevPose.getRotation());
+        float rotationAngle = glm::angle(deltaRotation);
+        if (rotationAngle > EPSILON) {
+            nextPose.angularVelocity = glm::normalize(glm::axis(deltaRotation));
+            nextPose.angularVelocity *= (rotationAngle / deltaTime);
+        }
+
     }
+    _poseStateMap[hand] = nextPose;
 
-    _poseStateMap[hand] = controller::Pose(position, rotation, velocity, angularVelocity);
 #endif // HAVE_SIXENSE
 }
 
