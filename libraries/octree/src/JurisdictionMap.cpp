@@ -272,18 +272,18 @@ std::unique_ptr<NLPacket> JurisdictionMap::packIntoPacket() {
 
     // add the root jurisdiction
     if (_rootOctalCode) {
-        size_t bytes = bytesRequiredForCodeLength(numberOfThreeBitSectionsInCode(_rootOctalCode));
+        uint32_t bytes = bytesRequiredForCodeLength(numberOfThreeBitSectionsInCode(_rootOctalCode));
         // No root or end node details to pack!
         packet->writePrimitive(bytes);
         packet->write(reinterpret_cast<char*>(_rootOctalCode), bytes);
 
         // if and only if there's a root jurisdiction, also include the end nodes
-        int endNodeCount = (int)_endNodes.size();
+        int endNodeCount = (uint32_t)_endNodes.size();
         packet->writePrimitive(endNodeCount);
 
         for (int i=0; i < endNodeCount; i++) {
             unsigned char* endNodeCode = _endNodes[i];
-            size_t bytes = 0;
+            bytes = 0;
             if (endNodeCode) {
                 bytes = bytesRequiredForCodeLength(numberOfThreeBitSectionsInCode(endNodeCode));
             }
@@ -291,7 +291,7 @@ std::unique_ptr<NLPacket> JurisdictionMap::packIntoPacket() {
             packet->write(reinterpret_cast<char*>(endNodeCode), bytes);
         }
     } else {
-        int bytes = 0;
+        uint32_t bytes = 0;
         packet->writePrimitive(bytes);
     }
 
@@ -302,7 +302,7 @@ int JurisdictionMap::unpackFromPacket(ReceivedMessage& message) {
     clear();
     
     // read the root jurisdiction
-    int bytes = 0;
+    uint32_t bytes = 0;
     message.readPrimitive(&bytes);
 
     if (bytes > 0 && bytes <= message.getBytesLeftToRead()) {
@@ -310,11 +310,11 @@ int JurisdictionMap::unpackFromPacket(ReceivedMessage& message) {
         message.read(reinterpret_cast<char*>(_rootOctalCode), bytes);
 
         // if and only if there's a root jurisdiction, also include the end nodes
-        int endNodeCount = 0;
+        uint32_t endNodeCount = 0;
         message.readPrimitive(&endNodeCount);
         
         for (int i = 0; i < endNodeCount; i++) {
-            int bytes = 0;
+            uint32_t bytes = 0;
             message.readPrimitive(&bytes);
 
             if (bytes <= message.getBytesLeftToRead()) {
