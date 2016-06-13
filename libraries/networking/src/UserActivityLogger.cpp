@@ -21,49 +21,71 @@
 
 static const QString USER_ACTIVITY_URL = "/api/v1/user_activities";
 
+static int SEND_EVENTS_PERIOD_SECONDS = 2;
+static int MAX_EVENTS_PER_PERIOD = 40;
+
 UserActivityLogger& UserActivityLogger::getInstance() {
     static UserActivityLogger sharedInstance;
     return sharedInstance;
+}
+
+void UserActivityLogger::appendEvent(const QString& eventType, const QJsonObject& properties) {
+    QJsonObject event {
+//        { "event", eventType },
+//        { "properties", properties }
+        { "action_name", eventType },
+        { "action_details", properties }
+    };
+    _pendingEvents.append(event);
+}
+
+UserActivityLogger::UserActivityLogger() {
+    // start timer
+    _flushEventsTimer.setInterval(SEND_EVENTS_PERIOD_SECONDS * 1000);
+    connect(&_flushEventsTimer, &QTimer::timeout, this, &UserActivityLogger::flushEvents);
+    _flushEventsTimer.start();
+
+}
+
+void UserActivityLogger::flushEvents() {
+    if (_pendingEvents.size() > 0) {
+        if (_pendingEvents.size() == MAX_EVENTS_PER_PERIOD) {
+            qWarning() << "EVENT LIMIT REACHED";
+            appendEvent("event_limit_reached");
+        }
+        qDebug() << "Sending " << _pendingEvents.size() << " events";
+
+        auto accountManager = DependencyManager::get<AccountManager>();
+
+        QJsonObject actions {
+            { "actions", _pendingEvents }
+        };
+        auto data = QJsonDocument(actions).toJson(QJsonDocument::Compact);
+        qDebug().noquote() << "Event data: " << data;
+
+        JSONCallbackParameters params;
+        params.errorCallbackReceiver = this;
+        params.errorCallbackMethod = "requestError";
+
+        _pendingEvents = QJsonArray();
+
+        accountManager->sendRequest(USER_ACTIVITY_URL,
+            AccountManagerAuth::Optional,
+            QNetworkAccessManager::PostOperation,
+            params, data);
+    }
 }
 
 void UserActivityLogger::disable(bool disable) {
     _disabled.set(disable);
 }
 
-void UserActivityLogger::logAction(QString action, QJsonObject details, JSONCallbackParameters params) {
-    if (_disabled.get()) {
+void UserActivityLogger::logAction(QString action, QJsonObject details) {
+    if (_disabled.get() || _pendingEvents.size() == MAX_EVENTS_PER_PERIOD) {
         return;
     }
-    
-    auto accountManager = DependencyManager::get<AccountManager>();
-    QHttpMultiPart* multipart = new QHttpMultiPart(QHttpMultiPart::FormDataType);
-    
-    // Adding the action name
-    QHttpPart actionPart;
-    actionPart.setHeader(QNetworkRequest::ContentDispositionHeader, "form-data; name=\"action_name\"");
-    actionPart.setBody(QByteArray().append(action));
-    multipart->append(actionPart);
-    
-    // If there are action details, add them to the multipart
-    if (!details.isEmpty()) {
-        QHttpPart detailsPart;
-        detailsPart.setHeader(QNetworkRequest::ContentDispositionHeader, "form-data;"
-                              " name=\"action_details\"");
-        detailsPart.setBody(QJsonDocument(details).toJson(QJsonDocument::Compact));
-        multipart->append(detailsPart);
-    }
-    qCDebug(networking) << "Logging activity" << action;
-    
-    // if no callbacks specified, call our owns
-    if (params.isEmpty()) {
-        params.errorCallbackReceiver = this;
-        params.errorCallbackMethod = "requestError";
-    }
-    
-    accountManager->sendRequest(USER_ACTIVITY_URL,
-                               AccountManagerAuth::Optional,
-                               QNetworkAccessManager::PostOperation,
-                               params, NULL, multipart);
+
+    appendEvent(action, details);
 }
 
 void UserActivityLogger::requestError(QNetworkReply& errorReply) {

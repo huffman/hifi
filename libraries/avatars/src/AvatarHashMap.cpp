@@ -44,6 +44,19 @@ bool AvatarHashMap::isAvatarInRange(const glm::vec3& position, const float range
     return false;
 }
 
+int AvatarHashMap::numberOfAvatarsInRange(const glm::vec3& position, float rangeMeters) {
+    auto hashCopy = getHashCopy();
+    int count = 0;
+    for (const AvatarSharedPointer& sharedAvatar : hashCopy) {
+        glm::vec3 avatarPosition = sharedAvatar->getPosition();
+        float distance = glm::distance(avatarPosition, position);
+        if (distance < rangeMeters) {
+            ++count;
+        }
+    }
+    return count;
+}
+
 AvatarSharedPointer AvatarHashMap::newSharedAvatar() {
     return std::make_shared<AvatarData>();
 }

@@ -1,5 +1,4 @@
 //
-//  AccountManager.h
 //  libraries/networking/src
 //
 //  Created by Stephen Birarda on 2/18/2014.
@@ -86,6 +85,7 @@ public:
 
     static QJsonObject dataObjectFromResponse(QNetworkReply& requestReply);
 
+    QUuid getSessionID() const { return _sessionID; }
     void setSessionID(const QUuid& sessionID) { _sessionID = sessionID; }
 
 public slots:
@@ -139,7 +139,7 @@ private:
     bool _isWaitingForKeypairResponse { false };
     QByteArray _pendingPrivateKey;
 
-    QUuid _sessionID;
+    QUuid _sessionID;// { QUuid::createUuid() };
 };
 
 #endif // hifi_AccountManager_h

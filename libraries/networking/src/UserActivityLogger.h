@@ -14,41 +14,49 @@
 
 #include "AccountManager.h"
 
-#include <QObject>
-#include <QString>
-#include <QJsonObject>
-#include <QNetworkReply>
+#include <QJsonArray>
+#include <QTimer>
 
 #include <SettingHandle.h>
 
 class UserActivityLogger : public QObject {
     Q_OBJECT
     
+    struct Event {
+        QString type;
+        QJsonObject properties;
+    };
+
 public:
     static UserActivityLogger& getInstance();
     
-public slots:
-    bool isEnabled() { return !_disabled.get(); }
-
-    void disable(bool disable);
-    void logAction(QString action, QJsonObject details = QJsonObject(), JSONCallbackParameters params = JSONCallbackParameters());
-    
     void launch(QString applicationVersion, bool previousSessionCrashed, int previousSessionRuntime);
-
     void insufficientGLVersion(const QJsonObject& glData);
-    
     void changedDisplayName(QString displayName);
     void changedModel(QString typeOfModel, QString modelURL);
     void changedDomain(QString domainURL);
     void connectedDevice(QString typeOfDevice, QString deviceName);
     void loadedScript(QString scriptName);
     void wentTo(QString destinationType, QString destinationName);
+
+    bool isEnabled() { return !_disabled.get(); }
     
+public slots:
+    void disable(bool disable);
+    void logAction(QString action, QJsonObject details = QJsonObject());
+
 private slots:
     void requestError(QNetworkReply& errorReply);
+    void flushEvents();
     
 private:
-    UserActivityLogger() {};
+    UserActivityLogger();
+
+    void appendEvent(const QString& eventType, const QJsonObject& properties = QJsonObject());
+
+    QTimer _flushEventsTimer { this };
+    QJsonArray _pendingEvents;
+
     Setting::Handle<bool> _disabled { "UserActivityLoggerDisabled", false };
 };
 

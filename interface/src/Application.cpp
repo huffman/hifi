@@ -1057,6 +1057,35 @@ Application::Application(int& argc, char** argv, QElapsedTimer& startupTimer) :
         }
     });
 
+
+
+
+
+
+    QTimer* sendFPSTimer = new QTimer(this);
+    sendFPSTimer->setInterval(10000);
+    connect(sendFPSTimer, &QTimer::timeout, this, [this]() {
+        UserActivityLogger::getInstance().logAction("fps", { { "rate", _frameCounter.rate() } });
+
+        auto avatarManager = DependencyManager::get<AvatarManager>();
+        int nearbyAvatars = avatarManager->numberOfAvatarsInRange(avatarManager->getMyAvatar()->getPosition(), 10) - 1;
+        UserActivityLogger::getInstance().logAction("nearby_avatars", { { "count", nearbyAvatars } });
+    });
+    sendFPSTimer->start();
+
+
+    auto onAddressBarToggled = [this]() {
+        this->disconnect(DependencyManager::get<DialogsManager>().data(), nullptr, nullptr, nullptr);
+
+        // Record time
+        UserActivityLogger::getInstance().logAction("opened_address_bar", { { "uptime_ms", _sessionRunTimer.elapsed() } });
+    };
+    connect(DependencyManager::get<DialogsManager>().data(), &DialogsManager::addressBarToggled, this, onAddressBarToggled);
+
+
+
+
+
     // Make sure we don't time out during slow operations at startup
     updateHeartbeat();
 
