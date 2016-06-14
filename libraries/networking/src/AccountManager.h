@@ -139,7 +139,7 @@ private:
     bool _isWaitingForKeypairResponse { false };
     QByteArray _pendingPrivateKey;
 
-    QUuid _sessionID;// { QUuid::createUuid() };
+    QUuid _sessionID { QUuid::createUuid() };
 };
 
 #endif // hifi_AccountManager_h
