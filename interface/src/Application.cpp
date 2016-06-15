@@ -1073,6 +1073,9 @@ Application::Application(int& argc, char** argv, QElapsedTimer& startupTimer) :
     });
     sendFPSTimer->start();
 
+    connect(DependencyManager::get<AudioClient>().data(), &AudioClient::mutedByMixer, this, []() {
+        UserActivityLogger::getInstance().logAction("received_mute_packet");
+    });
 
     auto onAddressBarToggled = [this]() {
         this->disconnect(DependencyManager::get<DialogsManager>().data(), nullptr, nullptr, nullptr);
