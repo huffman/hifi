@@ -43,6 +43,7 @@
 
 #include <gl/QOpenGLContextWrapper.h>
 
+#include "Trace.h"
 #include <ResourceScriptingInterface.h>
 #include <AccountManager.h>
 #include <AddressManager.h>
@@ -438,6 +439,7 @@ bool setupEssentials(int& argc, char** argv) {
     DependencyManager::set<HMDScriptingInterface>();
     DependencyManager::set<ResourceScriptingInterface>();
 
+    DependencyManager::set<Tracer>();
 
 #if defined(Q_OS_MAC) || defined(Q_OS_WIN)
     DependencyManager::set<SpeechRecognizer>();
@@ -1159,6 +1161,9 @@ void Application::aboutToQuit() {
         }
     }
 
+    DependencyManager::get<Tracer>()->setEnabled(false);
+    DependencyManager::get<Tracer>()->writeToFile("");
+
     getActiveDisplayPlugin()->deactivate();
 
     // Hide Running Scripts dialog so that it gets destroyed in an orderly manner; prevents warnings at shutdown.
@@ -1486,6 +1491,8 @@ void Application::initializeUi() {
 }
 
 void Application::paintGL() {
+    profile::Duration duration { "paintGL" };
+
     // Some plugins process message events, allowing paintGL to be called reentrantly.
     if (_inPaint || _aboutToQuit) {
         return;
@@ -1852,7 +1859,6 @@ bool Application::importSVOFromURL(const QString& urlString) {
 }
 
 bool Application::event(QEvent* event) {
-
     if (!Menu::getInstance()) {
         return false;
     }
