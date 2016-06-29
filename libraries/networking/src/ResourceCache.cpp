@@ -23,6 +23,7 @@
 #include "NodeList.h"
 
 #include "ResourceCache.h"
+#include <Trace.h>
 
 #define clamp(x, min, max) (((x) < (min)) ? (min) :\
                            (((x) > (max)) ? (max) :\
@@ -494,11 +495,15 @@ const int DEFAULT_REQUEST_LIMIT = 10;
 int ResourceCache::_requestLimit = DEFAULT_REQUEST_LIMIT;
 int ResourceCache::_requestsActive = 0;
 
+static int requestID = 0;
+
 Resource::Resource(const QUrl& url) :
+    _requestID(++requestID),
     _url(url),
     _activeUrl(url),
     _request(nullptr) {
     
+
     init();
 }
 
@@ -646,9 +651,12 @@ void Resource::reinsert() {
 
 void Resource::makeRequest() {
     if (_request) {
+        trace::ASYNC_END("Resource:" + getType(), trace::cResource, _requestID);
         _request->disconnect();
         _request->deleteLater();
     }
+
+    trace::ASYNC_BEGIN("Resource:" + getType(), trace::cResource, _requestID, { { "url", _url.toString() }, { "activeURL", _activeUrl.toString() } });
 
     _request = ResourceManager::createResourceRequest(this, _activeUrl);
 
@@ -656,6 +664,7 @@ void Resource::makeRequest() {
         qCDebug(networking).noquote() << "Failed to get request for" << _url.toDisplayString();
         ResourceCache::requestCompleted(_self);
         finishedLoading(false);
+        trace::ASYNC_END("Resource:" + getType(), trace::cResource, _requestID);
         return;
     }
     
@@ -679,6 +688,11 @@ void Resource::handleDownloadProgress(uint64_t bytesReceived, uint64_t bytesTota
 
 void Resource::handleReplyFinished() {
     Q_ASSERT_X(_request, "Resource::handleReplyFinished", "Request should not be null while in handleReplyFinished");
+
+    trace::ASYNC_END("Resource:" + getType(), trace::cResource, _requestID, {
+        { "from_cache", _request->loadedFromCache() },
+        { "size_mb", _bytesTotal / 1000000.0 }
+    });
 
     setSize(_bytesTotal);
 

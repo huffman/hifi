@@ -30,6 +30,7 @@
 #include "NetworkLogging.h"
 #include "udt/PacketHeaders.h"
 #include "SharedUtil.h"
+#include <Trace.h>
 
 const int KEEPALIVE_PING_INTERVAL_MS = 1000;
 
@@ -241,6 +242,10 @@ void NodeList::sendDomainServerCheckIn() {
     if (_isShuttingDown) {
         qCDebug(networking) << "Refusing to send a domain-server check in while shutting down.";
         return;
+    }
+
+    if (false) {
+        trace::INSTANT("DomainServerCheckIn", "g");
     }
     
     if (_publicSockAddr.isNull()) {

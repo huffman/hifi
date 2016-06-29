@@ -41,6 +41,7 @@
 
 #include "DomainServerNodeData.h"
 #include "NodeConnectionData.h"
+#include <Trace.h>
 
 int const DomainServer::EXIT_CODE_REBOOT = 234923;
 
@@ -67,6 +68,8 @@ DomainServer::DomainServer(int argc, char* argv[]) :
 
     LogUtils::init();
     Setting::init();
+
+    Tracer::getInstance();
 
     connect(this, &QCoreApplication::aboutToQuit, this, &DomainServer::aboutToQuit);
 

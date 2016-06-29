@@ -33,7 +33,7 @@ const QSurfaceFormat& getDefaultOpenGLSurfaceFormat() {
 }
 
 const QGLFormat& getDefaultGLFormat() {
-    // Specify an OpenGL 3.3 format using the Core profile.
+    // Specify an OpenGL 3.3 format using the Core trace.
     // That is, no old-school fixed pipeline functionality
     static QGLFormat glFormat;
     static std::once_flag once;

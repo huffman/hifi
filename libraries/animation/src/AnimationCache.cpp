@@ -14,6 +14,7 @@
 
 #include "AnimationCache.h"
 #include "AnimationLogging.h"
+#include <Trace.h>
 
 int animationPointerMetaTypeId = qRegisterMetaType<AnimationPointer>();
 
@@ -48,6 +49,8 @@ AnimationReader::AnimationReader(const QUrl& url, const QByteArray& data) :
 }
 
 void AnimationReader::run() {
+    //trace::ASYNC_BEGIN("AnimationReader::run", trace::cResource, _url.toString(), { { "url", _url.toString() } });
+    trace::Duration d("AnimationReader::run", trace::cResource, { { "url", _url.toString() } });
     auto originalPriority = QThread::currentThread()->priority();
     if (originalPriority == QThread::InheritPriority) {
         originalPriority = QThread::NormalPriority;

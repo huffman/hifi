@@ -99,8 +99,7 @@ public:
         ReceiveFirstAudioPacket
     };
 
-    Q_ENUMS(ConnectionStep);
-
+    Q_ENUM(ConnectionStep);
     const QUuid& getSessionUUID() const { return _sessionUUID; }
     void setSessionUUID(const QUuid& sessionUUID);
 

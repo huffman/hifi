@@ -43,6 +43,7 @@
 
 #include <gl/QOpenGLContextWrapper.h>
 
+#include "Trace.h"
 #include <ResourceScriptingInterface.h>
 #include <AccountManager.h>
 #include <AddressManager.h>
@@ -1608,6 +1609,8 @@ void Application::initializeUi() {
 }
 
 void Application::paintGL() {
+    //trace::Duration duration { "paintGL" };
+
     // Some plugins process message events, allowing paintGL to be called reentrantly.
     if (_inPaint || _aboutToQuit) {
         return;
@@ -1975,7 +1978,6 @@ bool Application::importSVOFromURL(const QString& urlString) {
 }
 
 bool Application::event(QEvent* event) {
-
     if (!Menu::getInstance()) {
         return false;
     }
@@ -3463,6 +3465,8 @@ void Application::updateDialogs(float deltaTime) const {
     }
 }
 
+static bool domainLoadingInProgress = false;
+
 void Application::update(float deltaTime) {
 
     PROFILE_RANGE_EX(__FUNCTION__, 0xffff0000, (uint64_t)_frameCount + 1);
@@ -3473,6 +3477,11 @@ void Application::update(float deltaTime) {
     updateLOD();
 
     if (!_physicsEnabled) {
+        if (!domainLoadingInProgress) {
+            trace::ASYNC_BEGIN("Scene Loading", trace::cDomainLoading, 0);
+            domainLoadingInProgress = true;
+        }
+
         // we haven't yet enabled physics.  we wait until we think we have all the collision information
         // for nearby entities before starting bullet up.
         quint64 now = usecTimestampNow();
@@ -3502,6 +3511,9 @@ void Application::update(float deltaTime) {
                 }
             }
         }
+    } else if (domainLoadingInProgress) {
+        domainLoadingInProgress = false;
+        trace::ASYNC_END("Scene Loading", trace::cDomainLoading, 0);
     }
 
     {

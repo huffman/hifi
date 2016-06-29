@@ -28,6 +28,7 @@
 #include "OctreeLogging.h"
 #include "OctreeUtils.h"
 #include "SharedUtil.h"
+#include <Trace.h>
 
 AtomicUIntStat OctreeElement::_octreeMemoryUsage { 0 };
 AtomicUIntStat OctreeElement::_octcodeMemoryUsage { 0 };
@@ -389,6 +390,7 @@ OctreeElementPointer OctreeElement::addChildAtIndex(int childIndex) {
 
         _isDirty = true;
         markWithChangedTime();
+        trace::INSTANT("EntityAdd", "g");
     }
     return childAt;
 }

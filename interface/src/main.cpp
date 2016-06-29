@@ -26,6 +26,7 @@
 #include "UserActivityLogger.h"
 #include "MainWindow.h"
 #include <thread>
+#include <Trace.h>
 
 #ifdef HAS_BUGSPLAT
 #include <BuildInfo.h>
@@ -40,6 +41,8 @@ int main(int argc, const char* argv[]) {
     CrashReporter crashReporter { BUG_SPLAT_DATABASE, BUG_SPLAT_APPLICATION_NAME, BuildInfo::VERSION };
 #endif
 
+    Tracer::getInstance();
+
     disableQtBearerPoll(); // Fixes wifi ping spikes
     
     QString applicationName = "High Fidelity Interface - " + qgetenv("USERNAME");
@@ -50,6 +53,16 @@ int main(int argc, const char* argv[]) {
     for (int i = 0; i < argc; ++i) {
         arguments << argv[i];
     }
+
+    QCommandLineParser parser;
+    QCommandLineOption urlOption("url", "", "value");
+    QCommandLineOption durationOption("duration", "Duration to run application");
+    QCommandLineOption traceFilenameOption("trace", "Location to store trace file", "value", "F:\trace.json");
+    parser.addOption(urlOption);
+    parser.addOption(durationOption);
+    parser.addOption(traceFilenameOption);
+    parser.addHelpOption();
+    parser.process(arguments);
 
 
 #ifdef Q_OS_WIN
@@ -70,11 +83,6 @@ int main(int argc, const char* argv[]) {
 
         // Try to connect - if we can't connect, interface has probably just gone down
         if (socket.waitForConnected(LOCAL_SERVER_TIMEOUT_MS)) {
-            QCommandLineParser parser;
-            QCommandLineOption urlOption("url", "", "value");
-            parser.addOption(urlOption);
-            parser.process(arguments);
-
             if (parser.isSet(urlOption)) {
                 QUrl url = QUrl(parser.value(urlOption));
                 if (url.isValid() && url.scheme() == HIFI_URL_SCHEME) {
@@ -188,6 +196,23 @@ int main(int argc, const char* argv[]) {
             crashReporter.mpSender.sendAdditionalFile(qPrintable(rolledLogPath));
         });
 #endif
+        QTimer timer;
+        QString durationString = getCmdOption(argc, argv, "--duration");
+        if (!durationString.isEmpty()) {
+            bool ok;
+            //QString durationString = "30000";// parser.value(durationOption);
+            auto duration = durationString.toInt(&ok);
+            if (ok) {
+                timer.setSingleShot(true);
+                timer.setInterval(duration);
+                QObject::connect(&timer, &QTimer::timeout, qApp, []() {
+                    qApp->quit();
+                });
+                timer.start();
+            } else {
+                qDebug() << "Unable to parse duration: " << durationString;
+            }
+        }
 
         printSystemInformation();
 
@@ -201,6 +226,11 @@ int main(int argc, const char* argv[]) {
     }
 
     Application::shutdownPlugins();
+
+    //QString traceFilename = parser.value(traceFilenameOption);
+    QString traceFilename = getCmdOption(argc, argv, "--trace");
+    Tracer::getInstance()->setEnabled(false);
+    Tracer::getInstance()->writeToFile(traceFilename);
 
     qCDebug(interfaceapp, "Normal exit.");
 #if !defined(DEBUG) && !defined(Q_OS_LINUX)
