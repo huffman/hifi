@@ -1,0 +1,13 @@
+{
+  "name": "profiling",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {},
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "os-homedir": "^1.0.1",
+    "rimraf": "^2.5.2"
+  }
+}

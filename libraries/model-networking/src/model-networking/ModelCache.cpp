@@ -22,6 +22,7 @@
 
 #include "ModelNetworkingLogging.h"
 #include <Trace.h>
+#include <StatTracker.h>
 
 class GeometryReader;
 
@@ -135,6 +136,7 @@ private:
 
 void GeometryReader::run() {
     //trace::ASYNC_BEGIN("GeometryReader::run", trace::cResource, _url.toString(), { { "url", _url.toString() } });
+    CounterStat counter("ResourceProcessing");
     trace::Duration d("GeometryReader::run", trace::cResource, { { "url", _url.toString() } });
     auto originalPriority = QThread::currentThread()->priority();
     if (originalPriority == QThread::InheritPriority) {

@@ -43,6 +43,7 @@
 
 #include <gl/QOpenGLContextWrapper.h>
 
+#include <StatTracker.h>
 #include "Trace.h"
 #include <ResourceScriptingInterface.h>
 #include <AccountManager.h>
@@ -408,6 +409,7 @@ bool setupEssentials(int& argc, char** argv) {
 
     // Set dependencies
     DependencyManager::set<AccountManager>(std::bind(&Application::getUserAgent, qApp));
+    DependencyManager::set<StatTracker>();
     DependencyManager::set<ScriptEngines>();
     DependencyManager::set<Preferences>();
     DependencyManager::set<recording::Deck>();
@@ -1610,6 +1612,11 @@ void Application::initializeUi() {
 
 void Application::paintGL() {
     //trace::Duration duration { "paintGL" };
+    trace::COUNTER("fps", "stats", { { "fps", _frameCounter.rate() } });
+    trace::COUNTER("downloads", "stats", {
+        { "current", ResourceCache::getLoadingRequests().length() },
+        { "pending", ResourceCache::getPendingRequestCount() }
+    });
 
     // Some plugins process message events, allowing paintGL to be called reentrantly.
     if (_inPaint || _aboutToQuit) {

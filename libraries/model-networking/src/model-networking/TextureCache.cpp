@@ -31,6 +31,7 @@
 
 #include "ModelNetworkingLogging.h"
 #include <Trace.h>
+#include <StatTracker.h>
 
 TextureCache::TextureCache() {
     const qint64 TEXTURE_DEFAULT_UNUSED_MAX_SIZE = DEFAULT_UNUSED_MAX_SIZE;
@@ -314,6 +315,7 @@ void ImageReader::listSupportedImageFormats() {
 }
 
 void ImageReader::run() {
+    CounterStat counter("ResourceProcessing");
     trace::Duration d("ImageReader::run", trace::cResource, { { "url", _url.toString() } });
 
     trace::DURATION_BEGIN("ImageReader::threadSetup", trace::cResource, { { "url", _url.toString() } });
