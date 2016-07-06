@@ -11,6 +11,8 @@
 
 #define TRACE_ENABLED
 
+using TraceTimestamp = uint64_t;
+
 enum EventType {
     DurationBegin = 0,
     DurationEnd,

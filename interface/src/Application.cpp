@@ -520,7 +520,7 @@ Application::Application(int& argc, char** argv, QElapsedTimer& startupTimer) :
     // (main thread, present thread, random OS load)
     // More threads == faster concurrent loads, but also more concurrent
     // load on the GPU until we can serialize GPU transfers (off the main thread)
-    QThreadPool::globalInstance()->setMaxThreadCount(2);
+    QThreadPool::globalInstance()->setMaxThreadCount(12);
     thread()->setPriority(QThread::HighPriority);
     thread()->setObjectName("Main Thread");
 
@@ -731,7 +731,7 @@ Application::Application(int& argc, char** argv, QElapsedTimer& startupTimer) :
     connect(&identityPacketTimer, &QTimer::timeout, getMyAvatar(), &MyAvatar::sendIdentityPacket);
     identityPacketTimer.start(AVATAR_IDENTITY_PACKET_SEND_INTERVAL_MSECS);
 
-    ResourceCache::setRequestLimit(3);
+    ResourceCache::setRequestLimit(16);
 
     _glWidget = new GLCanvas();
     getApplicationCompositor().setRenderingWidget(_glWidget);
@@ -1616,6 +1616,10 @@ void Application::paintGL() {
     trace::COUNTER("downloads", "stats", {
         { "current", ResourceCache::getLoadingRequests().length() },
         { "pending", ResourceCache::getPendingRequestCount() }
+    });
+    trace::COUNTER("processing", "stats", {
+        { "current", DependencyManager::get<StatTracker>()->getStat("Processing") },
+        { "pending", DependencyManager::get<StatTracker>()->getStat("PendingProcessing") }
     });
 
     // Some plugins process message events, allowing paintGL to be called reentrantly.

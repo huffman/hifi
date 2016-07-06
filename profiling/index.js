@@ -44,6 +44,10 @@ function traceContentSet(contentSet, traceName, runtimeSeconds, onFinish) {
     for (var i = 0; i < types.length; ++i) {
         var ac = childProcess.spawn(acBin, ['-t' + types[i]], {
             detached: false,
+            //stdio: ['pipe', 'pipe', 'pipe']
+            //stdio: i == 3 ? [0,1,2] : ['ignore', 'ignore', 'ignore']
+            //stdio: i == 3 ? [0,1,2] : ['pipe', 'pipe', 'pipe']
+            stdio: ['ignore', 'ignore', 'ignore']
         });
         acs.push(ac);
     }
@@ -59,14 +63,18 @@ function traceContentSet(contentSet, traceName, runtimeSeconds, onFinish) {
 
         console.log("\tStarting interface");
         var traceFile = 'F:\\trace_' + traceName + '.json';
+        console.log("Trace file: ", traceFile);
         var interfaceFlags = [
             '--url', 'hifi://localhost/',
             '--trace', traceFile,
-            '--duration', runtimeSeconds
+            '--duration', runtimeSeconds,
+            '--suppress-settings-reset',
+            ///'--kill-when-done-loading', 'on'
         ]
         var hifi = childProcess.spawn(interfaceBin, interfaceFlags, {
             detached: false,
-            stdio: ['ignore', 'ignore', 'ignore']
+            //stdio: ['ignore', 'ignore', 'ignore'],
+            stdio: ['pipe', 'pipe', 'pipe'],
         });
         hifi.on('error', finish);
         hifi.on('close', finish);
@@ -102,11 +110,17 @@ var commands = [
     //CommandClearCache(),
     //CommandContentSet('playa', 'playa_nocache', 90000),
     //CommandContentSet('playa', 'playa_cache', 90000),
-
     CommandClearCache(),
-    CommandContentSet('home', 'home_nocache', 30000),
-    //CommandContentSet('home', 'home_cache', 30000),
+    CommandContentSet('single_atp_16_instances', 'single_atp_nocache', 30000),
+    CommandContentSet('single_atp_16_instances', 'single_atp_cache', 30000),
 ];
+/*
+    for (var i = 0; i < 1; ++i) {
+        commands.push(CommandClearCache());
+        commands.push(CommandContentSet('home', 'home_' + i + '_nocache', 30000));
+        commands.push(CommandContentSet('home', 'home_' + i + '_cache', 30000));
+    }
+    */
 
 var curIndex = -1;
 function runNextCommand() {

@@ -20,6 +20,9 @@
 #include <gl/OpenGLVersionChecker.h>
 #include <SharedUtil.h>
 
+#include <DependencyManager.h>
+#include <StatTracker.h>
+
 #include "AddressManager.h"
 #include "Application.h"
 #include "InterfaceLogging.h"
@@ -58,9 +61,11 @@ int main(int argc, const char* argv[]) {
     QCommandLineOption urlOption("url", "", "value");
     QCommandLineOption durationOption("duration", "Duration to run application");
     QCommandLineOption traceFilenameOption("trace", "Location to store trace file", "value", "F:\trace.json");
+    QCommandLineOption killWhenDoneLoading("kill-when-done-loading", "", "value", "F:\trace.json");
     parser.addOption(urlOption);
     parser.addOption(durationOption);
     parser.addOption(traceFilenameOption);
+    parser.addOption(killWhenDoneLoading);
     parser.addHelpOption();
     parser.process(arguments);
 
@@ -213,6 +218,36 @@ int main(int argc, const char* argv[]) {
                 qDebug() << "Unable to parse duration: " << durationString;
             }
         }
+
+        //QString killWhenDoneLoading = getCmdOption(argc, argv, "--kill-when-done-loading");
+//        QString killWhenDoneLoading = "on";
+//        if (killWhenDoneLoading == "on") {
+            QTimer checkTimer;
+            checkTimer.setInterval(100);
+            static int timesInactive = 0;
+            static uint64_t inactiveTimestamp = 0;
+            QObject::connect(&checkTimer, &QTimer::timeout, qApp, [&checkTimer]() {
+                bool inactive = ResourceCache::getLoadingRequests().length() == 0
+                    && ResourceCache::getPendingRequestCount() == 0
+                    && DependencyManager::get<StatTracker>()->getStat("Processing") == 0
+                    && DependencyManager::get<StatTracker>()->getStat("PendingProcessing") == 0;
+                if (inactive) {
+                    if (timesInactive == 0) {
+                        inactiveTimestamp = usecTimestampNow();
+                    }
+                    timesInactive++;
+                } else {
+                    timesInactive = 0;
+                }
+                if (timesInactive >= 40) {
+                    QObject::disconnect(&checkTimer, 0, qApp, 0);
+                    Tracer::getInstance()->traceEvent("FinishedLoading", Instant, inactiveTimestamp,
+                        QCoreApplication::applicationPid(), int64_t(QThread::currentThreadId()), "", "", {}, { { "s", "g" } });
+                    qApp->quit();
+                }
+            });
+            checkTimer.start();
+//        }
 
         printSystemInformation();
 

@@ -118,6 +118,7 @@ public:
         const QByteArray& data) :
         _resource(resource), _url(url), _mapping(mapping), _data(data) {
 
+        DependencyManager::get<StatTracker>()->incrementStat("PendingProcessing");
         trace::FLOW_BEGIN("GeometryReader", trace::cResource, _url.toString(), { { "url", _url.toString() } });
         
     }
@@ -135,8 +136,9 @@ private:
 };
 
 void GeometryReader::run() {
+    DependencyManager::get<StatTracker>()->decrementStat("PendingProcessing");
     //trace::ASYNC_BEGIN("GeometryReader::run", trace::cResource, _url.toString(), { { "url", _url.toString() } });
-    CounterStat counter("ResourceProcessing");
+    CounterStat counter("Processing");
     trace::Duration d("GeometryReader::run", trace::cResource, { { "url", _url.toString() } });
     auto originalPriority = QThread::currentThread()->priority();
     if (originalPriority == QThread::InheritPriority) {

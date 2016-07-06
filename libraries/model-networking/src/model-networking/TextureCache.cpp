@@ -304,6 +304,7 @@ ImageReader::ImageReader(const QWeakPointer<Resource>& resource, const QByteArra
     _url(url),
     _content(data)
 {
+    DependencyManager::get<StatTracker>()->incrementStat("PendingProcessing");
 }
 
 void ImageReader::listSupportedImageFormats() {
@@ -315,7 +316,9 @@ void ImageReader::listSupportedImageFormats() {
 }
 
 void ImageReader::run() {
-    CounterStat counter("ResourceProcessing");
+    DependencyManager::get<StatTracker>()->decrementStat("PendingProcessing");
+
+    CounterStat counter("Processing");
     trace::Duration d("ImageReader::run", trace::cResource, { { "url", _url.toString() } });
 
     trace::DURATION_BEGIN("ImageReader::threadSetup", trace::cResource, { { "url", _url.toString() } });
@@ -375,7 +378,9 @@ void ImageReader::run() {
         auto url = _url.toString().toStdString();
 
         PROFILE_RANGE_EX(__FUNCTION__"::textureLoader", 0xffffff00, nullptr);
+        trace::DURATION_BEGIN("ImageReader::load", trace::cResource, { { "type", resource.dynamicCast<NetworkTexture>()->getTextureType() } });
         texture.reset(resource.dynamicCast<NetworkTexture>()->getTextureLoader()(image, url));
+        trace::DURATION_END("ImageReader::load", trace::cResource);
     }
     trace::DURATION_END("ImageReader::texture", trace::cResource);
 

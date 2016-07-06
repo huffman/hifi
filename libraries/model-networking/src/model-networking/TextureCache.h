@@ -68,6 +68,7 @@ public:
     int getOriginalHeight() const { return _originalHeight; }
     int getWidth() const { return _width; }
     int getHeight() const { return _height; }
+    Type getTextureType() const { return _type;  }
     
     TextureLoaderFunc getTextureLoader() const;
 
