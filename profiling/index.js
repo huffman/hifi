@@ -18,11 +18,11 @@ var CLUMSY_PARAMS = [
     '--drop-chance', '2'
 ]
 
-var build = "dev/hifi/build"
+var build = path.resolve(__dirname, '../build')
 var cacheDir = path.resolve(osHomeDir(), 'AppData/Local/High Fidelity/Interface/data8');
-var interfaceBin = path.resolve(osHomeDir(), build, "interface/Release/interface.exe")
-var dsBin = path.resolve(osHomeDir(), build, "domain-server/Release/domain-server.exe")
-var acBin = path.resolve(osHomeDir(), build, "assignment-client/Release/assignment-client.exe")
+var interfaceBin = path.resolve(build, "interface/Release/interface.exe")
+var dsBin = path.resolve(build, "domain-server/Release/domain-server.exe")
+var acBin = path.resolve(build, "assignment-client/Release/assignment-client.exe")
 
 console.log("interface: ", interfaceBin);
 console.log("ds: ", dsBin);
@@ -54,6 +54,7 @@ function traceContentSet(contentSet, traceName, runtimeSeconds, onFinish) {
 
     setTimeout(function() {
         function finish() {
+            console.log("DONE");
             ds.kill();
             acs.forEach(function(ac) {
                 ac.kill();
@@ -62,7 +63,8 @@ function traceContentSet(contentSet, traceName, runtimeSeconds, onFinish) {
         }
 
         console.log("\tStarting interface");
-        var traceFile = 'F:\\trace_' + traceName + '.json';
+        //var traceFile = 'F:\\trace_' + traceName + '.json';
+        var traceFile = path.resolve(__dirname, 'trace', 'trace_' + traceName + '.json');
         console.log("Trace file: ", traceFile);
         var interfaceFlags = [
             '--url', 'hifi://localhost/',
@@ -100,6 +102,13 @@ function CommandStopClumsy() {
 }
 
 function CommandContentSet(contentSet, traceName, runtimeSeconds) {
+    return function(onFinish) {
+        console.log("CommandContentSet");
+        traceContentSet(contentSet, traceName, runtimeSeconds, onFinish);
+    }
+}
+
+function CommandContentSetRemote(host, traceName, runtimeSeconds) {
     return function(onFinish) {
         console.log("CommandContentSet");
         traceContentSet(contentSet, traceName, runtimeSeconds, onFinish);

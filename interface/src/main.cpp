@@ -67,7 +67,6 @@ int main(int argc, const char* argv[]) {
     parser.addOption(traceFilenameOption);
     parser.addOption(killWhenDoneLoading);
     parser.addHelpOption();
-    parser.process(arguments);
 
 
 #ifdef Q_OS_WIN
@@ -85,6 +84,7 @@ int main(int argc, const char* argv[]) {
         socket.connectToServer(applicationName);
 
         static const int LOCAL_SERVER_TIMEOUT_MS = 500;
+        parser.process(arguments);
 
         // Try to connect - if we can't connect, interface has probably just gone down
         if (socket.waitForConnected(LOCAL_SERVER_TIMEOUT_MS)) {
