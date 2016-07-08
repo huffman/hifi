@@ -381,12 +381,23 @@ static const QString STATE_SNAP_TURN = "SnapTurn";
 static const QString STATE_GROUNDED = "Grounded";
 static const QString STATE_NAV_FOCUSED = "NavigationFocused";
 
+static int threadPoolSize = 2;
+static int numConcurrentDownloads = 3;
+
 bool setupEssentials(int& argc, char** argv) {
     unsigned int listenPort = 0; // bind to an ephemeral port by default
     const char** constArgv = const_cast<const char**>(argv);
     const char* portStr = getCmdOption(argc, constArgv, "--listenPort");
     if (portStr) {
         listenPort = atoi(portStr);
+    }
+    const char* processingThreadsStr = getCmdOption(argc, constArgv, "--processing-threads");
+    if (processingThreadsStr) {
+        threadPoolSize = atoi(processingThreadsStr);
+    }
+    const char* concurrentDownloadsStr = getCmdOption(argc, constArgv, "--concurrent-downloads");
+    if (concurrentDownloadsStr) {
+        numConcurrentDownloads = atoi(concurrentDownloadsStr);
     }
     // Set build version
     QCoreApplication::setApplicationVersion(BuildInfo::VERSION);
@@ -520,7 +531,7 @@ Application::Application(int& argc, char** argv, QElapsedTimer& startupTimer) :
     // (main thread, present thread, random OS load)
     // More threads == faster concurrent loads, but also more concurrent
     // load on the GPU until we can serialize GPU transfers (off the main thread)
-    QThreadPool::globalInstance()->setMaxThreadCount(12);
+    QThreadPool::globalInstance()->setMaxThreadCount(threadPoolSize);
     thread()->setPriority(QThread::HighPriority);
     thread()->setObjectName("Main Thread");
 
@@ -731,7 +742,7 @@ Application::Application(int& argc, char** argv, QElapsedTimer& startupTimer) :
     connect(&identityPacketTimer, &QTimer::timeout, getMyAvatar(), &MyAvatar::sendIdentityPacket);
     identityPacketTimer.start(AVATAR_IDENTITY_PACKET_SEND_INTERVAL_MSECS);
 
-    ResourceCache::setRequestLimit(16);
+    ResourceCache::setRequestLimit(numConcurrentDownloads);
 
     _glWidget = new GLCanvas();
     getApplicationCompositor().setRenderingWidget(_glWidget);

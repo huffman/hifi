@@ -12,13 +12,17 @@
 #include <QThreadStorage>
 
 #include "NetworkAccessManager.h"
+#include <QtNetwork/QNetworkProxy>
 
 QThreadStorage<QNetworkAccessManager*> networkAccessManagers;
 
 QNetworkAccessManager& NetworkAccessManager::getInstance() {
     if (!networkAccessManagers.hasLocalData()) {
-        networkAccessManagers.setLocalData(new QNetworkAccessManager());
-        
+        auto man = new QNetworkAccessManager();
+        auto proxy = new QNetworkProxy(QNetworkProxy::HttpProxy, "localhost", 8800);
+        man->setProxy(*proxy);
+
+        networkAccessManagers.setLocalData(man);
     }
     
     return *networkAccessManagers.localData();

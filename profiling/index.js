@@ -28,7 +28,7 @@ console.log("interface: ", interfaceBin);
 console.log("ds: ", dsBin);
 console.log("ac: ", acBin);
 
-function traceContentSet(contentSet, traceName, runtimeSeconds, onFinish) {
+function traceContentSet(contentSet, traceName, runtimeSeconds, interfaceParams, onFinish) {
     console.log("\tRunning content set: ", contentSet, traceName);
 
     var dsConfig = path.resolve(osHomeDir(), 'AppData/Roaming/High Fidelity - dev/content_sets/' + contentSet + '/domain-server/config.json');
@@ -72,11 +72,11 @@ function traceContentSet(contentSet, traceName, runtimeSeconds, onFinish) {
             '--duration', runtimeSeconds,
             '--suppress-settings-reset',
             ///'--kill-when-done-loading', 'on'
-        ]
+        ].concat(interfaceParams);
         var hifi = childProcess.spawn(interfaceBin, interfaceFlags, {
             detached: false,
-            //stdio: ['ignore', 'ignore', 'ignore'],
-            stdio: ['pipe', 'pipe', 'pipe'],
+            stdio: ['ignore', 'ignore', 'ignore'],
+            //stdio: ['pipe', 'pipe', 'pipe'],
         });
         hifi.on('error', finish);
         hifi.on('close', finish);
@@ -101,24 +101,24 @@ function CommandStopClumsy() {
     }
 }
 
-function CommandContentSet(contentSet, traceName, runtimeSeconds) {
+function CommandContentSet(contentSet, traceName, params, runtimeSeconds) {
     return function(onFinish) {
         console.log("CommandContentSet");
-        traceContentSet(contentSet, traceName, runtimeSeconds, onFinish);
+        traceContentSet(contentSet, traceName, runtimeSeconds, params, onFinish);
     }
 }
 
 function CommandContentSetRemote(host, traceName, runtimeSeconds) {
     return function(onFinish) {
         console.log("CommandContentSet");
-        traceContentSet(contentSet, traceName, runtimeSeconds, onFinish);
+        traceContentSet(contentSet, traceName, runtimeSeconds, params, onFinish);
     }
 }
 
 var commands = [
-    //CommandClearCache(),
-    //CommandContentSet('playa', 'playa_nocache', 90000),
-    //CommandContentSet('playa', 'playa_cache', 90000),
+    CommandClearCache(),
+    CommandContentSet('playa', 'playa_nocache_3_2', ['--concurrent-downloads', '6', '--processing-threads', '2'], 90000),
+    CommandContentSet('playa', 'playa_cache_3_2', ['--concurrent-downloads', '3', '--processing-threads', '2'], 90000),
     CommandClearCache(),
     CommandContentSet('single_atp_16_instances', 'single_atp_nocache', 30000),
     CommandContentSet('single_atp_16_instances', 'single_atp_cache', 30000),
