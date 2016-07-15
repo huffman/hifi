@@ -32,6 +32,7 @@
 #include "RenderableLightEntityItem.h"
 #include "RenderableModelEntityItem.h"
 #include "RenderableParticleEffectEntityItem.h"
+#include "RenderableProceduralParticlesEntityItem.h"
 #include "RenderableTextEntityItem.h"
 #include "RenderableWebEntityItem.h"
 #include "RenderableZoneEntityItem.h"
@@ -59,6 +60,7 @@ EntityTreeRenderer::EntityTreeRenderer(bool wantScripts, AbstractViewStateInterf
     REGISTER_ENTITY_TYPE_WITH_FACTORY(Text, RenderableTextEntityItem::factory)
     REGISTER_ENTITY_TYPE_WITH_FACTORY(Web, RenderableWebEntityItem::factory)
     REGISTER_ENTITY_TYPE_WITH_FACTORY(ParticleEffect, RenderableParticleEffectEntityItem::factory)
+    REGISTER_ENTITY_TYPE_WITH_FACTORY(ProceduralParticles, RenderableProceduralParticlesEntityItem::factory)
     REGISTER_ENTITY_TYPE_WITH_FACTORY(Zone, RenderableZoneEntityItem::factory)
     REGISTER_ENTITY_TYPE_WITH_FACTORY(Line, RenderableLineEntityItem::factory)
     REGISTER_ENTITY_TYPE_WITH_FACTORY(PolyVox, RenderablePolyVoxEntityItem::factory)

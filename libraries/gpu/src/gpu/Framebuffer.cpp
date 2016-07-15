@@ -26,7 +26,7 @@ Framebuffer* Framebuffer::create() {
 }
 
 
-Framebuffer* Framebuffer::create( const Format& colorBufferFormat, uint16 width, uint16 height) {
+Framebuffer* Framebuffer::create(const Format& colorBufferFormat, uint16 width, uint16 height) {
     auto framebuffer = Framebuffer::create();
 
     auto colorTexture = TexturePointer(Texture::create2D(colorBufferFormat, width, height, Sampler(Sampler::FILTER_MIN_MAG_POINT)));
@@ -36,7 +36,7 @@ Framebuffer* Framebuffer::create( const Format& colorBufferFormat, uint16 width,
     return framebuffer;
 }
 
-Framebuffer* Framebuffer::create( const Format& colorBufferFormat, const Format& depthStencilBufferFormat, uint16 width, uint16 height) {
+Framebuffer* Framebuffer::create(const Format& colorBufferFormat, const Format& depthStencilBufferFormat, uint16 width, uint16 height) {
     auto framebuffer = Framebuffer::create();
 
     auto colorTexture = TexturePointer(Texture::create2D(colorBufferFormat, width, height, Sampler(Sampler::FILTER_MIN_MAG_POINT)));
