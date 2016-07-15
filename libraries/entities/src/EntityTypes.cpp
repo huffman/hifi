@@ -22,6 +22,7 @@
 #include "LightEntityItem.h"
 #include "ModelEntityItem.h"
 #include "ParticleEffectEntityItem.h"
+#include "ProceduralParticlesEntityItem.h"
 #include "TextEntityItem.h"
 #include "WebEntityItem.h"
 #include "ZoneEntityItem.h"
@@ -43,6 +44,7 @@ REGISTER_ENTITY_TYPE(Web)
 REGISTER_ENTITY_TYPE(Light)
 REGISTER_ENTITY_TYPE(Text)
 REGISTER_ENTITY_TYPE(ParticleEffect)
+REGISTER_ENTITY_TYPE(ProceduralParticles)
 REGISTER_ENTITY_TYPE(Zone)
 REGISTER_ENTITY_TYPE(Line)
 REGISTER_ENTITY_TYPE(PolyVox)

@@ -43,6 +43,7 @@ public:
         Light,
         Text,
         ParticleEffect,
+        ProceduralParticles,
         Zone,
         Web,
         Line,

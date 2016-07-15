@@ -1,0 +1,53 @@
+<@include gpu/Config.slh@>
+<$VERSION_HEADER$>
+//  Generated on <$_SCRIBE_DATE$>
+//  particle vertex shader
+//
+//  Copyright 2016 High Fidelity, Inc.
+//
+//  Distributed under the Apache License, Version 2.0.
+//  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
+//
+
+<@include gpu/Color.slh@>
+<@include gpu/Transform.slh@>
+<$declareStandardTransform()$>
+
+struct ParticleUniforms {
+    float radius;
+    vec4 color; // rgba
+    bool firstPass;
+    float iGlobalTime;
+    float iDeltaTime;
+    vec2 iResolution;
+    float maxParticles;
+};
+
+layout(std140) uniform particleBuffer {
+    ParticleUniforms particle;
+};
+
+uniform sampler2D particles;
+
+out vec4 _color;
+
+const int NUM_VERTICES_PER_PARTICLE = 3;
+
+vec2 getFragCoord(float index) {
+    return vec2(mod(index, particle.iResolution.x - 1.0),
+                2.0*floor(index / (particle.iResolution.x - 1.0)));
+}
+
+void main(void) {
+    // pass along the color
+    _color = colorToLinearRGBA(particle.color);
+
+    TransformCamera cam = getTransformCamera();
+    TransformObject obj = getTransformObject();
+
+    // get position from texture
+    int particleID = gl_VertexID / NUM_VERTICES_PER_PARTICLE;
+    vec4 position = texture(particles, getFragCoord(float(particleID)) / particle.iResolution);
+
+    <$transformModelToClipPos(cam, obj, position, gl_Position)$>
+}

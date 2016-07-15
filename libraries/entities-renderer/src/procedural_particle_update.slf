@@ -1,0 +1,180 @@
+<@include gpu/Config.slh@>
+<$VERSION_HEADER$>
+//  Generated on <$_SCRIBE_DATE$>
+//  fragment shader
+//
+//  Copyright 2016 High Fidelity, Inc.
+//
+//  Distributed under the Apache License, Version 2.0.
+//  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
+//
+
+// Constants
+const float dt = 0.0167;
+const float FLT_MAX = 1.0 / 0.000000000001;
+const vec3 UP = vec3(0.0, 1.0, 0.0);
+
+struct ParticleUniforms {
+    float radius;
+    vec4 color; // rgba
+    bool firstPass;
+    float iGlobalTime;
+    float iDeltaTime;
+    vec2 iResolution;
+    float maxParticles;
+};
+
+layout(std140) uniform particleBuffer {
+    ParticleUniforms particle;
+};
+
+uniform sampler2D particlesTex;
+
+// output from DrawUnitQuadTexcoord
+in vec2 varTexCoord0;
+
+out vec4 fragColor;
+
+// Helpers
+float hash(float n) { return fract(sin(n)*753.5453123); }
+
+vec2 getFragCoord(float index) {
+    return vec2(mod(index, particle.iResolution.x - 1.0),
+                2.0*floor(index / (particle.iResolution.x - 1.0)));
+}
+
+const float SCALE = 75.0;
+
+vec4 initPosition(float index) {
+    // Particles start off dead
+    const float MIN_LIFETIME = 2.0;
+    const float PARTICLE_LIFETIME = 5.0;
+
+    // TODO remove this (its for testing)
+    return vec4(mod(index, particle.iResolution.x),
+                floor(index / particle.iResolution.x), 0.0, 1.0);
+
+    return vec4(vec3(0.0), MIN_LIFETIME + PARTICLE_LIFETIME * hash(index*7344.0));
+}
+
+vec4 initVelocity(float index) {
+    // Particles start off dead
+    return vec4(vec3(0.0), FLT_MAX);
+}
+
+vec4 updatePosition(vec4 pos, vec4 vel, float index, vec2 fragCoord) {
+    /*if (vel.w == FLT_MAX && pos.w > 0.0) {
+        // If this particle just died, move it to be near an unrezzed object
+        float object = floor(hash(fragCoord.x*1692.0 + iGlobalTime) * NUM_OBJECTS);
+        vec4 objPos = loadValue(vec2(object, txObjectPosY));
+        vec3 objDim = loadValue(vec2(object, txObjectDimY)).xyz;
+
+        if (particle.iGlobalTime < objPos.w) {
+            const float ORBIT_DIM_RATIO = 2.0;
+            vec3 offset = objDim * ORBIT_DIM_RATIO * vec3(hash(fragCoord.x*872.0 + iGlobalTime) - 0.5,
+            hash(fragCoord.x*1667.0 + iGlobalTime) - 0.5,
+            hash(fragCoord.x*23589.0 + iGlobalTime) - 0.5);
+
+            pos = vec4(objPos.xyz + offset, -pos.w);
+        }
+    } else if (vel.w < FLT_MAX && pos.w < 0.0) {
+        pos.w = -pos.w;
+    } else if (vel.w < FLT_MAX && pos.w > 0.0) {
+        // Otherwise, move by dx
+        pos += vec4(vel.xyz * dt, 0.0);
+    }*/
+
+    return pos;
+}
+
+vec4 updateVelocity(vec4 pos, vec4 vel, float index, vec2 fragCoord) {
+/*    vec3 minR;
+    float minD2 = FLT_MAX;
+    int numUnrezzed = 0;
+
+    // pull particles towards nearest object
+    for (int i = 0; i < int(NUM_OBJECTS); i++) {
+        vec4 posTime = loadValue(vec2(float(i), txObjectPosY));
+        if (iGlobalTime > posTime.w) {
+            continue;
+        }
+
+        vec3 r = posTime.xyz - pos.xyz;
+        float d2 = dot(r, r);
+        numUnrezzed++;
+
+        if (d2 < minD2) {
+            minR = r;
+            minD2 = d2;
+        }
+    }
+
+    if (minD2 != FLT_MAX) {
+        const float G = 400.0;
+        const float SQRT_G = 20.0;
+        float d = sqrt(minD2);
+        if (pos.w < 0.0) {
+            float velMag = SQRT_G/sqrt(d);
+            vel.xyz = velMag*normalize(cross(UP, -minR));
+        } else {
+            vel.xyz += G/(d * minD2)* minR * dt;
+
+            if (vel.w < pos.w) {
+                // Particle still alive (die off quickly if no unrezzed objects)
+                vel.w += dt;
+            } else if (vel.w < FLT_MAX) {
+                // Particle died
+                vel = vec4(FLT_MAX);
+            } else {
+                // Particle reborn
+                vel.w = 0.0;
+            }
+        }
+    } else {
+        // Die quickly if there are no objects left
+        const float FAST_DEATH_SPEED = 3.0;
+        vel.w += dt * FAST_DEATH_SPEED;
+    }
+
+    // TODO: this should depend on the size of the object
+    const float MAX_VEL = 13.5;
+    vel.x = abs(vel.x) > MAX_VEL ? sign(vel.x) * MAX_VEL : vel.x;
+    vel.y = abs(vel.y) > MAX_VEL ? sign(vel.y) * MAX_VEL : vel.y;
+    vel.z = abs(vel.z) > MAX_VEL ? sign(vel.z) * MAX_VEL : vel.z;*/
+
+    return vel;
+}
+
+void main(void) {
+    // Convert to Shadertoy's weird multi-pass fragCoord system
+    vec2 fragCoord = varTexCoord0 * particle.iResolution + 0.5;
+    float index = floor(particle.iResolution.x * (varTexCoord0.x + varTexCoord0.y * particle.iResolution.y));
+
+    vec2 particleBounds = getFragCoord(particle.maxParticles - 1.0);
+    particleBounds.x = (fragCoord.y >= particleBounds.y) ?
+    particleBounds.x : particle.iResolution.x - 1.0;
+
+    if (fragCoord.y <= particleBounds.y + 0.5 + 1.0 && fragCoord.x <= particleBounds.x + 0.5) {
+
+        // Even rows are positions, odd rows are velocities
+        if (mod(fragCoord.y - 0.5, 2.0) == 0.0) {
+            if (particle.firstPass) {
+                fragColor = initPosition(index);
+            } else {
+                vec4 pos = texture(particlesTex, varTexCoord0);
+                vec4 vel = texture(particlesTex, varTexCoord0 + vec2(0.0, 1.0 / particle.iResolution.y));
+                fragColor = updatePosition(pos, vel, index, varTexCoord0);
+            }
+        } else {
+            if (particle.firstPass) {
+                fragColor = initVelocity(index);
+            } else {
+                vec4 pos = texture(particlesTex, varTexCoord0 - vec2(0.0, 1.0 / particle.iResolution.y));
+                vec4 vel = texture(particlesTex, varTexCoord0);
+                fragColor = updateVelocity(pos, vel, index, varTexCoord0);
+            }
+        }
+    } else {
+        discard;
+    }
+}
