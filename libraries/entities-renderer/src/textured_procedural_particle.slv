@@ -39,7 +39,7 @@ vec2 getFragCoord(float index) {
 }
 
 const int NUM_VERTICES_PER_PARTICLE = 3;
-// This ordering ensures that un-rotated particles render upright in the wiewer.
+// This ordering ensures that un-rotated particles render upright in the viewer.
 const vec4 UNIT_TRI[NUM_VERTICES_PER_PARTICLE] = vec4[NUM_VERTICES_PER_PARTICLE](
     vec4(-1.0, 1.0, 0.0, 0.0),
     vec4(-1.0, -1.0, 0.0, 0.0),
@@ -68,10 +68,10 @@ void main(void) {
     // anchor point in eye space
     // TODO: expose setRadius(int index) function
     float radius = particle.radius;
-    vec4 quadPos = radius * UNIT_QUAD[twoTriID];
+    vec4 quadPos = 0.5 * UNIT_QUAD[twoTriID];
 
     vec4 anchorPoint;
-    vec4 _inPosition = vec4(texture(particlesTex, getFragCoord(particleID) / particle.Resolution).xyz, 1.0);
+    vec4 _inPosition = vec4(texture(particlesTex, getFragCoord(particleID) / particle.iResolution).xyz, 1.0);
     <$transformModelToEyePos(cam, obj, _inPosition, anchorPoint)$>
 
     vec4 eyePos = anchorPoint + quadPos;

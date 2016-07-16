@@ -100,7 +100,7 @@ public:
         glm::ivec4 viewport = glm::ivec4(0, 0, _particleBuffers[(int)!_evenPass]->getWidth(), _particleBuffers[(int)!_evenPass]->getHeight());
         batch.setViewportTransform(viewport);
         batch.setResourceTexture(0, _particleBuffers[(int)_evenPass]->getRenderBuffer(0));
-//        batch.draw(gpu::TRIANGLE_STRIP, 4);
+        batch.draw(gpu::TRIANGLE_STRIP, 4);
 
         // Render using the updated FBO's texture
         batch.setPipeline(_pipeline);
@@ -114,7 +114,7 @@ public:
 
         batch.setModelTransform(_modelTransform);
 
-//        batch.drawInstanced((gpu::uint32)_maxParticles, gpu::TRIANGLES, (gpu::uint32)VERTEX_PER_PARTICLE);
+        batch.drawInstanced((gpu::uint32)_maxParticles, gpu::TRIANGLES, (gpu::uint32)VERTEX_PER_PARTICLE);
     }
 
 protected:
@@ -168,10 +168,11 @@ RenderableProceduralParticlesEntityItem::RenderableProceduralParticlesEntityItem
         createPipelines();
     }
     // Create the FBOs
+    // TODO: don't default to MAX_DIM * MAX_DIM
     for (int i = 0; i < 2; i++) {
         _particleBuffers.append(gpu::FramebufferPointer(gpu::Framebuffer::create(gpu::Format(gpu::Dimension::VEC4,
                                                                                              gpu::Type::FLOAT,
-                                                                                             gpu::Semantic::RGBA), 0, 0)));
+                                                                                             gpu::Semantic::RGBA), MAX_DIM, MAX_DIM)));
     }
     // Resize the FBOs
     setMaxParticles(_maxParticles);

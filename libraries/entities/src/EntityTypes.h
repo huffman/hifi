@@ -43,14 +43,14 @@ public:
         Light,
         Text,
         ParticleEffect,
-        ProceduralParticles,
         Zone,
         Web,
         Line,
         PolyVox,
         PolyLine,
         Shape,
-        LAST = Shape
+        ProceduralParticles,
+        LAST = ProceduralParticles
     } EntityType;
 
     static const QString& getEntityTypeName(EntityType entityType);

@@ -26,10 +26,10 @@ const xColor ProceduralParticlesEntityItem::DEFAULT_COLOR = { 255, 255, 255 };
 const float ProceduralParticlesEntityItem::DEFAULT_ALPHA = 1.0f;
 const quint32 ProceduralParticlesEntityItem::MAX_DIM = 1024;                                    // Limit particles so they fit in a 1024 * 1024 texture
 const quint32 ProceduralParticlesEntityItem::MAXIMUM_MAX_PARTICLES = MAX_DIM * MAX_DIM / 2;     // 1024 * 1024 / 2 = 524288
-const quint32 ProceduralParticlesEntityItem::DEFAULT_MAX_PARTICLES = 5;
+const quint32 ProceduralParticlesEntityItem::DEFAULT_MAX_PARTICLES = 1000;
 const float ProceduralParticlesEntityItem::DEFAULT_PARTICLE_RADIUS = 0.025f;
 // TODO make this "" and fix textureless particles
-const QString ProceduralParticlesEntityItem::DEFAULT_TEXTURES = "https://hifi-public.s3.amazonaws.com/alan/Particles/Particle-Sprite-Smoke-1.png";
+const QString ProceduralParticlesEntityItem::DEFAULT_TEXTURES = "";
 
 EntityItemPointer ProceduralParticlesEntityItem::factory(const EntityItemID& entityID, const EntityItemProperties& properties) {
     EntityItemPointer entity { new ProceduralParticlesEntityItem(entityID) };
@@ -49,10 +49,10 @@ EntityItemProperties ProceduralParticlesEntityItem::getProperties(EntityProperty
     EntityItemProperties properties = EntityItem::getProperties(desiredProperties); // get the properties from our base class
 
     COPY_ENTITY_PROPERTY_TO_PROPERTIES(color, getXColor);
-    COPY_ENTITY_PROPERTY_TO_PROPERTIES(alpha, getAlpha);
     COPY_ENTITY_PROPERTY_TO_PROPERTIES(maxParticles, getMaxParticles);
     COPY_ENTITY_PROPERTY_TO_PROPERTIES(particleRadius, getParticleRadius);
     COPY_ENTITY_PROPERTY_TO_PROPERTIES(textures, getTextures);
+    COPY_ENTITY_PROPERTY_TO_PROPERTIES(alpha, getAlpha);
 
     return properties;
 }
@@ -61,10 +61,10 @@ bool ProceduralParticlesEntityItem::setProperties(const EntityItemProperties& pr
     bool somethingChanged = EntityItem::setProperties(properties); // set the properties in our base class
 
     SET_ENTITY_PROPERTY_FROM_PROPERTIES(color, setColor);
-    SET_ENTITY_PROPERTY_FROM_PROPERTIES(alpha, setAlpha);
     SET_ENTITY_PROPERTY_FROM_PROPERTIES(maxParticles, setMaxParticles);
     SET_ENTITY_PROPERTY_FROM_PROPERTIES(particleRadius, setParticleRadius);
     SET_ENTITY_PROPERTY_FROM_PROPERTIES(textures, setTextures);
+    SET_ENTITY_PROPERTY_FROM_PROPERTIES(alpha, setAlpha);
 
     if (somethingChanged) {
         bool wantDebug = false;
@@ -89,22 +89,9 @@ int ProceduralParticlesEntityItem::readEntitySubclassDataFromBuffer(const unsign
 
     READ_ENTITY_PROPERTY(PROP_COLOR, rgbColor, setColor);
     READ_ENTITY_PROPERTY(PROP_MAX_PARTICLES, quint32, setMaxParticles);
-
-    if (args.bitstreamVersion >= VERSION_ENTITIES_PARTICLE_MODIFICATIONS) {
-        READ_ENTITY_PROPERTY(PROP_PARTICLE_RADIUS, float, setParticleRadius);
-        READ_ENTITY_PROPERTY(PROP_TEXTURES, QString, setTextures);
-    } else {
-        // OLD PROP_EMIT_ACCELERATION FAKEOUT
-        SKIP_ENTITY_PROPERTY(PROP_PARTICLE_RADIUS, float);
-        // OLD PROP_ACCELERATION_SPREAD FAKEOUT
-        SKIP_ENTITY_PROPERTY(PROP_PARTICLE_RADIUS, float);
-        READ_ENTITY_PROPERTY(PROP_PARTICLE_RADIUS, float, setParticleRadius);
-        READ_ENTITY_PROPERTY(PROP_TEXTURES, QString, setTextures);
-    }
-
-    if (args.bitstreamVersion >= VERSION_ENTITIES_PARTICLE_COLOR_PROPERTIES) {
-        READ_ENTITY_PROPERTY(PROP_ALPHA, float, setAlpha);
-    }
+    READ_ENTITY_PROPERTY(PROP_PARTICLE_RADIUS, float, setParticleRadius);
+    READ_ENTITY_PROPERTY(PROP_TEXTURES, QString, setTextures);
+    READ_ENTITY_PROPERTY(PROP_ALPHA, float, setAlpha);
 
     return bytesRead;
 }
