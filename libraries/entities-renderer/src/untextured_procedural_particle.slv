@@ -9,45 +9,66 @@
 //  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
 //
 
-<@include gpu/Color.slh@>
 <@include gpu/Transform.slh@>
+
 <$declareStandardTransform()$>
 
 struct ParticleUniforms {
+    vec4 color;         // rgba
     float radius;
-    vec4 color; // rgba
-    bool firstPass;
+    float firstPass;
     float iGlobalTime;
     float iDeltaTime;
-    vec2 iResolution;
-    float maxParticles;
+    vec4 iResolution;   // iResolution.xy = texture size, z = maxParticles, w = spare
 };
 
 layout(std140) uniform particleBuffer {
     ParticleUniforms particle;
 };
 
-uniform sampler2D particles;
+uniform sampler2D particlesTex;
 
-out vec4 _color;
+out vec4 varColor;
+out vec2 varTexCoord;
 
-const int NUM_VERTICES_PER_PARTICLE = 3;
-
-vec2 getFragCoord(float index) {
-    return vec2(mod(index, particle.iResolution.x - 1.0),
-                2.0*floor(index / (particle.iResolution.x - 1.0)));
+ivec2 getFragCoord(int index) {
+    return ivec2(mod(index, particle.iResolution.x),
+                 2 * int(index / particle.iResolution.x));
 }
 
-void main(void) {
-    // pass along the color
-    _color = colorToLinearRGBA(particle.color);
+const int NUM_VERTICES_PER_PARTICLE = 3;
+// Center the triangle around the particle
+const vec4 UNIT_TRI[NUM_VERTICES_PER_PARTICLE] = vec4[NUM_VERTICES_PER_PARTICLE](
+vec4(-1.0, 3.0, 0.0, 0.0),
+vec4(-1.0, -1.0, 0.0, 0.0),
+vec4(3.0, -1.0, 0.0, 0.0)
+);
 
+void main(void) {
     TransformCamera cam = getTransformCamera();
     TransformObject obj = getTransformObject();
 
-    // get position from texture
+    // Which particle are we dealing with
     int particleID = gl_VertexID / NUM_VERTICES_PER_PARTICLE;
-    vec4 position = texture(particles, getFragCoord(float(particleID)) / particle.iResolution);
+    // Which quad vertex pos?
+    int triID = gl_VertexID - particleID * NUM_VERTICES_PER_PARTICLE;
 
-    <$transformModelToClipPos(cam, obj, position, gl_Position)$>
+    // TODO: expose setColor(int index) function
+    varColor = particle.color;
+
+    // TODO: expose setRadius(int index) function
+    float radius = particle.radius;
+
+    // Pass the tex coords to the fragment shader
+    varTexCoord = UNIT_TRI[triID].xy;
+
+    vec4 quadPos = radius * UNIT_TRI[triID];
+
+    // anchor point in eye space
+    vec4 anchorPoint;
+    vec4 _inPosition = vec4(texelFetch(particlesTex, getFragCoord(particleID), 0).xyz, 1.0);
+    <$transformModelToEyePos(cam, obj, _inPosition, anchorPoint)$>
+
+    vec4 eyePos = anchorPoint + quadPos;
+    <$transformEyeToClipPos(cam, eyePos, gl_Position)$>
 }

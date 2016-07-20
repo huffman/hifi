@@ -9,10 +9,15 @@
 //  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
 //
 
-in vec4 _color;
+in vec4 varColor;
+in vec2 varTexCoord;
 
 out vec4 outFragColor;
 
 void main(void) {
-    outFragColor = _color;
+    if (abs(varTexCoord.x) <= 1.0 && abs(varTexCoord.y) <= 1.0) {
+        outFragColor = varColor;
+    } else {
+        discard;
+    }
 }

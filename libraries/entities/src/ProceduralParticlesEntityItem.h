@@ -75,9 +75,6 @@ public:
     void setParticleRadius(float particleRadius) { _particleRadius = particleRadius; }
     float getParticleRadius() const { return _particleRadius; }
 
-    bool getFirstPass() const { return _firstPass; }
-    void setFirstPass(bool firstPass) { _firstPass = firstPass; }
-
     float getSimulationTime() const { return _simulationTime; }
     void setSimulationTime(float simulationTime) { _simulationTime = simulationTime; }
 
@@ -104,7 +101,6 @@ protected:
     rgbColor _color;
     float _alpha { DEFAULT_ALPHA };
     float _particleRadius { DEFAULT_PARTICLE_RADIUS };
-    bool _firstPass { true };
 
     // Emiter properties
     quint32 _maxParticles { DEFAULT_MAX_PARTICLES };
