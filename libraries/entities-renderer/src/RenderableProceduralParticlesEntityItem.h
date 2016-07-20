@@ -15,39 +15,28 @@
 #include <TextureCache.h>
 #include "RenderableEntityItem.h"
 
+class ProceduralParticles;
+
 class RenderableProceduralParticlesEntityItem : public ProceduralParticlesEntityItem  {
-    friend class ProceduralParticlePayloadData;
+    using Pointer = std::shared_ptr<RenderableProceduralParticlesEntityItem>;
+    static Pointer baseFactory(const EntityItemID& entityID, const EntityItemProperties& properties);
 public:
     static EntityItemPointer factory(const EntityItemID& entityID, const EntityItemProperties& properties);
     RenderableProceduralParticlesEntityItem(const EntityItemID& entityItemID);
 
     virtual void update(const quint64& now) override;
 
-    void updateRenderItem();
-
-    virtual bool addToScene(EntityItemPointer self, render::ScenePointer scene, render::PendingChanges& pendingChanges) override;
-    virtual void removeFromScene(EntityItemPointer self, render::ScenePointer scene, render::PendingChanges& pendingChanges) override;
-
     void setMaxParticles(quint32 maxParticles) override;
 
-protected:
-    virtual void locationChanged(bool tellPhysics = true) override { EntityItem::locationChanged(tellPhysics); notifyBoundChanged(); }
-    virtual void dimensionsChanged() override { EntityItem::dimensionsChanged(); notifyBoundChanged(); }
+    void render(RenderArgs* args) override;
 
-    void notifyBoundChanged();
+    // TODO: allow configurable shaders
+//    void setUserData(const QString& value) override;
 
-    void createPipelines();
+    SIMPLE_RENDERABLE();
 
-    render::ScenePointer _scene;
-    render::ItemID _renderItemId { render::Item::INVALID_ITEM_ID };
-
-    bool _evenPass { true };
-    QList<gpu::FramebufferPointer> _particleBuffers;
-
-    NetworkTexturePointer _texture;
-    gpu::PipelinePointer _updatePipeline;
-    gpu::PipelinePointer _untexturedPipeline;
-    gpu::PipelinePointer _texturedPipeline;
+private:
+    QSharedPointer<ProceduralParticles> _particles;
 };
 
 

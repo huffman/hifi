@@ -166,7 +166,6 @@ void ProceduralParticlesEntityItem::setMaxParticles(quint32 maxParticles) {
         _maxParticles = maxParticles;
 
         // Restart the simulation if the number of particles changes
-        setFirstPass(true);
         setSimulationTime(0.0f);
     }
 }

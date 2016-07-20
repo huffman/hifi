@@ -26,22 +26,28 @@
 #include "procedural_particle_update_frag.h"
 #include <gpu/DrawUnitQuadTexcoord_vert.h>
 
+static int UPDATE_BUFFER = -1;
+static int UPDATE_PARTICLES = -1;
+static int NOTEX_DRAW_BUFFER = -1;
+static int NOTEX_DRAW_PARTICLES = -1;
+static int DRAW_BUFFER = -1;
+static int DRAW_PARTICLES = 0;
+static int DRAW_TEXTURE = 1;
 
-class ProceduralParticlePayloadData {
+class ProceduralParticles {
 public:
     static const size_t VERTEX_PER_PARTICLE = 3;
 
     struct ParticleUniforms {
+        glm::vec4 color;                  // rgba
         float radius;
-        glm::vec4 color; // rgba
-        bool firstPass;
-        float iGlobalTime;
-        float iDeltaTime;
-        glm::vec2 iResolution;
-        float maxParticles;
+        float firstPass { true };         // needs to be a float to fit in buffer
+        float iGlobalTime { 0.0f };
+        float iDeltaTime { 0.0f };
+        glm::vec4 iResolution { 0.0f };   // iResolution.xy = texture size, z = maxParticles, w = spare
     };
 
-    using Payload = render::Payload<ProceduralParticlePayloadData>;
+    using Payload = render::Payload<ProceduralParticles>;
     using Pointer = Payload::DataPointer;
     using PipelinePointer = gpu::PipelinePointer;
     using FormatPointer = gpu::Stream::FormatPointer;
@@ -51,303 +57,227 @@ public:
     using Buffer = gpu::Buffer;
     using BufferView = gpu::BufferView;
 
-    ProceduralParticlePayloadData() {
-        ParticleUniforms uniforms;
-        _uniformBuffer = std::make_shared<Buffer>(sizeof(ParticleUniforms), (const gpu::Byte*) &uniforms);
+    ProceduralParticles(glm::vec4 color, float radius, quint32 maxParticles, quint32 MAX_DIM) {
+        _uniforms = ParticleUniforms();
+        _uniforms.color = color;
+        _uniforms.radius = radius;
+        _uniforms.iResolution.z = maxParticles;
+
+        // Create the FBOs
+        for (int i = 0; i < 2; i++) {
+            _particleBuffers.append(gpu::FramebufferPointer(gpu::Framebuffer::create(gpu::Format(gpu::Dimension::VEC4,
+                                                                                                 gpu::Type::FLOAT,
+                                                                                                 gpu::Semantic::RGBA), 1, 1)));
+        }
+
+        // Resize the FBOs
+        setMaxParticles(maxParticles, MAX_DIM);
+
+        _uniformBuffer = std::make_shared<Buffer>(sizeof(ParticleUniforms), (const gpu::Byte*) &_uniforms);
     }
 
-    void setUpdatePipeline(PipelinePointer updatePipeline) { _updatePipeline = updatePipeline; }
-    const PipelinePointer& getUpdatePipeline() const { return _updatePipeline; }
+    void setMaxParticles(quint32 maxParticles, const quint32 MAX_DIM) {
+        _uniforms.iResolution.z = maxParticles;
 
-    void setPipeline(PipelinePointer pipeline) { _pipeline = pipeline; }
-    const PipelinePointer& getPipeline() const { return _pipeline; }
+        int width = std::min(MAX_DIM, maxParticles);
+        int height = ((int)(maxParticles / MAX_DIM) + 1) * 2;
+        for (auto& buffer : _particleBuffers) {
+            buffer->resize(width, height);
+        }
 
-    const Transform& getModelTransform() const { return _modelTransform; }
-    void setModelTransform(const Transform& modelTransform) { _modelTransform = modelTransform; }
+        _uniforms.iResolution.x = width;
+        _uniforms.iResolution.y = height;
 
-    const AABox& getBound() const { return _bound; }
-    void setBound(const AABox& bound) { _bound = bound; }
-
-    const int& getMaxParticles() const { return _maxParticles; }
-    void setMaxParticles(int maxParticles) { _maxParticles = maxParticles; }
+        // Restart the simulation when the number of particles changes
+        _uniforms.firstPass = true;
+    }
 
     const ParticleUniforms& getParticleUniforms() const { return _uniformBuffer.get<ParticleUniforms>(); }
     ParticleUniforms& editParticleUniforms() { return _uniformBuffer.edit<ParticleUniforms>(); }
 
-    QList<gpu::FramebufferPointer> getParticleBuffers() { return _particleBuffers; }
-    void setParticleBuffers(QList<gpu::FramebufferPointer> particleBuffers) { _particleBuffers = particleBuffers; }
+    void update(float iGlobalTime, float iDeltaTime) {
+        _uniforms.iGlobalTime = iGlobalTime;
+        _uniforms.iDeltaTime = iDeltaTime;
 
-    void setTexture(TexturePointer texture) { _texture = texture; }
-    const TexturePointer& getTexture() const { return _texture; }
+        /*    if (_texturesChangedFlag) {
+         if (_textures.isEmpty()) {
+         _texture.clear();
+         } else {
+         // for now use the textures string directly.
+         // Eventually we'll want multiple textures in a map or array.
+         _texture = DependencyManager::get<TextureCache>()->getTexture(_textures);
+         }
+         _texturesChangedFlag = false;
+         }*/
 
-    bool getVisibleFlag() const { return _visibleFlag; }
-    void setVisibleFlag(bool visibleFlag) { _visibleFlag = visibleFlag; }
+        if (!_texture) {
+            // TODO: remove (for testing)
+            _texture = DependencyManager::get<TextureCache>()->getTexture(QString("https://hifi-public.s3.amazonaws.com/alan/Particles/Particle-Sprite-Smoke-1.png"));
+        }
+    }
 
-    bool getEvenPass() const { return _evenPass; }
-    void setEvenPass(bool evenPass) { _evenPass = evenPass; }
+    void render(RenderArgs* args) {
+        // lazy creation of particle system pipeline
+        if (!_updatePipeline || !_untexturedPipeline || !_texturedPipeline) {
+            createPipelines();
+        }
 
-    void render(RenderArgs* args) const {
-        assert(_pipeline && _updatePipeline && _particleBuffers.length() == 2);
         auto mainViewport = args->_viewport;
         gpu::Batch& batch = *args->_batch;
 
-        // Set particle uniforms (used for both updating and rendering)
-        batch.setUniformBuffer(0, _uniformBuffer);
+        memcpy(&editParticleUniforms(), &_uniforms, sizeof(ParticleUniforms));
 
         // Update the particles in the other FBO based on the current FBO's texture
         batch.setPipeline(_updatePipeline);
+        batch.setUniformBuffer(UPDATE_BUFFER, _uniformBuffer);
         batch.setFramebuffer(_particleBuffers[(int)!_evenPass]);
         glm::ivec4 viewport = glm::ivec4(0, 0, _particleBuffers[(int)!_evenPass]->getWidth(), _particleBuffers[(int)!_evenPass]->getHeight());
         batch.setViewportTransform(viewport);
-        batch.setResourceTexture(0, _particleBuffers[(int)_evenPass]->getRenderBuffer(0));
+        batch.setResourceTexture(UPDATE_PARTICLES, _particleBuffers[(int)_evenPass]->getRenderBuffer(0));
         batch.draw(gpu::TRIANGLE_STRIP, 4);
 
         // Render using the updated FBO's texture
-        batch.setPipeline(_pipeline);
         auto lightingFramebuffer = DependencyManager::get<FramebufferCache>()->getLightingFramebuffer();
         batch.setFramebuffer(lightingFramebuffer);
         batch.setViewportTransform(mainViewport);
-        batch.setResourceTexture(0, _particleBuffers[(int)!_evenPass]->getRenderBuffer(0));
-        if (_texture) {
-            batch.setResourceTexture(1, _texture);
+        if (_texture && _texture->isLoaded()) {
+            batch.setPipeline(_texturedPipeline);
+            batch.setUniformBuffer(DRAW_BUFFER, _uniformBuffer);
+            batch.setResourceTexture(DRAW_PARTICLES, _particleBuffers[(int)!_evenPass]->getRenderBuffer(0));
+            batch.setResourceTexture(DRAW_TEXTURE, _texture->getGPUTexture());
+        } else {
+            batch.setPipeline(_untexturedPipeline);
+            batch.setUniformBuffer(NOTEX_DRAW_BUFFER, _uniformBuffer);
+            batch.setResourceTexture(NOTEX_DRAW_PARTICLES, _particleBuffers[(int)!_evenPass]->getRenderBuffer(0));
         }
 
-        batch.setModelTransform(_modelTransform);
+        batch.setModelTransform(Transform());
 
-        batch.drawInstanced((gpu::uint32)_maxParticles, gpu::TRIANGLES, (gpu::uint32)VERTEX_PER_PARTICLE);
+        batch.draw(gpu::TRIANGLES, 3 * _uniforms.iResolution.z);
+        //batch.drawInstanced((gpu::uint32)_uniforms.iResolution.z, gpu::TRIANGLES, (gpu::uint32)VERTEX_PER_PARTICLE);
+
+        _uniforms.firstPass = false;
+        _evenPass = !_evenPass;
     }
 
-protected:
-    Transform _modelTransform;
-    AABox _bound;
-    PipelinePointer _pipeline;
-    int _maxParticles;
-    BufferView _uniformBuffer;
-    TexturePointer _texture;
-    bool _visibleFlag { true };
+private:
+    void createPipelines() {
+        std::string uniformBuffer = "particleBuffer";
+        std::string particlesTex = "particlesTex";
+        std::string colorMap = "colorMap";
+        if (!_updatePipeline) {
+            auto state = std::make_shared<gpu::State>();
+            state->setCullMode(gpu::State::CULL_BACK);
 
-    PipelinePointer _updatePipeline;
-    bool _evenPass;
+            auto vertShader = gpu::Shader::createVertex(std::string(DrawUnitQuadTexcoord_vert));
+            auto fragShader = gpu::Shader::createPixel(std::string(procedural_particle_update_frag));
+
+            auto program = gpu::Shader::createProgram(vertShader, fragShader);
+
+            gpu::Shader::BindingSet slotBindings;
+            gpu::Shader::makeProgram(*program, slotBindings);
+
+            UPDATE_BUFFER = program->getBuffers().findLocation(uniformBuffer);
+            UPDATE_PARTICLES = program->getTextures().findLocation(particlesTex);
+
+            _updatePipeline = gpu::Pipeline::create(program, state);
+        }
+        if (!_untexturedPipeline) {
+            auto state = std::make_shared<gpu::State>();
+            state->setCullMode(gpu::State::CULL_BACK);
+            state->setDepthTest(true, false, gpu::LESS_EQUAL);
+            state->setBlendFunction(true, gpu::State::SRC_ALPHA, gpu::State::BLEND_OP_ADD, gpu::State::ONE,
+                                    gpu::State::FACTOR_ALPHA, gpu::State::BLEND_OP_ADD, gpu::State::ONE);
+
+            auto vertShader = gpu::Shader::createVertex(std::string(untextured_procedural_particle_vert));
+            auto fragShader = gpu::Shader::createPixel(std::string(untextured_procedural_particle_frag));
+            auto program = gpu::Shader::createProgram(vertShader, fragShader);
+
+            gpu::Shader::BindingSet slotBindings;
+            gpu::Shader::makeProgram(*program, slotBindings);
+
+            NOTEX_DRAW_BUFFER = program->getBuffers().findLocation(uniformBuffer);
+            NOTEX_DRAW_PARTICLES = program->getTextures().findLocation(particlesTex);
+
+            _untexturedPipeline = gpu::Pipeline::create(program, state);
+        }
+        if (!_texturedPipeline) {
+            auto state = std::make_shared<gpu::State>();
+            state->setCullMode(gpu::State::CULL_BACK);
+            state->setDepthTest(true, false, gpu::LESS_EQUAL);
+            state->setBlendFunction(true, gpu::State::SRC_ALPHA, gpu::State::BLEND_OP_ADD, gpu::State::ONE,
+                                    gpu::State::FACTOR_ALPHA, gpu::State::BLEND_OP_ADD, gpu::State::ONE);
+
+            auto vertShader = gpu::Shader::createVertex(std::string(textured_procedural_particle_vert));
+            auto fragShader = gpu::Shader::createPixel(std::string(textured_procedural_particle_frag));
+            auto program = gpu::Shader::createProgram(vertShader, fragShader);
+
+            // Request these specifically because it doesn't work otherwise
+            gpu::Shader::BindingSet slotBindings;
+            slotBindings.insert(gpu::Shader::Binding(particlesTex, DRAW_PARTICLES));
+            slotBindings.insert(gpu::Shader::Binding(colorMap, DRAW_TEXTURE));
+            gpu::Shader::makeProgram(*program, slotBindings);
+
+            DRAW_BUFFER = program->getBuffers().findLocation(uniformBuffer);
+            DRAW_PARTICLES = program->getTextures().findLocation(particlesTex);
+            DRAW_TEXTURE = program->getTextures().findLocation(colorMap);
+
+            _texturedPipeline = gpu::Pipeline::create(program, state);
+        }
+    }
+
+    ParticleUniforms _uniforms;
+    BufferView _uniformBuffer;
+
+    bool _evenPass { true };
     QList<gpu::FramebufferPointer> _particleBuffers;
+
+    // Rendering
+    NetworkTexturePointer _texture;
+    gpu::PipelinePointer _updatePipeline;
+    gpu::PipelinePointer _untexturedPipeline;
+    gpu::PipelinePointer _texturedPipeline;
+
 };
 
-namespace render {
-    template <>
-    const ItemKey payloadGetKey(const ProceduralParticlePayloadData::Pointer& payload) {
-        if (payload->getVisibleFlag()) {
-            return ItemKey::Builder::transparentShape();
-        } else {
-            return ItemKey::Builder().withInvisible().build();
-        }
-    }
-
-    template <>
-    const Item::Bound payloadGetBound(const ProceduralParticlePayloadData::Pointer& payload) {
-        return payload->getBound();
-    }
-
-    template <>
-    void payloadRender(const ProceduralParticlePayloadData::Pointer& payload, RenderArgs* args) {
-        if (payload->getVisibleFlag()) {
-            payload->render(args);
-        }
-    }
-}
-
-EntityItemPointer RenderableProceduralParticlesEntityItem::factory(const EntityItemID& entityID,
-                                                                   const EntityItemProperties& properties) {
-    auto entity = std::make_shared<RenderableProceduralParticlesEntityItem>(entityID);
+RenderableProceduralParticlesEntityItem::Pointer RenderableProceduralParticlesEntityItem::baseFactory(const EntityItemID& entityID, const EntityItemProperties& properties) {
+    Pointer entity = std::make_shared<RenderableProceduralParticlesEntityItem>(entityID);
     entity->setProperties(properties);
     return entity;
 }
 
+EntityItemPointer RenderableProceduralParticlesEntityItem::factory(const EntityItemID& entityID, const EntityItemProperties& properties) {
+    return baseFactory(entityID, properties);
+}
+
 RenderableProceduralParticlesEntityItem::RenderableProceduralParticlesEntityItem(const EntityItemID& entityItemID) :
     ProceduralParticlesEntityItem(entityItemID) {
-    // lazy creation of particle system pipeline
-    if (!_updatePipeline || !_untexturedPipeline || !_texturedPipeline) {
-        createPipelines();
-    }
-    // Create the FBOs
-    // TODO: don't default to MAX_DIM * MAX_DIM
-    for (int i = 0; i < 2; i++) {
-        _particleBuffers.append(gpu::FramebufferPointer(gpu::Framebuffer::create(gpu::Format(gpu::Dimension::VEC4,
-                                                                                             gpu::Type::FLOAT,
-                                                                                             gpu::Semantic::RGBA), MAX_DIM, MAX_DIM)));
-    }
-    // Resize the FBOs
-    setMaxParticles(_maxParticles);
+
 }
 
-bool RenderableProceduralParticlesEntityItem::addToScene(EntityItemPointer self,
-                                                         render::ScenePointer scene,
-                                                         render::PendingChanges& pendingChanges) {
-    _scene = scene;
-    _renderItemId = _scene->allocateID();
-    auto particlePayloadData = std::make_shared<ProceduralParticlePayloadData>();
-    particlePayloadData->setUpdatePipeline(_updatePipeline);
-    particlePayloadData->setPipeline(_untexturedPipeline);
-    particlePayloadData->setParticleBuffers(_particleBuffers);
-    auto renderPayload = std::make_shared<ProceduralParticlePayloadData::Payload>(particlePayloadData);
-    render::Item::Status::Getters statusGetters;
-    makeEntityItemStatusGetters(getThisPointer(), statusGetters);
-    renderPayload->addStatusGetters(statusGetters);
-    pendingChanges.resetItem(_renderItemId, renderPayload);
-    return true;
-}
-
-void RenderableProceduralParticlesEntityItem::removeFromScene(EntityItemPointer self,
-                                                              render::ScenePointer scene,
-                                                              render::PendingChanges& pendingChanges) {
-    pendingChanges.removeItem(_renderItemId);
-    _scene = nullptr;
-    render::Item::clearID(_renderItemId);
-};
+// TODO: forward radius and color/alpha changes to _particles
 
 void RenderableProceduralParticlesEntityItem::setMaxParticles(quint32 maxParticles) {
     ProceduralParticlesEntityItem::setMaxParticles(maxParticles);
-
-    int width = std::min(MAX_DIM, _maxParticles);
-    int height = ((int)(_maxParticles / MAX_DIM) + 1) * 2;
-    for (auto& buffer : _particleBuffers) {
-        buffer->resize(width, height);
+    if (_particles) {
+        _particles->setMaxParticles(_maxParticles, MAX_DIM);
     }
 }
 
 void RenderableProceduralParticlesEntityItem::update(const quint64& now) {
     ProceduralParticlesEntityItem::update(now);
 
-    if (_texturesChangedFlag) {
-        if (_textures.isEmpty()) {
-            _texture.clear();
-        } else {
-            // for now use the textures string directly.
-            // Eventually we'll want multiple textures in a map or array.
-            _texture = DependencyManager::get<TextureCache>()->getTexture(_textures);
-        }
-        _texturesChangedFlag = false;
-    }
-
-    updateRenderItem();
-
-    // These needs to be below updateRenderItem() to guarentee that the payload gets the correct state
-    _firstPass = false;
-    _evenPass = !_evenPass;
-}
-
-void RenderableProceduralParticlesEntityItem::updateRenderItem() {
-    // this 2 tests are synonyms for this class, but we would like to get rid of the _scene pointer ultimately
-    if (!_scene || !render::Item::isValidID(_renderItemId)) {
-        return;
-    }
-    if (!getVisible()) {
-        render::PendingChanges pendingChanges;
-        pendingChanges.updateItem<ProceduralParticlePayloadData>(_renderItemId, [](ProceduralParticlePayloadData& payload) {
-            payload.setVisibleFlag(false);
-        });
-
-        _scene->enqueuePendingChanges(pendingChanges);
-        return;
-    }
-
-    using ParticleUniforms = ProceduralParticlePayloadData::ParticleUniforms;
-
-    // Fill in Uniforms structure
-    ParticleUniforms particleUniforms;
-    particleUniforms.radius = getParticleRadius();
-    particleUniforms.color = glm::vec4(getColorRGB(), getAlpha());
-    particleUniforms.firstPass = getFirstPass();
-    particleUniforms.iGlobalTime = getSimulationTime();
-    particleUniforms.iDeltaTime = getDeltaTime();
-    particleUniforms.iResolution = glm::vec2(_particleBuffers[0]->getWidth(), _particleBuffers[0]->getHeight());
-    particleUniforms.maxParticles = getMaxParticles();
-
-    int maxParticles = getMaxParticles();
-    bool evenPass = _evenPass;
-
-    auto particleBuffers = _particleBuffers;
-
-    bool success;
-    auto bounds = getAABox(success);;
-    if (!success) {
-        return;
-    }
-
-    Transform transform;
-    render::PendingChanges pendingChanges;
-    pendingChanges.updateItem<ProceduralParticlePayloadData>(_renderItemId, [=](ProceduralParticlePayloadData& payload) {
-        payload.setVisibleFlag(true);
-
-        // Update particle uniforms
-        memcpy(&payload.editParticleUniforms(), &particleUniforms, sizeof(ParticleUniforms));
-
-        payload.setParticleBuffers(particleBuffers);
-        payload.setMaxParticles(maxParticles);
-        payload.setEvenPass(evenPass);
-
-        // Update transform and bounds
-        payload.setModelTransform(transform);
-        payload.setBound(bounds);
-
-        payload.setUpdatePipeline(_updatePipeline);
-
-        if (_texture && _texture->isLoaded()) {
-            payload.setTexture(_texture->getGPUTexture());
-            payload.setPipeline(_texturedPipeline);
-        } else {
-            payload.setTexture(nullptr);
-            payload.setPipeline(_untexturedPipeline);
-        }
-    });
-
-    _scene->enqueuePendingChanges(pendingChanges);
-}
-
-void RenderableProceduralParticlesEntityItem::createPipelines() {
-    if (!_updatePipeline) {
-        auto state = std::make_shared<gpu::State>();
-        state->setCullMode(gpu::State::CULL_BACK);
-
-        auto vertShader = gpu::Shader::createVertex(std::string(DrawUnitQuadTexcoord_vert));
-        auto fragShader = gpu::Shader::createPixel(std::string(procedural_particle_update_frag));
-
-        auto program = gpu::Shader::createProgram(vertShader, fragShader);
-        _updatePipeline = gpu::Pipeline::create(program, state);
-    }
-    if (!_untexturedPipeline) {
-        auto state = std::make_shared<gpu::State>();
-        state->setCullMode(gpu::State::CULL_BACK);
-        state->setDepthTest(true, false, gpu::LESS_EQUAL);
-        state->setBlendFunction(true, gpu::State::SRC_ALPHA, gpu::State::BLEND_OP_ADD, gpu::State::ONE,
-                                gpu::State::FACTOR_ALPHA, gpu::State::BLEND_OP_ADD, gpu::State::ONE);
-
-        auto vertShader = gpu::Shader::createVertex(std::string(untextured_procedural_particle_vert));
-        auto fragShader = gpu::Shader::createPixel(std::string(untextured_procedural_particle_frag));
-
-        auto program = gpu::Shader::createProgram(vertShader, fragShader);
-        _untexturedPipeline = gpu::Pipeline::create(program, state);
-    }
-    if (!_texturedPipeline) {
-        auto state = std::make_shared<gpu::State>();
-        state->setCullMode(gpu::State::CULL_BACK);
-        state->setDepthTest(true, false, gpu::LESS_EQUAL);
-        state->setBlendFunction(true, gpu::State::SRC_ALPHA, gpu::State::BLEND_OP_ADD, gpu::State::ONE,
-                                gpu::State::FACTOR_ALPHA, gpu::State::BLEND_OP_ADD, gpu::State::ONE);
-
-        auto vertShader = gpu::Shader::createVertex(std::string(textured_procedural_particle_vert));
-        auto fragShader = gpu::Shader::createPixel(std::string(textured_procedural_particle_frag));
-
-        auto program = gpu::Shader::createProgram(vertShader, fragShader);
-        _texturedPipeline = gpu::Pipeline::create(program, state);
+    if (_particles) {
+        _particles->update(_simulationTime, _deltaTime);
     }
 }
 
-void RenderableProceduralParticlesEntityItem::notifyBoundChanged() {
-    if (!render::Item::isValidID(_renderItemId)) {
-        return;
+void RenderableProceduralParticlesEntityItem::render(RenderArgs* args) {
+    if (!_particles) {
+        _particles.reset(new ProceduralParticles(glm::vec4(getColorRGB(), getAlpha()), getRadius(), 1024*1024/2, MAX_DIM));
     }
-    render::PendingChanges pendingChanges;
-    pendingChanges.updateItem<ProceduralParticlePayloadData>(_renderItemId, [](ProceduralParticlePayloadData& payload) {
-    });
 
-    _scene->enqueuePendingChanges(pendingChanges);
+    _particles->render(args);
+
+    args->_details._trianglesRendered += (int) _maxParticles;
 }

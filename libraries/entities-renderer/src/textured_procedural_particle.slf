@@ -12,10 +12,14 @@
 uniform sampler2D colorMap;
 
 in vec4 varColor;
-in vec2 varTexcoord;
+in vec2 varTexCoord;
 
 out vec4 outFragColor;
 
 void main(void) {
-    outFragColor = texture(colorMap, varTexcoord.xy) * varColor;
+    if (abs(varTexCoord.x) <= 1.0 && abs(varTexCoord.y) <= 1.0) {
+        outFragColor = texture(colorMap, (varTexCoord + 1.0)/2.0) * varColor;
+    } else {
+        discard;
+    }
 }
