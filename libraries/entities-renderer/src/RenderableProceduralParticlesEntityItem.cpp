@@ -62,6 +62,14 @@ void RenderableProceduralParticlesEntityItem::setMaxParticles(quint32 maxParticl
     }
 }
 
+void RenderableProceduralParticlesEntityItem::setTextures(const QString& textures) {
+    ProceduralParticlesEntityItem::setTextures(textures);
+    if (_particles && _texturesChangedFlag) {
+        _particles->setTextures(_textures);
+    }
+}
+
+
 void RenderableProceduralParticlesEntityItem::update(const quint64& now) {
     ProceduralParticlesEntityItem::update(now);
 

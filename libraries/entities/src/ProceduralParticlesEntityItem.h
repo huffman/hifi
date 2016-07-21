@@ -83,10 +83,12 @@ public:
 
     static const QString DEFAULT_TEXTURES;
     const QString& getTextures() const { return _textures; }
-    void setTextures(const QString& textures) {
+    virtual void setTextures(const QString& textures) {
         if (_textures != textures) {
             _textures = textures;
             _texturesChangedFlag = true;
+        } else {
+            _texturesChangedFlag = false;
         }
     }
 

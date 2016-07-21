@@ -70,7 +70,7 @@ void ParticleOverlay::setProperties(const QVariantMap& properties) {
 
     auto alpha = properties["alpha"];
     if (alpha.isValid() && alpha.canConvert<float>()) {
-        _alpha = alpha.toFloat();
+        setAlpha(alpha.toFloat());
         if (_particles) {
             _particles->setAlpha(_alpha);
         }
@@ -78,7 +78,7 @@ void ParticleOverlay::setProperties(const QVariantMap& properties) {
 
     auto particleRadius = properties["particleRadius"];
     if (particleRadius.isValid() && particleRadius.canConvert<float>()) {
-        _particleRadius = particleRadius.toFloat();
+        setParticleRadius(particleRadius.toFloat());
         if (_particles) {
             _particles->setParticleRadius(_particleRadius);
         }
@@ -86,7 +86,7 @@ void ParticleOverlay::setProperties(const QVariantMap& properties) {
 
     auto maxParticles = properties["maxParticles"];
     if (maxParticles.isValid() && maxParticles.canConvert<uint>()) {
-        _maxParticles = maxParticles.toUInt();
+        setMaxParticles(maxParticles.toUInt());
         if (_particles) {
             _particles->setMaxParticles(_maxParticles, MAX_DIM);
         }
@@ -94,10 +94,9 @@ void ParticleOverlay::setProperties(const QVariantMap& properties) {
 
     auto textures = properties["textures"];
     if (textures.isValid() && textures.canConvert<QString>()) {
-        _textures = textures.toString();
-        if (_particles) {
-            // TODO: expose setTextures
-            //_particles->setTextures(_textures);
+        setTextures(textures.toString());
+        if (_particles && _texturesChangedFlag) {
+            _particles->setTextures(_textures);
         }
     }
 

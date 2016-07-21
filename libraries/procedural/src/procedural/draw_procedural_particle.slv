@@ -50,7 +50,13 @@ vec4 setColor(vec4 pos, vec4 vel, int index, ivec2 iFragCoord) {
 }
 
 float setRadius(vec4 pos, vec4 vel, int index, ivec2 iFragCoord) {
-    return particle.radius;
+    const float GROW_TIME = 0.75;
+    float remainingTime = pos.w - vel.w;
+    remainingTime = max(remainingTime, 0.0);
+    float ratio = min(min(vel.w/GROW_TIME, 1.0),
+                      min(remainingTime/GROW_TIME, 1.0));
+
+    return ratio * particle.radius;
 }
 
 void main(void) {

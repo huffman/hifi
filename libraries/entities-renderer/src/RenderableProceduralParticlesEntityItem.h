@@ -29,6 +29,7 @@ public:
     void setColor(const xColor& color) override;
     void setAlpha(float alpha) override;
     void setMaxParticles(quint32 maxParticles) override;
+    void setTextures(const QString& textures) override;
 
     void render(RenderArgs* args) override;
 

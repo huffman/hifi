@@ -32,17 +32,15 @@ public:
 
     ProceduralParticles(glm::vec4 color, float radius, quint32 maxParticles, quint32 MAX_DIM);
 
-    void setParticleRadius(float radius) { _uniforms.radius = radius; }
-
     void setColor(const rgbColor& color) {
         _uniforms.color.x = color[0];
         _uniforms.color.y = color[1];
         _uniforms.color.z = color[2];
     }
-
     void setAlpha(float alpha) { _uniforms.color.w = alpha; }
-
+    void setParticleRadius(float radius) { _uniforms.radius = radius; }
     void setMaxParticles(quint32 maxParticles, const quint32 MAX_DIM);
+    void setTextures(const QString& textures);
 
     const ParticleUniforms& getParticleUniforms() const { return _uniformBuffer.get<ParticleUniforms>(); }
     ParticleUniforms& editParticleUniforms() { return _uniformBuffer.edit<ParticleUniforms>(); }

@@ -65,23 +65,20 @@ void ProceduralParticles::setMaxParticles(quint32 maxParticles, const quint32 MA
     _uniforms.firstPass = true;
 }
 
+void ProceduralParticles::setTextures(const QString& textures) {
+    if (textures.isEmpty()) {
+        _texture.clear();
+    } else {
+        _texture = DependencyManager::get<TextureCache>()->getTexture(textures);
+    }
+}
+
 void ProceduralParticles::update(float iGlobalTime, float iDeltaTime) {
     _uniforms.iGlobalTime = iGlobalTime;
     _uniforms.iDeltaTime = iDeltaTime;
 
-    /*    if (_texturesChangedFlag) {
-    if (_textures.isEmpty()) {
-    _texture.clear();
-    } else {
-    // for now use the textures string directly.
-    // Eventually we'll want multiple textures in a map or array.
-    _texture = DependencyManager::get<TextureCache>()->getTexture(_textures);
-    }
-    _texturesChangedFlag = false;
-    }*/
-
+    // TODO: remove (for testing)
     if (!_texture) {
-        // TODO: remove (for testing)
         _texture = DependencyManager::get<TextureCache>()->getTexture(QString("https://hifi-public.s3.amazonaws.com/alan/Particles/Particle-Sprite-Smoke-1.png"));
     }
 }
