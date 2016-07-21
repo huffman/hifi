@@ -28,7 +28,6 @@ const quint32 ProceduralParticlesEntityItem::MAX_DIM = 1024;                    
 const quint32 ProceduralParticlesEntityItem::MAXIMUM_MAX_PARTICLES = MAX_DIM * MAX_DIM / 2;     // 1024 * 1024 / 2 = 524288
 const quint32 ProceduralParticlesEntityItem::DEFAULT_MAX_PARTICLES = 1000;
 const float ProceduralParticlesEntityItem::DEFAULT_PARTICLE_RADIUS = 0.025f;
-// TODO make this "" and fix textureless particles
 const QString ProceduralParticlesEntityItem::DEFAULT_TEXTURES = "";
 
 EntityItemPointer ProceduralParticlesEntityItem::factory(const EntityItemID& entityID, const EntityItemProperties& properties) {

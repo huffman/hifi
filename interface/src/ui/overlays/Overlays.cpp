@@ -27,6 +27,7 @@
 #include "Line3DOverlay.h"
 #include "LocalModelsOverlay.h"
 #include "ModelOverlay.h"
+#include "ParticleOverlay.h"
 #include "Rectangle3DOverlay.h"
 #include "Sphere3DOverlay.h"
 #include "Grid3DOverlay.h"
@@ -180,6 +181,8 @@ unsigned int Overlays::addOverlay(const QString& type, const QVariant& propertie
         thisOverlay = std::make_shared<Web3DOverlay>();
     } else if (type == RectangleOverlay::TYPE) {
         thisOverlay = std::make_shared<RectangleOverlay>();
+    } else if (type == ParticleOverlay::TYPE) {
+        thisOverlay = std::make_shared<ParticleOverlay>();
     }
 
     if (thisOverlay) {
