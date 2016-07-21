@@ -11,8 +11,6 @@
 #ifndef hifi_ProceduralParticlesEntityItem_h
 #define hifi_ProceduralParticlesEntityItem_h
 
-#include <deque>
-
 #include "EntityItem.h"
 
 #include "ColorUtils.h"
@@ -53,14 +51,14 @@ public:
 
     static const xColor DEFAULT_COLOR;
     void setColor(const rgbColor& value) { memcpy(_color, value, sizeof(_color)); }
-    void setColor(const xColor& value) {
+    virtual void setColor(const xColor& value) {
         _color[RED_INDEX] = value.red;
         _color[GREEN_INDEX] = value.green;
         _color[BLUE_INDEX] = value.blue;
     }
 
     static const float DEFAULT_ALPHA;
-    void setAlpha(float alpha) { _alpha = alpha; }
+    virtual void setAlpha(float alpha) { _alpha = alpha; }
     float getAlpha() const { return _alpha; }
 
     virtual void debugDump() const;
@@ -72,7 +70,7 @@ public:
     quint32 getMaxParticles() const { return _maxParticles; }
 
     static const float DEFAULT_PARTICLE_RADIUS;
-    void setParticleRadius(float particleRadius) { _particleRadius = particleRadius; }
+    virtual void setParticleRadius(float particleRadius) { _particleRadius = particleRadius; }
     float getParticleRadius() const { return _particleRadius; }
 
     float getSimulationTime() const { return _simulationTime; }

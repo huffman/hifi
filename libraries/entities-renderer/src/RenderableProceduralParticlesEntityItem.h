@@ -25,7 +25,9 @@ public:
     RenderableProceduralParticlesEntityItem(const EntityItemID& entityItemID);
 
     virtual void update(const quint64& now) override;
-
+    void setParticleRadius(float radius) override;
+    void setColor(const xColor& color) override;
+    void setAlpha(float alpha) override;
     void setMaxParticles(quint32 maxParticles) override;
 
     void render(RenderArgs* args) override;

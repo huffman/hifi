@@ -45,6 +45,14 @@ const vec4 UNIT_TRI[NUM_VERTICES_PER_PARTICLE] = vec4[NUM_VERTICES_PER_PARTICLE]
     vec4(3.0, -1.0, 0.0, 0.0)
 );
 
+vec4 setColor(vec4 pos, vec4 vel, int index, ivec2 iFragCoord) {
+    return particle.color;
+}
+
+float setRadius(vec4 pos, vec4 vel, int index, ivec2 iFragCoord) {
+    return particle.radius;
+}
+
 void main(void) {
     TransformCamera cam = getTransformCamera();
     TransformObject obj = getTransformObject();
@@ -54,11 +62,12 @@ void main(void) {
     // Which quad vertex pos?
     int triID = gl_VertexID - particleID * NUM_VERTICES_PER_PARTICLE;
 
-    // TODO: expose setColor(int index) function
-    varColor = particle.color;
+    ivec2 iFragCoord = getFragCoord(particleID);
+    vec4 pos = texelFetch(particlesTex, iFragCoord, 0);
+    vec4 vel = texelFetch(particlesTex, iFragCoord + ivec2(0, 1), 0);
 
-    // TODO: expose setRadius(int index) function
-    float radius = particle.radius;
+    varColor = setColor(pos, vel, particleID, iFragCoord);
+    float radius = setRadius(pos, vel, particleID, iFragCoord);
 
     // Pass the tex coords to the fragment shader
     varTexCoord = UNIT_TRI[triID].xy;
@@ -67,7 +76,7 @@ void main(void) {
 
     // anchor point in eye space
     vec4 anchorPoint;
-    vec4 _inPosition = vec4(texelFetch(particlesTex, getFragCoord(particleID), 0).xyz, 1.0);
+    vec4 _inPosition = vec4(pos.xyz, 1.0);
     <$transformModelToEyePos(cam, obj, _inPosition, anchorPoint)$>
 
     vec4 eyePos = anchorPoint + quadPos;
