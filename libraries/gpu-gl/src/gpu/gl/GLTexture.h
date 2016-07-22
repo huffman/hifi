@@ -74,34 +74,40 @@ public:
         return object;
     }
 
-    template <typename GLTextureType> 
-    static GLuint getId(const TexturePointer& texture, bool shouldSync) {
-        if (!texture) {
-            return 0;
-        }
-        GLTextureType* object { nullptr };
-        if (shouldSync) {
-            object = sync<GLTextureType>(texture, shouldSync);
-        } else {
-            object = Backend::getGPUObject<GLTextureType>(*texture);
-        }
-        if (!object) {
-            return 0;
-        }
+//    template <typename GLTextureType> 
+//    static GLuint getId(const TexturePointer& texture, bool shouldSync) {
+//        if (!texture) {
+//            return 0;
+//        }
+//        GLTextureType* object { nullptr };
+//        if (shouldSync) {
+//            object = sync<GLTextureType>(texture, shouldSync);
+//        } else {
+//            object = Backend::getGPUObject<GLTextureType>(*texture);
+//        }
+//        if (!object) {
+//            return 0;
+//        }
+//
+//        GLuint result = 0;
+//
+//        if (!object->_transferrable || (object->getSyncState() == GLSyncState::Idle && object->_transferCount > 0)) {
+//            return object->_texture;
+//        }
+//        
+//        return result;
+//    }
 
-        GLuint result = object->_id;
+    GLuint getTextureID() const {
 
-        // Don't return textures that are in transfer state
-        if ((object->getSyncState() != GLSyncState::Idle) || 
-            // Don't return transferrable textures that have never completed transfer
-            (!object->_transferrable || 0 != object->_transferCount)) {
-            // Will be either 0 or the original texture being downsampled.
-            result = object->_downsampleSource._texture;
+        if (getSyncState() == GLSyncState::Idle && _transferCount == 1) {
         }
-        
-        return result;
+        //return _texture;
+        if (!_transferrable || (getSyncState() == GLSyncState::Idle && _transferCount > 0)) {
+            return _texture;
+        }
+        return 0;
     }
-
     // Used by derived classes and helpers to ensure the actual GL object exceeds the lifetime of `this`
     GLuint takeOwnership() {
         GLuint result = _id;

@@ -203,7 +203,9 @@ void GLBackend::do_setResourceTexture(Batch& batch, size_t paramOffset) {
     // Always make sure the GLObject is in sync
     GLTexture* object = syncGPUObject(resourceTexture);
     if (object) {
-        GLuint to = object->_texture;
+        //GLuint to = object->_texture;
+        //GLuint to = object->_texture;
+        GLuint to = object->getTextureID();
         GLuint target = object->_target;
         glActiveTexture(GL_TEXTURE0 + slot);
         glBindTexture(target, to);

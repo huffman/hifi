@@ -176,7 +176,7 @@ static const int MAX_CONCURRENT_RESOURCE_DOWNLOADS = 16;
 // 2 logical cores available for time sensitive tasks.
 static const int MIN_PROCESSING_THREAD_POOL_SIZE = 2;
 static const int PROCESSING_THREAD_POOL_SIZE = std::max(MIN_PROCESSING_THREAD_POOL_SIZE,
-                                                        QThread::idealThreadCount() - 2);
+    2);// QThread::idealThreadCount() - 2);
 
 static const QString SNAPSHOT_EXTENSION  = ".jpg";
 static const QString SVO_EXTENSION  = ".svo";

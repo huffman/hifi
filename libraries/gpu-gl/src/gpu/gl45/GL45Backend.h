@@ -50,7 +50,7 @@ protected:
     GLuint getBufferID(const Buffer& buffer) override;
     gl::GLBuffer* syncGPUObject(const Buffer& buffer) override;
 
-    GLuint getTextureID(const TexturePointer& texture, bool needTransfer = true) override;
+//    GLuint getTextureID(const TexturePointer& texture, bool needTransfer = true) override;
     gl::GLTexture* syncGPUObject(const TexturePointer& texture, bool sync = true) override;
 
     GLuint getQueryID(const QueryPointer& query) override;

@@ -39,8 +39,8 @@ int main(int argc, const char* argv[]) {
     static QString BUG_SPLAT_APPLICATION_NAME = "Interface";
     CrashReporter crashReporter { BUG_SPLAT_DATABASE, BUG_SPLAT_APPLICATION_NAME, BuildInfo::VERSION };
 #endif
-
     disableQtBearerPoll(); // Fixes wifi ping spikes
+    SetProcessAffinityMask(GetCurrentProcess(), 0x0F);
     
     QString applicationName = "High Fidelity Interface - " + qgetenv("USERNAME");
 

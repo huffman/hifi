@@ -448,6 +448,8 @@ void OpenGLDisplayPlugin::submitOverlayTexture(const gpu::TexturePointer& overla
 }
 
 void OpenGLDisplayPlugin::updateTextures() {
+    PROFILE_RANGE_EX(__FUNCTION__, 0xff00ff00, 0);
+
     // FIXME intrduce a GPU wait instead of a CPU/GPU sync point?
 #if THREADED_PRESENT
     if (_sceneTextureEscrow.fetchSignaledAndRelease(_currentSceneTexture)) {
@@ -524,6 +526,8 @@ void OpenGLDisplayPlugin::compositeScene() {
 }
 
 void OpenGLDisplayPlugin::compositeLayers() {
+    PROFILE_RANGE_EX(__FUNCTION__, 0xff00ff00, 0);
+
     using namespace oglplus;
     auto targetRenderSize = getRecommendedRenderSize();
     if (!_compositeFramebuffer || _compositeFramebuffer->size != targetRenderSize) {
@@ -561,6 +565,8 @@ void OpenGLDisplayPlugin::compositeLayers() {
 }
 
 void OpenGLDisplayPlugin::internalPresent() {
+    PROFILE_RANGE_EX(__FUNCTION__, 0xff00ff00, 0);
+
     using namespace oglplus;
     const uvec2& srcSize = _compositeFramebuffer->size;
     uvec2 dstSize = getSurfacePixels();

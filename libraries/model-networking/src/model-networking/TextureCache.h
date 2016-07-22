@@ -74,6 +74,7 @@ signals:
     void networkTextureCreated(const QWeakPointer<NetworkTexture>& self);
 
 protected:
+protected:
 
     virtual bool isCacheable() const override { return _loaded; }
 

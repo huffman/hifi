@@ -60,9 +60,10 @@ public:
                     } else {
                         gltexture = nullptr;
                     }
+                    //gltexture = nullptr;
 
                     if (gltexture) {
-                        glFramebufferTexture2D(GL_FRAMEBUFFER, colorAttachments[unit], GL_TEXTURE_2D, gltexture->_texture, 0);
+                        glFramebufferTexture2D(GL_FRAMEBUFFER, colorAttachments[unit], GL_TEXTURE_2D, gltexture->getTextureID(), 0);
                         _colorBuffers.push_back(colorAttachments[unit]);
                     } else {
                         glFramebufferTexture2D(GL_FRAMEBUFFER, colorAttachments[unit], GL_TEXTURE_2D, 0, 0);
@@ -87,7 +88,7 @@ public:
             }
 
             if (gltexture) {
-                glFramebufferTexture2D(GL_FRAMEBUFFER, attachement, GL_TEXTURE_2D, gltexture->_texture, 0);
+                glFramebufferTexture2D(GL_FRAMEBUFFER, attachement, GL_TEXTURE_2D, gltexture->getTextureID(), 0);
             } else {
                 glFramebufferTexture2D(GL_FRAMEBUFFER, attachement, GL_TEXTURE_2D, 0, 0);
             }

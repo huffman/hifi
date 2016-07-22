@@ -57,8 +57,8 @@ public:
                         gltexture = nullptr;
                     }
 
-                    if (gltexture) {
-                        glNamedFramebufferTexture(_id, colorAttachments[unit], gltexture->_texture, 0);
+                    if (gltexture && gltexture->getTextureID() != 0) {
+                        glNamedFramebufferTexture(_id, colorAttachments[unit], gltexture->getTextureID(), 0);
                         _colorBuffers.push_back(colorAttachments[unit]);
                     } else {
                         glNamedFramebufferTexture(_id, colorAttachments[unit], 0, 0);
@@ -83,7 +83,7 @@ public:
             }
 
             if (gltexture) {
-                glNamedFramebufferTexture(_id, attachement, gltexture->_texture, 0);
+                glNamedFramebufferTexture(_id, attachement, gltexture->getTextureID(), 0);
             } else {
                 glNamedFramebufferTexture(_id, attachement, 0, 0);
             }

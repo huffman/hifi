@@ -141,7 +141,9 @@ GLTexture::GLTexture(const gpu::Texture& texture, GLuint id, GLTexture* original
     _transferrable(transferrable),
     _downsampleSource(originalTexture)
 {
+    _syncState = Idle;
     if (_transferrable) {
+        _syncState = Pending;
         uint16 mipCount = usedMipLevels();
         _currentMaxMipCount = std::max(_currentMaxMipCount, mipCount);
         if (!_textureCountByMips.count(mipCount)) {
@@ -215,7 +217,7 @@ bool GLTexture::isInvalid() const {
 }
 
 bool GLTexture::isOutdated() const {
-    return GLSyncState::Idle == _syncState && _contentStamp < _gpuObject.getDataStamp();
+    return GLSyncState::Pending == _syncState && _contentStamp < _gpuObject.getDataStamp();
 }
 
 bool GLTexture::isOverMaxMemory() const {

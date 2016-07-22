@@ -19,6 +19,7 @@
 
 #include <SharedUtil.h>
 #include <NumericalConstants.h>
+#include <shared/NsightHelpers.h>
 
 // The GLEscrow class provides a simple mechanism for producer GL contexts to provide
 // content to a consumer where the consumer is assumed to be connected to a display and
@@ -71,6 +72,8 @@ public:
         }
 
         bool signaled() const {
+            PROFILE_RANGE_EX(__FUNCTION__, 0xff00ff00, 0);
+
             auto result = glClientWaitSync(_sync, 0, 0);
             if (GL_TIMEOUT_EXPIRED != result && GL_WAIT_FAILED != result) {
                 return true;

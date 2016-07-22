@@ -44,6 +44,9 @@ GLTextureTransferHelper::~GLTextureTransferHelper() {
 
 void GLTextureTransferHelper::transferTexture(const gpu::TexturePointer& texturePointer) {
     GLTexture* object = Backend::getGPUObject<GLTexture>(*texturePointer);
+    if (object->_transferCount > 0 || object->getSyncState() != GLSyncState::Pending || !object->_transferrable) {
+        //return;
+    }
     Backend::incrementTextureGPUTransferCount();
 #ifdef THREADED_TEXTURE_TRANSFER
     GLsync fence { 0 };
@@ -90,6 +93,8 @@ bool GLTextureTransferHelper::processQueueItems(const Queue& messages) {
         if (!texturePointer) {
             continue;
         }
+
+        PROFILE_RANGE_EX(__FUNCTION__, 0xffff0000, nullptr);
 
         if (package.fence) {
             glClientWaitSync(package.fence, GL_SYNC_FLUSH_COMMANDS_BIT, GL_TIMEOUT_IGNORED);

@@ -132,10 +132,11 @@ void GLBackend::init() {
                 return 0;
             }
             
-            if (object->getSyncState() != GLSyncState::Idle) {
-                return object->_downsampleSource._texture;
-            }
-            return object->_texture;
+            //if (object->getSyncState() != GLSyncState::Idle) {
+                //return object->_downsampleSource._texture;
+            //}
+            //return object->_texture;
+            return object->getTextureID();
         };
 
         QString vendor{ (const char*)glGetString(GL_VENDOR) };
