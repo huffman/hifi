@@ -33,8 +33,7 @@ public:
 
     void render(RenderArgs* args) override;
 
-    // TODO: allow configurable shaders
-//    void setUserData(const QString& value) override;
+    void setUserData(const QString& value) override;
 
     SIMPLE_RENDERABLE();
 

@@ -69,6 +69,14 @@ void RenderableProceduralParticlesEntityItem::setTextures(const QString& texture
     }
 }
 
+void RenderableProceduralParticlesEntityItem::setUserData(const QString& value) {
+    if (value != getUserData()) {
+        ProceduralParticlesEntityItem::setUserData(value);
+        if (_particles) {
+            _particles->parse(value);
+        }
+    }
+}
 
 void RenderableProceduralParticlesEntityItem::update(const quint64& now) {
     ProceduralParticlesEntityItem::update(now);
