@@ -73,7 +73,7 @@ void RenderableProceduralParticlesEntityItem::setUserData(const QString& value) 
     if (value != getUserData()) {
         ProceduralParticlesEntityItem::setUserData(value);
         if (_particles) {
-            _particles->parse(value);
+            _particles->setUserData(value);
         }
     }
 }
@@ -91,7 +91,9 @@ void RenderableProceduralParticlesEntityItem::render(RenderArgs* args) {
         _particles.reset(new ProceduralParticles(glm::vec4(getColorRGB(), getAlpha()), getParticleRadius(), getMaxParticles(), MAX_DIM));
     }
 
-    _particles->render(args);
+    if (_particles->ready()) {
+        _particles->render(args);
+    }
 
     args->_details._trianglesRendered += (int) _maxParticles;
 }

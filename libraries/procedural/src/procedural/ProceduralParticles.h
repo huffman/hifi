@@ -6,6 +6,8 @@
 //  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
 //
 
+#include <QJsonObject>
+#include <QJsonArray>
 #include <RenderArgs.h>
 #include <gpu/Stream.h>
 #include <model-networking/TextureCache.h>
@@ -34,8 +36,10 @@ public:
 
     ProceduralParticles(glm::vec4 color, float radius, quint32 maxParticles, quint32 MAX_DIM);
     ProceduralParticles(glm::vec4 color, float radius, quint32 maxParticles, quint32 MAX_DIM, const QString& userDataJson);
+    ProceduralParticles(glm::vec4 color, float radius, quint32 maxParticles, quint32 MAX_DIM, const QVariantMap& userDataJson);
 
-    void parse(const QString& userDataJson);
+    void setUserData(const QString& userDataJson);
+    void setUserData(const QVariantMap& userDataJson);
 
     void setColor(const rgbColor& color) {
         _particleUniforms.color.x = color[0];
@@ -49,6 +53,7 @@ public:
 
     const ParticleUniforms& getParticleUniforms() const { return _uniformBuffer.get<ParticleUniforms>(); }
     ParticleUniforms& editParticleUniforms() { return _uniformBuffer.edit<ParticleUniforms>(); }
+    float& editHifiUniforms() { return _hifiBuffer.edit<float>(); }
 
     void update(float iGlobalTime, float iDeltaTime);
 

@@ -16,8 +16,6 @@
 
 #include <DependencyManager.h>
 
-#include <QJsonObject>
-#include <QJsonArray>
 #include <QJsonDocument>
 #include <QFile>
 #include <QFileInfo>
@@ -28,7 +26,7 @@
 #include "textured_procedural_particle_frag.h"
 #include <gpu/DrawUnitQuadTexcoord_vert.h>
 
-static const QString PROCEDURAL_USER_DATA_KEY = "ProceduralParticle";
+static const QString PROCEDURAL_USER_DATA_KEY = "ProceduralParticles";
 static const QString URL_KEY = "shaderUrl";
 static const QString UNIFORMS_KEY = "uniforms";
 
@@ -65,14 +63,26 @@ ProceduralParticles::ProceduralParticles(glm::vec4 color, float radius, quint32 
 ProceduralParticles::ProceduralParticles(glm::vec4 color, float radius, quint32 maxParticles, quint32 MAX_DIM, const QString& userDataJson) :
     ProceduralParticles(color, radius, maxParticles, MAX_DIM)
 {
-    parse(userDataJson);
+    setUserData(userDataJson);
     _proceduralDataDirty = true;
 }
 
-void ProceduralParticles::parse(const QString& userDataJson) {
+ProceduralParticles::ProceduralParticles(glm::vec4 color, float radius, quint32 maxParticles, quint32 MAX_DIM, const QVariantMap& userDataJson) :
+    ProceduralParticles(color, radius, maxParticles, MAX_DIM)
+{
+    setUserData(userDataJson);
+    _proceduralDataDirty = true;
+}
+
+// Example
+// {"ProceduralParticles":
+//   {"shaderUrl": "https://hifi-content.s3.amazonaws.com/samuel/loadingParticles.fs",
+//    "uniforms": [{"numObjects":2}, {"objects":[[5, 5, 5, 0], [1, 1, 1, 0], [10, 10, 10, 0], [3, 3, 3, 0]]}]
+//   }
+// };
+void ProceduralParticles::setUserData(const QString& userDataJson) {
     auto proceduralData = getProceduralData(userDataJson);
-    // Instead of parsing, prep for a parse on the rendering thread
-    // This will be called by ProceduralParticles::ready
+
     std::lock_guard<std::mutex> lock(_proceduralDataMutex);
     _proceduralData = proceduralData.toObject();
 
@@ -81,12 +91,15 @@ void ProceduralParticles::parse(const QString& userDataJson) {
     _proceduralDataDirty = true;
 }
 
-// Example
-//{
-//    "ProceduralParticles": {
-//        "uniforms": {},
-//    }
-//}
+void ProceduralParticles::setUserData(const QVariantMap& userDataJson) {
+    std::lock_guard<std::mutex> lock(_proceduralDataMutex);
+    _proceduralData = QJsonObject::fromVariantMap(userDataJson[PROCEDURAL_USER_DATA_KEY].toMap());
+
+    // Mark as dirty after modifying _proceduralData, but before releasing lock
+    // to avoid setting it after parsing has begun
+    _proceduralDataDirty = true;
+}
+
 QJsonValue ProceduralParticles::getProceduralData(const QString& proceduralJson) {
     if (proceduralJson.isEmpty()) {
         return QJsonValue();
@@ -214,77 +227,41 @@ bool ProceduralParticles::ready() {
     return true;
 }
 
+// Overlays.addOverlay("particles", {"userData": {"ProceduralParticles": {"shaderUrl": "https://hifi-content.s3.amazonaws.com/samuel/loadingParticles.fs", "uniforms": [{"numObjects":[2,0,0,0]}, {"objects":[[5, 5, 5, 0], [1, 1, 1, 0], [10, 10, 10, 0], [3, 3, 3, 0]]}]}}});
 void ProceduralParticles::setupUniforms() {
     // setup the particle buffer
     memcpy(&editParticleUniforms(), &_particleUniforms, sizeof(ParticleUniforms));
 
-    // setup the user uniform buffer
+    // Set any userdata specified uniforms
+    // The order of the uniforms must be preserved, so everything is stored in a larger QJsonArray
     std::vector<float> data;
+    foreach(auto object, _parsedUniforms) {
+        QJsonObject uniform = object.toObject();
+        foreach(auto key, uniform.keys()) {
+            QJsonValue value =  uniform[key];
 
-    // Set any userdata specified uniforms 
-    foreach(QJsonValue key, _parsedUniforms) {
-        std::string uniformName = key.toString().toLocal8Bit().data();
-        int32_t slot = UPDATE_HIFI_BUFFER;
-        if (gpu::Shader::INVALID_LOCATION == slot) {
-            continue;
-        }
-        QJsonValue value = _parsedUniforms[key];
-        if (value.isDouble()) {
-            float v = value.toDouble();
-            _uniforms.push_back([=](gpu::Batch& batch) {
-                batch._glUniform1f(slot, v);
-            });
-        }
-        else if (value.isArray()) {
-            auto valueArray = value.toArray();
-            switch (valueArray.size()) {
-            case 0:
-                break;
+            if (value.isDouble()) {                                     // floats, ints
+                data.push_back(value.toDouble());
+            } else if (value.isArray()) {                               // arrays
+                auto valueArray = value.toArray();
 
-            case 1: {
-                float v = valueArray[0].toDouble();
-                _uniforms.push_back([=](gpu::Batch& batch) {
-                    batch._glUniform1f(slot, v);
-                });
-                break;
-            }
+                for (auto innerValue : valueArray) {
+                    if (innerValue.isDouble()) {                        // float[], int[]
+                        data.push_back(innerValue.toDouble());
+                    } else if (innerValue.isArray()) {                  // vec2[], vec3[], vec4[]
+                        auto innerValueArray = innerValue.toArray();
 
-            case 2: {
-                glm::vec2 v{ valueArray[0].toDouble(), valueArray[1].toDouble() };
-                _uniforms.push_back([=](gpu::Batch& batch) {
-                    batch._glUniform2f(slot, v.x, v.y);
-                });
-                break;
-            }
-
-            case 3: {
-                glm::vec3 v{
-                    valueArray[0].toDouble(),
-                    valueArray[1].toDouble(),
-                    valueArray[2].toDouble(),
-                };
-                _uniforms.push_back([=](gpu::Batch& batch) {
-                    batch._glUniform3f(slot, v.x, v.y, v.z);
-                });
-                break;
-            }
-
-            default:
-            case 4: {
-                glm::vec4 v{
-                    valueArray[0].toDouble(),
-                    valueArray[1].toDouble(),
-                    valueArray[2].toDouble(),
-                    valueArray[3].toDouble(),
-                };
-                _uniforms.push_back([=](gpu::Batch& batch) {
-                    batch._glUniform4f(slot, v.x, v.y, v.z, v.w);
-                });
-                break;
-            }
+                        for (auto v : innerValueArray) {
+                            data.push_back(v.toDouble());
+                        }
+                    }
+                }
             }
         }
     }
+
+    // Only send as much data as the buffer has room for
+    memcpy(&editHifiUniforms(), &data[0], std::min(data.size() * sizeof(float), _hifiBuffer._buffer->getSize()));
 }
 
 void ProceduralParticles::render(RenderArgs* args) {
@@ -351,10 +328,10 @@ void ProceduralParticles::render(RenderArgs* args) {
 }
 
 void ProceduralParticles::createPipelines() {
-    std::string particleBuffer = "particleBuffer";
-    std::string hifiBuffer = "hifiBuffer";
-    std::string particlesTex = "particlesTex";
-    std::string colorMap = "colorMap";
+    const std::string particleBuffer = "particleBuffer";
+    const std::string hifiBuffer = "hifiBuffer";
+    const std::string particlesTex = "particlesTex";
+    const std::string colorMap = "colorMap";
     if (!_updatePipeline) {
         auto state = std::make_shared<gpu::State>();
         state->setCullMode(gpu::State::CULL_BACK);
@@ -369,6 +346,7 @@ void ProceduralParticles::createPipelines() {
 
         UPDATE_PARTICLES_BUFFER = program->getBuffers().findLocation(particleBuffer);
         UPDATE_HIFI_BUFFER = program->getBuffers().findLocation(hifiBuffer);
+        _hifiBuffer = std::make_shared<Buffer>(program->getBuffers().findSlot(hifiBuffer)._size, nullptr);
         UPDATE_PARTICLES = program->getTextures().findLocation(particlesTex);
 
         _updatePipeline = gpu::Pipeline::create(program, state);

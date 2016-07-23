@@ -1,3 +1,4 @@
 set(TARGET_NAME script-engine)
+AUTOSCRIBE_SHADER_LIB(procedural)
 setup_hifi_library(Gui Network Script ScriptTools WebSockets Widgets)
 link_hifi_libraries(shared networking octree gpu ui procedural model model-networking recording avatars fbx entities controllers animation audio physics)

@@ -38,10 +38,12 @@ void ParticleOverlay::update(float deltaTime) {
 
 void ParticleOverlay::render(RenderArgs* args) {
     if (!_particles) {
-        _particles.reset(new ProceduralParticles(glm::vec4(getColorRGB(), getAlpha()), getParticleRadius(), getMaxParticles(), MAX_DIM));
+        _particles.reset(new ProceduralParticles(glm::vec4(getColorRGB(), getAlpha()), getParticleRadius(), getMaxParticles(), MAX_DIM, getUserData()));
     }
 
-    _particles->render(args);
+    if (_particles->ready()) {
+        _particles->render(args);
+    }
 
     args->_details._trianglesRendered += (int)_maxParticles;
 }
@@ -100,6 +102,14 @@ void ParticleOverlay::setProperties(const QVariantMap& properties) {
         }
     }
 
+    auto userData = properties["userData"];
+    if (userData.isValid() && userData.canConvert<QVariantMap>()) {
+        setUserData(userData.toMap());
+        if (_particles) {
+            _particles->setUserData(_userData);
+        }
+    }
+
     // Always ignore ray intersection
     setIgnoreRayIntersection(true);
 }
@@ -123,6 +133,10 @@ QVariant ParticleOverlay::getProperty(const QString& property) {
 
     if (property == "textures") {
         return QVariant(getTextures());
+    }
+
+    if (property == "userData") {
+        return QVariant(getUserData());
     }
 
     return Volume3DOverlay::getProperty(property);

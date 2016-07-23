@@ -68,6 +68,9 @@ public:
         }
     }
 
+    const QVariantMap& getUserData() { return _userData; }
+    void setUserData(const QVariantMap& userData) { _userData = userData; }
+
     void setProperties(const QVariantMap& properties) override;
     QVariant getProperty(const QString& property) override;
 
@@ -84,6 +87,8 @@ private:
 
     QString _textures { DEFAULT_TEXTURES };
     bool _texturesChangedFlag { false };
+
+    QVariantMap _userData;
 
     float _simulationTime { 0.0f };
     float _deltaTime { 0.0f };

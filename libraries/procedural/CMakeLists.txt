@@ -1,5 +1,5 @@
 set(TARGET_NAME procedural)
-AUTOSCRIBE_SHADER_LIB(gpu model render-utils)
+AUTOSCRIBE_SHADER_LIB(gpu model procedural render-utils)
 setup_hifi_library()
 link_hifi_libraries(shared gpu gpu-gl networking model model-networking render-utils)
 
