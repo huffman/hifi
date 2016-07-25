@@ -232,6 +232,8 @@ public:
 
     const glm::vec3& getRegistrationPoint() const { return _registrationPoint; }
 
+    float priority { 0 };
+
 protected:
 
     void setPupilDilation(float dilation) { _pupilDilation = dilation; }
