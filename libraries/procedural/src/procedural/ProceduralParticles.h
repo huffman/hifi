@@ -25,10 +25,10 @@ public:
     struct ParticleUniforms {
         glm::vec4 color;                  // rgba
         float radius;
-        float firstPass{ true };         // needs to be a float to fit in buffer
-        float iGlobalTime{ 0.0f };
-        float iDeltaTime{ 0.0f };
-        glm::vec4 iResolution{ 0.0f };   // iResolution.xy = texture size, z = maxParticles, w = spare
+        float firstPass { true };         // needs to be a float to fit in buffer
+        float iGlobalTime { 0.0f };
+        float iDeltaTime { 0.0f };
+        glm::vec4 iResolution { 0.0f };   // iResolution.xy = texture size, z = maxParticles, w = spare
     };
 
     using Buffer = gpu::Buffer;
@@ -62,7 +62,7 @@ public:
 
 protected:
     // ProceduralParticles metadata
-    bool _enabled{ false };
+    bool _enabled { false };
 
     QJsonObject _proceduralData;
     std::mutex _proceduralDataMutex;
@@ -72,10 +72,11 @@ protected:
     NetworkShaderPointer _networkShader;
     QString _shaderSource;
     QString _shaderPath;
-    quint64 _shaderModified{ 0 };
+    quint64 _shaderModified { 0 };
     QJsonArray _parsedUniforms;
-    bool _shaderDirty{ true };
-    bool _uniformsDirty{ true };
+    bool _shadersCompiled { true };
+    bool _shaderDirty { true };
+    bool _uniformsDirty { true };
 
 private:
     // This should only be called from the render thread, as it shares data with ProceduralParticles::prepare
@@ -91,7 +92,7 @@ private:
     BufferView _uniformBuffer;
     BufferView _hifiBuffer;
 
-    bool _evenPass{ true };
+    bool _evenPass { true };
     QList<gpu::FramebufferPointer> _particleBuffers;
 
     // Rendering

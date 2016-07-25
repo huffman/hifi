@@ -30,10 +30,8 @@ layout(std140) uniform particleBuffer {
 uniform sampler2D particlesTex;
 
 // TODO: make this a texture buffer to allow for variable length inputs without a capped maximum
-const int MAX_OBJECTS = 50;
 layout(std140) uniform hifiBuffer {
-    ivec4 NUM_OBJECTS;
-    vec4[2 * MAX_OBJECTS] objects;     // 2 * MAX_OBJECTS elements, alternating pos/dim
+#define HIFI_UPDATE_UNIFORMS
 };
 
 // output from DrawUnitQuadTexcoord
@@ -41,109 +39,12 @@ in vec2 varTexCoord0;
 
 out vec4 fragColor;
 
-// Helpers
-float hash(float n) { return fract(sin(n)*753.5453123); }
-
 ivec2 getFragCoord(int index) {
     return ivec2(mod(index, particle.iResolution.x),
-                 2 * int(index / particle.iResolution.x));
+    2 * int(index / particle.iResolution.x));
 }
 
-const float SCALE = 10.0;
-
-vec4 initPosition(int index) {
-    // Particles start off dead
-    const float MIN_LIFETIME = 2.0;
-    const float PARTICLE_LIFETIME = 5.0;
-
-    return vec4(vec3(0.0), MIN_LIFETIME + PARTICLE_LIFETIME * hash(index*7344.0));
-}
-
-vec4 initVelocity(int index) {
-    // Particles start off dead
-    return vec4(vec3(0.0), FLT_MAX);
-}
-
-vec4 updatePosition(vec4 pos, vec4 vel, int index, ivec2 iFragCoord) {
-    if (vel.w == FLT_MAX && pos.w > 0.0) {
-        // If this particle just died, move it to be near an unrezzed object
-        int object = int(hash(index*1692.0 + particle.iGlobalTime) * (float(NUM_OBJECTS.x) - 0.01));
-        vec4 objPos = objects[2 * object];
-        vec3 objDim = objects[2 * object + 1].xyz;
-
-        if (particle.iGlobalTime < objPos.w) {
-            const float ORBIT_DIM_RATIO = 2.0;
-            vec3 offset = objDim * ORBIT_DIM_RATIO * vec3(hash(index*872.0 + particle.iGlobalTime) - 0.5,
-                                                          hash(index*1667.0 + particle.iGlobalTime) - 0.5,
-                                                          hash(index*23589.0 + particle.iGlobalTime) - 0.5);
-
-            pos = vec4(objPos.xyz + offset, -pos.w);
-        }
-    } else if (vel.w < FLT_MAX && pos.w < 0.0) {
-        pos.w = -pos.w;
-    } else if (vel.w < FLT_MAX && pos.w > 0.0) {
-        // Otherwise, move by dx
-        pos += vec4(vel.xyz * dt, 0.0);
-    }
-
-    return pos;
-}
-
-vec4 updateVelocity(vec4 pos, vec4 vel, int index, ivec2 iFragCoord) {
-    vec3 minR;
-    float minD2 = FLT_MAX;
-
-    // pull particles towards nearest object
-    for (int i = 0; i < NUM_OBJECTS.x; i++) {
-        vec4 posTime = objects[2 * i];
-        if (particle.iGlobalTime > posTime.w) {
-            continue;
-        }
-
-        vec3 r = posTime.xyz - pos.xyz;
-        float d2 = dot(r, r);
-
-        if (d2 < minD2) {
-            minR = r;
-            minD2 = d2;
-        }
-    }
-
-    if (minD2 != FLT_MAX) {
-        const float G = 25.0;
-        const float SQRT_G = 5.0;
-        float d = sqrt(minD2);
-        if (pos.w < 0.0) {
-            float velMag = SQRT_G/sqrt(d);
-            vel.xyz = velMag*normalize(cross(UP, -minR));
-        } else {
-            vel.xyz += G/(d * minD2)* minR * dt;
-
-            if (vel.w < pos.w) {
-                // Particle still alive (die off quickly if no unrezzed objects)
-                vel.w += dt;
-            } else if (vel.w < FLT_MAX) {
-                // Particle died
-                vel = vec4(FLT_MAX);
-            } else {
-                // Particle reborn
-                vel.w = 0.0;
-            }
-        }
-    } else {
-        // Die quickly if there are no objects left
-        const float FAST_DEATH_SPEED = 3.0;
-        vel.w += dt * FAST_DEATH_SPEED;
-    }
-
-    // TODO: this should depend on the size of the object
-    const float MAX_VEL = 7.5;
-    vel.x = abs(vel.x) > MAX_VEL ? sign(vel.x) * MAX_VEL : vel.x;
-    vel.y = abs(vel.y) > MAX_VEL ? sign(vel.y) * MAX_VEL : vel.y;
-    vel.z = abs(vel.z) > MAX_VEL ? sign(vel.z) * MAX_VEL : vel.z;
-
-    return vel;
-}
+#define HIFI_UPDATE_METHODS
 
 void main(void) {
     ivec2 iFragCoord = ivec2(varTexCoord0 * particle.iResolution.xy);

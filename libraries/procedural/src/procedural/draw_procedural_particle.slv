@@ -45,19 +45,7 @@ const vec4 UNIT_TRI[NUM_VERTICES_PER_PARTICLE] = vec4[NUM_VERTICES_PER_PARTICLE]
     vec4(3.0, -1.0, 0.0, 0.0)
 );
 
-vec4 setColor(vec4 pos, vec4 vel, int index, ivec2 iFragCoord) {
-    return particle.color;
-}
-
-float setRadius(vec4 pos, vec4 vel, int index, ivec2 iFragCoord) {
-    const float GROW_TIME = 0.75;
-    float remainingTime = pos.w - vel.w;
-    remainingTime = max(remainingTime, 0.0);
-    float ratio = min(min(vel.w/GROW_TIME, 1.0),
-                      min(remainingTime/GROW_TIME, 1.0));
-
-    return ratio * particle.radius;
-}
+#define HIFI_DRAW_METHODS
 
 void main(void) {
     TransformCamera cam = getTransformCamera();
