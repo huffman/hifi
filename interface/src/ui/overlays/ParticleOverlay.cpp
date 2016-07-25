@@ -25,6 +25,7 @@ QString const ParticleOverlay::TYPE = "particles";
 ParticleOverlay::ParticleOverlay(const ParticleOverlay* particleOverlay) :
     Volume3DOverlay(particleOverlay)
 {
+    setColor(DEFAULT_XCOLOR);
 }
 
 void ParticleOverlay::update(float deltaTime) {

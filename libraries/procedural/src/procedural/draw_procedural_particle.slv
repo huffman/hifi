@@ -63,6 +63,9 @@ void main(void) {
     varColor = setColor(pos, vel, particleID, iFragCoord);
     float radius = setRadius(pos, vel, particleID, iFragCoord);
 
+    radius = 0.5;
+    varColor = vec4(1.0);
+
     // Pass the tex coords to the fragment shader
     varTexCoord = UNIT_TRI[triID].xy;
 
@@ -71,6 +74,7 @@ void main(void) {
     // anchor point in eye space
     vec4 anchorPoint;
     vec4 _inPosition = vec4(pos.xyz, 1.0);
+    _inPosition = vec4(particleID + cos(particle.iGlobalTime));
     <$transformModelToEyePos(cam, obj, _inPosition, anchorPoint)$>
 
     vec4 eyePos = anchorPoint + quadPos;

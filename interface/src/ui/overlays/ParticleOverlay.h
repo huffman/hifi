@@ -24,7 +24,7 @@ public:
     static QString const TYPE;
     virtual QString getType() const override { return TYPE; }
 
-    ParticleOverlay() {};
+    ParticleOverlay() { setColor(DEFAULT_XCOLOR); }
     ParticleOverlay(const ParticleOverlay* particleOverlay);
 
     virtual void update(float deltaTime) override;
@@ -33,6 +33,11 @@ public:
     static const xColor DEFAULT_XCOLOR;
     xColor getXColor() const { xColor color = { _color[RED_INDEX], _color[GREEN_INDEX], _color[BLUE_INDEX] }; return color; }
     glm::vec3 getColorRGB() const { return  ColorUtils::sRGBToLinearVec3(toGlm(getXColor())); }
+    void setColor(const xColor& value) {
+        _color[RED_INDEX] = value.red;
+        _color[GREEN_INDEX] = value.green;
+        _color[BLUE_INDEX] = value.blue;
+    }
     void setColor(glm::vec3 color) {
         _color[RED_INDEX] = color.r;
         _color[GREEN_INDEX] = color.g;

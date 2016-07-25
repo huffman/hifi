@@ -243,30 +243,32 @@ bool ProceduralParticles::ready() {
 
 // Overlays.addOverlay("particles", {"userData": {"ProceduralParticles": {"shaderUrl": "https://hifi-content.s3.amazonaws.com/samuel/loadingParticles.fs", "uniforms": [{"numObjects":[2,0,0,0]}, {"objects":[[5, 5, 5, 0], [1, 1, 1, 0], [10, 10, 10, 0], [3, 3, 3, 0]]}]}}});
 void ProceduralParticles::setupUniforms() {
-    // setup the particle buffer
+    // Always setup the particle buffer so the particle uniforms are updated
     memcpy(&editParticleUniforms(), &_particleUniforms, sizeof(ParticleUniforms));
 
-    // Set any userdata specified uniforms
-    // The order of the uniforms must be preserved, so everything is stored in a larger QJsonArray
-    std::vector<float> data;
-    foreach(auto object, _parsedUniforms) {
-        QJsonObject uniform = object.toObject();
-        foreach(auto key, uniform.keys()) {
-            QJsonValue value =  uniform[key];
+    if (_shaderDirty || _uniformsDirty) {
+        // Set any userdata specified uniforms
+        // The order of the uniforms must be preserved, so everything is stored in a larger QJsonArray
+        std::vector<float> data;
+        foreach(auto object, _parsedUniforms) {
+            QJsonObject uniform = object.toObject();
+            foreach(auto key, uniform.keys()) {
+                QJsonValue value =  uniform[key];
 
-            if (value.isDouble()) {                                     // floats, ints
-                data.push_back(value.toDouble());
-            } else if (value.isArray()) {                               // arrays
-                auto valueArray = value.toArray();
+                if (value.isDouble()) {                                     // floats, ints
+                    data.push_back(value.toDouble());
+                } else if (value.isArray()) {                               // arrays
+                    auto valueArray = value.toArray();
 
-                for (auto innerValue : valueArray) {
-                    if (innerValue.isDouble()) {                        // float[], int[]
-                        data.push_back(innerValue.toDouble());
-                    } else if (innerValue.isArray()) {                  // vec2[], vec3[], vec4[]
-                        auto innerValueArray = innerValue.toArray();
+                    for (auto innerValue : valueArray) {
+                        if (innerValue.isDouble()) {                        // float[], int[]
+                            data.push_back(innerValue.toDouble());
+                        } else if (innerValue.isArray()) {                  // vec2[], vec3[], vec4[]
+                            auto innerValueArray = innerValue.toArray();
 
-                        for (auto v : innerValueArray) {
-                            data.push_back(v.toDouble());
+                            for (auto v : innerValueArray) {
+                                data.push_back(v.toDouble());
+                            }
                         }
                     }
                 }
@@ -275,7 +277,7 @@ void ProceduralParticles::setupUniforms() {
     }
 
     // Only send as much data as the buffer has room for
-    memcpy(&editHifiUniforms(), &data[0], std::min(data.size() * sizeof(float), _hifiBuffer._buffer->getSize()));
+//    memcpy(&editHifiUniforms(), &data[0], std::min(data.size() * sizeof(float), _hifiBuffer._buffer->getSize()));
 }
 
 void ProceduralParticles::render(RenderArgs* args) {
@@ -303,16 +305,14 @@ void ProceduralParticles::render(RenderArgs* args) {
     auto mainViewport = args->_viewport;
     gpu::Batch& batch = *args->_batch;
 
-    if (_shaderDirty || _uniformsDirty) {
-        setupUniforms();
-    }
+    setupUniforms();
 
     _shaderDirty = _uniformsDirty = false;
 
     // Update the particles in the other FBO based on the current FBO's texture
     batch.setPipeline(_updatePipeline);
     batch.setUniformBuffer(UPDATE_PARTICLES_BUFFER, _uniformBuffer);
-    batch.setUniformBuffer(UPDATE_HIFI_BUFFER, _hifiBuffer);
+    //batch.setUniformBuffer(UPDATE_HIFI_BUFFER, _hifiBuffer);
     batch.setFramebuffer(_particleBuffers[(int)!_evenPass]);
     glm::ivec4 viewport = glm::ivec4(0, 0, _particleBuffers[(int)!_evenPass]->getWidth(), _particleBuffers[(int)!_evenPass]->getHeight());
     batch.setViewportTransform(viewport);
@@ -337,7 +337,7 @@ void ProceduralParticles::render(RenderArgs* args) {
 
     batch.setModelTransform(Transform());
 
-    batch.draw(gpu::TRIANGLES, 3 * _particleUniforms.iResolution.z);
+    batch.draw(gpu::TRIANGLES, VERTEX_PER_PARTICLE * _particleUniforms.iResolution.z);
     //batch.drawInstanced((gpu::uint32)_particleUniforms.iResolution.z, gpu::TRIANGLES, (gpu::uint32)VERTEX_PER_PARTICLE);
 
     _particleUniforms.firstPass = false;
@@ -392,7 +392,7 @@ void ProceduralParticles::createPipelines() {
         _hifiBuffer = std::make_shared<Buffer>(program->getBuffers().findSlot(hifiBuffer)._size, nullptr);
         UPDATE_PARTICLES = program->getTextures().findLocation(particlesTex);
 
-        if (UPDATE_PARTICLES_BUFFER == -1 || UPDATE_HIFI_BUFFER == -1 || UPDATE_PARTICLES == -1) {
+        if (UPDATE_PARTICLES_BUFFER == -1 /*|| UPDATE_HIFI_BUFFER == -1*/ || UPDATE_PARTICLES == -1) {
             success = false;
         }
 
