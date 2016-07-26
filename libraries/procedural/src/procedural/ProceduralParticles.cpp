@@ -351,7 +351,7 @@ void ProceduralParticles::createPipelines() {
     const std::string hifiBuffer = "hifiBuffer";
     const std::string particlesTex = "particlesTex";
     const std::string colorMap = "colorMap";
-    if (!_updatePipeline) {
+    if (!_updatePipeline || _shaderDirty) {
         auto state = std::make_shared<gpu::State>();
         state->setCullMode(gpu::State::CULL_BACK);
 
@@ -412,7 +412,7 @@ void ProceduralParticles::createPipelines() {
         success = false;
     }
 
-    if (!_untexturedPipeline) {
+    if (!_untexturedPipeline || _shaderDirty) {
         auto state = std::make_shared<gpu::State>();
         state->setCullMode(gpu::State::CULL_BACK);
         state->setDepthTest(true, false, gpu::LESS_EQUAL);
@@ -435,7 +435,7 @@ void ProceduralParticles::createPipelines() {
 
         _untexturedPipeline = gpu::Pipeline::create(program, state);
     }
-    if (!_texturedPipeline) {
+    if (!_texturedPipeline || _shaderDirty) {
         auto state = std::make_shared<gpu::State>();
         state->setCullMode(gpu::State::CULL_BACK);
         state->setDepthTest(true, false, gpu::LESS_EQUAL);
