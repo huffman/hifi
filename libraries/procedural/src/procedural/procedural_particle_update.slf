@@ -30,9 +30,9 @@ layout(std140) uniform particleBuffer {
 uniform sampler2D particlesTex;
 
 // TODO: make this a texture buffer to allow for variable length inputs without a capped maximum
-//layout(std140) uniform hifiBuffer {
+layout(std140) uniform hifiBuffer {
 #define HIFI_UPDATE_UNIFORMS
-//};
+};
 
 // output from DrawUnitQuadTexcoord
 in vec2 varTexCoord0;

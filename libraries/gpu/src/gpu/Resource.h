@@ -405,6 +405,23 @@ public:
         return *(t);
     }
 
+    template <typename T> T& editArray(int numElements) {
+#if _DEBUG
+        if (!_buffer) {
+            qDebug() << "Accessing null gpu::buffer!";
+        }
+        if (numElements * sizeof(T) > (_buffer->getSize() - _offset)) {
+            qDebug() << "Accessing buffer in non allocated memory, element size = " << numElements * sizeof(T) << " available space in buffer at offset is = " << (_buffer->getSize() - _offset);
+        }
+        if (numElements * sizeof(T) > _size) {
+            qDebug() << "Accessing buffer outside the BufferView range, element size = " << numElements * sizeof(T) << " when bufferView size = " << _size;
+        }
+#endif
+        _buffer->markDirty(_offset, numElements * sizeof(T));
+        T* t = (reinterpret_cast<T*> (_buffer->editData() + _offset));
+        return *(t);
+    }
+
     template <typename T> const T& get(const Index index) const {
         Resource::Size elementOffset = index * _stride + _offset;
  #if _DEBUG

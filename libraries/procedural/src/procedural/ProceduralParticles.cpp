@@ -242,6 +242,7 @@ bool ProceduralParticles::ready() {
 }
 
 // Overlays.addOverlay("particles", {"userData": {"ProceduralParticles": {"shaderUrl": "https://hifi-content.s3.amazonaws.com/samuel/loadingParticles.fs", "uniforms": [{"numObjects":[2,0,0,0]}, {"objects":[[5, 5, 5, 0], [1, 1, 1, 0], [10, 10, 10, 0], [3, 3, 3, 0]]}]}}});
+// Overlays.addOverlay("particles", {"maxParticles": 50000, "userData": {"ProceduralParticles": {"shaderUrl": "https://hifi-content.s3.amazonaws.com/samuel/loadingParticles.fs", "uniforms": []}}});
 void ProceduralParticles::setupUniforms() {
     // Always setup the particle buffer so the particle uniforms are updated
     memcpy(&editParticleUniforms(), &_particleUniforms, sizeof(ParticleUniforms));
@@ -249,35 +250,38 @@ void ProceduralParticles::setupUniforms() {
     if (_shaderDirty || _uniformsDirty) {
         // Set any userdata specified uniforms
         // The order of the uniforms must be preserved, so everything is stored in a larger QJsonArray
-        std::vector<float> data;
+        int index = 0;
         foreach(auto object, _parsedUniforms) {
             QJsonObject uniform = object.toObject();
             foreach(auto key, uniform.keys()) {
                 QJsonValue value =  uniform[key];
 
                 if (value.isDouble()) {                                     // floats, ints
-                    data.push_back(value.toDouble());
+                    _hifiBufferData[index] = value.toDouble();
+                    index++;
                 } else if (value.isArray()) {                               // arrays
                     auto valueArray = value.toArray();
 
-                    for (auto innerValue : valueArray) {
+                    foreach(auto innerValue, valueArray) {
                         if (innerValue.isDouble()) {                        // float[], int[]
-                            data.push_back(innerValue.toDouble());
+                            _hifiBufferData[index] = innerValue.toDouble();
+                            index++;
                         } else if (innerValue.isArray()) {                  // vec2[], vec3[], vec4[]
                             auto innerValueArray = innerValue.toArray();
 
-                            for (auto v : innerValueArray) {
-                                data.push_back(v.toDouble());
+                            foreach(auto v, innerValueArray) {
+                                _hifiBufferData[index] = v.toDouble();
+                                index++;
                             }
                         }
                     }
                 }
             }
         }
-    }
 
-    // Only send as much data as the buffer has room for
-//    memcpy(&editHifiUniforms(), &data[0], std::min(data.size() * sizeof(float), _hifiBuffer._buffer->getSize()));
+        // Only send as much data as we're using
+        memcpy(&editHifiUniforms(index), &_hifiBufferData[0], index * sizeof(float));
+    }
 }
 
 void ProceduralParticles::render(RenderArgs* args) {
@@ -295,7 +299,7 @@ void ProceduralParticles::render(RenderArgs* args) {
     }
 
     // lazy creation of particle system pipeline
-    if (!_updatePipeline || !_untexturedPipeline || !_texturedPipeline || _shaderDirty) {
+    if (_shaderDirty) {
         createPipelines();
         if (!_shadersCompiled) {
             return;
@@ -312,7 +316,7 @@ void ProceduralParticles::render(RenderArgs* args) {
     // Update the particles in the other FBO based on the current FBO's texture
     batch.setPipeline(_updatePipeline);
     batch.setUniformBuffer(UPDATE_PARTICLES_BUFFER, _uniformBuffer);
-    //batch.setUniformBuffer(UPDATE_HIFI_BUFFER, _hifiBuffer);
+    batch.setUniformBuffer(UPDATE_HIFI_BUFFER, _hifiBuffer);
     batch.setFramebuffer(_particleBuffers[(int)!_evenPass]);
     glm::ivec4 viewport = glm::ivec4(0, 0, _particleBuffers[(int)!_evenPass]->getWidth(), _particleBuffers[(int)!_evenPass]->getHeight());
     batch.setViewportTransform(viewport);
@@ -335,7 +339,7 @@ void ProceduralParticles::render(RenderArgs* args) {
         batch.setResourceTexture(NOTEX_DRAW_PARTICLES, _particleBuffers[(int)!_evenPass]->getRenderBuffer(0));
     }
 
-    batch.setModelTransform(Transform());
+    //batch.setModelTransform(Transform());
 
     batch.draw(gpu::TRIANGLES, VERTEX_PER_PARTICLE * _particleUniforms.iResolution.z);
     //batch.drawInstanced((gpu::uint32)_particleUniforms.iResolution.z, gpu::TRIANGLES, (gpu::uint32)VERTEX_PER_PARTICLE);
@@ -351,117 +355,120 @@ void ProceduralParticles::createPipelines() {
     const std::string hifiBuffer = "hifiBuffer";
     const std::string particlesTex = "particlesTex";
     const std::string colorMap = "colorMap";
-    if (!_updatePipeline || _shaderDirty) {
-        auto state = std::make_shared<gpu::State>();
-        state->setCullMode(gpu::State::CULL_BACK);
 
-        std::string frag = procedural_particle_update_frag;
+    // Update pipeline
+    auto state = std::make_shared<gpu::State>();
+    state->setCullMode(gpu::State::CULL_BACK);
 
-        int uniformsIndex = frag.find(HIFI_UPDATE_UNIFORMS);
-        int uniformsBegin = _shaderSource.indexOf(BEGIN_HIFI_UPDATE_UNIFORMS) + BEGIN_HIFI_UPDATE_UNIFORMS.length();
-        int uniformsEnd = _shaderSource.indexOf(END_HIFI_UPDATE_UNIFORMS);
+    std::string frag = procedural_particle_update_frag;
 
-        if (uniformsIndex != -1 && uniformsBegin != -1 && uniformsEnd != -1) {
-            frag.replace(uniformsIndex, HIFI_UPDATE_UNIFORMS.length(),
-                         _shaderSource.mid(uniformsBegin, uniformsEnd - uniformsBegin).toStdString());
-        } else {
-            success = false;
-        }
+    int uniformsIndex = frag.find(HIFI_UPDATE_UNIFORMS);
+    int uniformsBegin = _shaderSource.indexOf(BEGIN_HIFI_UPDATE_UNIFORMS) + BEGIN_HIFI_UPDATE_UNIFORMS.length();
+    int uniformsEnd = _shaderSource.indexOf(END_HIFI_UPDATE_UNIFORMS);
 
-        int methodsIndex = frag.find(HIFI_UPDATE_METHODS);
-        int methodsBegin = _shaderSource.indexOf(BEGIN_HIFI_UPDATE_METHODS) + BEGIN_HIFI_UPDATE_METHODS.length();
-        int methodsEnd = _shaderSource.indexOf(END_HIFI_UPDATE_METHODS);
-
-        if (methodsIndex != -1 && methodsBegin != -1 && methodsEnd != -1) {
-            frag.replace(methodsIndex, HIFI_UPDATE_METHODS.length(),
-                         _shaderSource.mid(methodsBegin, methodsEnd - methodsBegin).toStdString());
-        } else {
-            success = false;
-        }
-
-        auto vertShader = gpu::Shader::createVertex(std::string(DrawUnitQuadTexcoord_vert));
-        auto fragShader = gpu::Shader::createPixel(frag);
-
-        auto program = gpu::Shader::createProgram(vertShader, fragShader);
-
-        gpu::Shader::BindingSet slotBindings;
-        gpu::Shader::makeProgram(*program, slotBindings);
-
-        UPDATE_PARTICLES_BUFFER = program->getBuffers().findLocation(particleBuffer);
-        UPDATE_HIFI_BUFFER = program->getBuffers().findLocation(hifiBuffer);
-        _hifiBuffer = std::make_shared<Buffer>(program->getBuffers().findSlot(hifiBuffer)._size, nullptr);
-        UPDATE_PARTICLES = program->getTextures().findLocation(particlesTex);
-
-        if (UPDATE_PARTICLES_BUFFER == -1 /*|| UPDATE_HIFI_BUFFER == -1*/ || UPDATE_PARTICLES == -1) {
-            success = false;
-        }
-
-        _updatePipeline = gpu::Pipeline::create(program, state);
-    }
-
-    std::string vert = draw_procedural_particle_vert;
-
-    int methodsIndex = vert.find(HIFI_DRAW_METHODS);
-    int methodsBegin = _shaderSource.indexOf(BEGIN_HIFI_DRAW_METHODS) + BEGIN_HIFI_DRAW_METHODS.length();
-    int methodsEnd = _shaderSource.indexOf(END_HIFI_DRAW_METHODS);
-
-    if (methodsIndex != -1 && methodsBegin != -1 && methodsEnd != -1) {
-        vert.replace(methodsIndex, HIFI_DRAW_METHODS.length(),
-                     _shaderSource.mid(methodsBegin, methodsEnd - methodsBegin).toStdString());
+    if (uniformsIndex != -1 && uniformsBegin != -1 && uniformsEnd != -1) {
+        frag.replace(uniformsIndex, HIFI_UPDATE_UNIFORMS.length(),
+                     _shaderSource.mid(uniformsBegin, uniformsEnd - uniformsBegin).toStdString());
     } else {
         success = false;
     }
 
-    if (!_untexturedPipeline || _shaderDirty) {
-        auto state = std::make_shared<gpu::State>();
-        state->setCullMode(gpu::State::CULL_BACK);
-        state->setDepthTest(true, false, gpu::LESS_EQUAL);
-        state->setBlendFunction(true, gpu::State::SRC_ALPHA, gpu::State::BLEND_OP_ADD, gpu::State::ONE,
-            gpu::State::FACTOR_ALPHA, gpu::State::BLEND_OP_ADD, gpu::State::ONE);
+    int methodsIndex = frag.find(HIFI_UPDATE_METHODS);
+    int methodsBegin = _shaderSource.indexOf(BEGIN_HIFI_UPDATE_METHODS) + BEGIN_HIFI_UPDATE_METHODS.length();
+    int methodsEnd = _shaderSource.indexOf(END_HIFI_UPDATE_METHODS);
 
-        auto vertShader = gpu::Shader::createVertex(vert);
-        auto fragShader = gpu::Shader::createPixel(std::string(untextured_procedural_particle_frag));
-        auto program = gpu::Shader::createProgram(vertShader, fragShader);
-
-        gpu::Shader::BindingSet slotBindings;
-        gpu::Shader::makeProgram(*program, slotBindings);
-
-        NOTEX_DRAW_BUFFER = program->getBuffers().findLocation(particleBuffer);
-        NOTEX_DRAW_PARTICLES = program->getTextures().findLocation(particlesTex);
-
-        if (NOTEX_DRAW_BUFFER == -1 || NOTEX_DRAW_PARTICLES == -1) {
-            success = false;
-        }
-
-        _untexturedPipeline = gpu::Pipeline::create(program, state);
+    if (methodsIndex != -1 && methodsBegin != -1 && methodsEnd != -1) {
+        frag.replace(methodsIndex, HIFI_UPDATE_METHODS.length(),
+                        _shaderSource.mid(methodsBegin, methodsEnd - methodsBegin).toStdString());
+    } else {
+        success = false;
     }
-    if (!_texturedPipeline || _shaderDirty) {
-        auto state = std::make_shared<gpu::State>();
-        state->setCullMode(gpu::State::CULL_BACK);
-        state->setDepthTest(true, false, gpu::LESS_EQUAL);
-        state->setBlendFunction(true, gpu::State::SRC_ALPHA, gpu::State::BLEND_OP_ADD, gpu::State::ONE,
-            gpu::State::FACTOR_ALPHA, gpu::State::BLEND_OP_ADD, gpu::State::ONE);
 
-        auto vertShader = gpu::Shader::createVertex(vert);
-        auto fragShader = gpu::Shader::createPixel(std::string(textured_procedural_particle_frag));
-        auto program = gpu::Shader::createProgram(vertShader, fragShader);
+    auto vertShader = gpu::Shader::createVertex(std::string(DrawUnitQuadTexcoord_vert));
+    auto fragShader = gpu::Shader::createPixel(frag);
 
-        // Request these specifically because it doesn't work otherwise
-        gpu::Shader::BindingSet slotBindings;
-        slotBindings.insert(gpu::Shader::Binding(particlesTex, DRAW_PARTICLES));
-        slotBindings.insert(gpu::Shader::Binding(colorMap, DRAW_TEXTURE));
-        gpu::Shader::makeProgram(*program, slotBindings);
+    auto program = gpu::Shader::createProgram(vertShader, fragShader);
 
-        DRAW_BUFFER = program->getBuffers().findLocation(particleBuffer);
-        DRAW_PARTICLES = program->getTextures().findLocation(particlesTex);
-        DRAW_TEXTURE = program->getTextures().findLocation(colorMap);
+    gpu::Shader::BindingSet slotBindings;
+    gpu::Shader::makeProgram(*program, slotBindings);
 
-        if (DRAW_BUFFER == -1 || DRAW_PARTICLES == -1 || DRAW_TEXTURE == -1) {
-            success = false;
-        }
+    UPDATE_PARTICLES_BUFFER = program->getBuffers().findLocation(particleBuffer);
+    UPDATE_HIFI_BUFFER = program->getBuffers().findLocation(hifiBuffer);
+    int hifiBufferSize = program->getBuffers().findSlot(hifiBuffer)._size;
+    _hifiBufferData.resize(hifiBufferSize / sizeof(float));
+    _hifiBuffer = std::make_shared<Buffer>(hifiBufferSize, (const gpu::Byte*) &_hifiBufferData[0]);
+    UPDATE_PARTICLES = program->getTextures().findLocation(particlesTex);
 
-        _texturedPipeline = gpu::Pipeline::create(program, state);
+//    int test;
+//    glGetIntegerv(35371, &test);
+//
+//    glGetIntegerv(35373, &test);
+//
+//    glGetIntegerv(35376, &test);
+
+    if (UPDATE_PARTICLES_BUFFER == -1 || UPDATE_HIFI_BUFFER == -1 || UPDATE_PARTICLES == -1) {
+        success = false;
     }
+
+    _updatePipeline = gpu::Pipeline::create(program, state);
+
+    // Drawing pipelines
+    std::string vert = draw_procedural_particle_vert;
+
+    int drawMethodsIndex = vert.find(HIFI_DRAW_METHODS);
+    int drawMethodsBegin = _shaderSource.indexOf(BEGIN_HIFI_DRAW_METHODS) + BEGIN_HIFI_DRAW_METHODS.length();
+    int drawMethodsEnd = _shaderSource.indexOf(END_HIFI_DRAW_METHODS);
+
+    if (drawMethodsIndex != -1 && drawMethodsBegin != -1 && drawMethodsEnd != -1) {
+        vert.replace(drawMethodsIndex, HIFI_DRAW_METHODS.length(),
+                     _shaderSource.mid(drawMethodsBegin, drawMethodsEnd - drawMethodsBegin).toStdString());
+    } else {
+        success = false;
+    }
+
+    auto drawState = std::make_shared<gpu::State>();
+    drawState->setCullMode(gpu::State::CULL_BACK);
+    drawState->setDepthTest(true, false, gpu::LESS_EQUAL);
+    drawState->setBlendFunction(true, gpu::State::SRC_ALPHA, gpu::State::BLEND_OP_ADD, gpu::State::ONE,
+                                gpu::State::FACTOR_ALPHA, gpu::State::BLEND_OP_ADD, gpu::State::ONE);
+
+    // Untextured pipeline
+    auto notexVertShader = gpu::Shader::createVertex(vert);
+    auto notexFragShader = gpu::Shader::createPixel(std::string(untextured_procedural_particle_frag));
+    auto notexProgram = gpu::Shader::createProgram(notexVertShader, notexFragShader);
+
+    gpu::Shader::BindingSet notexSlotBindings;
+    gpu::Shader::makeProgram(*notexProgram, notexSlotBindings);
+
+    NOTEX_DRAW_BUFFER = notexProgram->getBuffers().findLocation(particleBuffer);
+    NOTEX_DRAW_PARTICLES = notexProgram->getTextures().findLocation(particlesTex);
+
+    if (NOTEX_DRAW_BUFFER == -1 || NOTEX_DRAW_PARTICLES == -1) {
+        success = false;
+    }
+
+    _untexturedPipeline = gpu::Pipeline::create(notexProgram, drawState);
+
+    // Textured pipeline
+    auto texVertShader = gpu::Shader::createVertex(vert);
+    auto texFragShader = gpu::Shader::createPixel(std::string(textured_procedural_particle_frag));
+    auto texProgram = gpu::Shader::createProgram(texVertShader, texFragShader);
+
+    // Request these specifically because it doesn't work otherwise
+    gpu::Shader::BindingSet texSlotBindings;
+    texSlotBindings.insert(gpu::Shader::Binding(particlesTex, DRAW_PARTICLES));
+    texSlotBindings.insert(gpu::Shader::Binding(colorMap, DRAW_TEXTURE));
+    gpu::Shader::makeProgram(*texProgram, texSlotBindings);
+
+    DRAW_BUFFER = texProgram->getBuffers().findLocation(particleBuffer);
+    DRAW_PARTICLES = texProgram->getTextures().findLocation(particlesTex);
+    DRAW_TEXTURE = texProgram->getTextures().findLocation(colorMap);
+
+    if (DRAW_BUFFER == -1 || DRAW_PARTICLES == -1 || DRAW_TEXTURE == -1) {
+        success = false;
+    }
+
+    _texturedPipeline = gpu::Pipeline::create(texProgram, drawState);
 
     _shadersCompiled = success;
 }

@@ -53,7 +53,7 @@ public:
 
     const ParticleUniforms& getParticleUniforms() const { return _uniformBuffer.get<ParticleUniforms>(); }
     ParticleUniforms& editParticleUniforms() { return _uniformBuffer.edit<ParticleUniforms>(); }
-    float& editHifiUniforms() { return _hifiBuffer.edit<float>(); }
+    float& editHifiUniforms(int numElements) { return _hifiBuffer.editArray<float>(numElements); }
 
     void update(float iGlobalTime, float iDeltaTime);
 
@@ -90,6 +90,7 @@ private:
 
     ParticleUniforms _particleUniforms;
     BufferView _uniformBuffer;
+    std::vector<float> _hifiBufferData;
     BufferView _hifiBuffer;
 
     bool _evenPass { true };
