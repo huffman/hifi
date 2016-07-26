@@ -405,7 +405,7 @@ public:
         return *(t);
     }
 
-    template <typename T> T& editArray(int numElements) {
+    template <typename T> T& editArray(size_t numElements) {
 #if _DEBUG
         if (!_buffer) {
             qDebug() << "Accessing null gpu::buffer!";
