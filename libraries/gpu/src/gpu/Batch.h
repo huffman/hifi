@@ -195,7 +195,7 @@ public:
 
     // Ouput Stage
     void setFramebuffer(const FramebufferPointer& framebuffer);
- 
+
     // Clear framebuffer layers
     // Targets can be any of the render buffers contained in the currnetly bound Framebuffer
     // Optionally the scissor test can be enabled locally for this command and to restrict the clearing command to the pixels contained in the scissor rectangle

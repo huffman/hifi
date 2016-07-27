@@ -10,7 +10,6 @@
 //
 
 // Constants
-const float dt = 0.0167;
 const float FLT_MAX = 1.0 / 0.000000000001;
 const vec3 UP = vec3(0.0, 1.0, 0.0);
 
@@ -30,9 +29,9 @@ layout(std140) uniform particleBuffer {
 uniform sampler2D particlesTex;
 
 // TODO: make this a texture buffer to allow for variable length inputs without a capped maximum
-//layout(std140) uniform hifiBuffer {
+layout(std140) uniform hifiBuffer {
 #define HIFI_UPDATE_UNIFORMS
-//};
+};
 
 // output from DrawUnitQuadTexcoord
 in vec2 varTexCoord0;
