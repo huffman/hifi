@@ -63,8 +63,6 @@ void main(void) {
     varColor = setColor(pos, vel, particleID, iFragCoord);
     float radius = setRadius(pos, vel, particleID, iFragCoord);
 
-    radius = 0.25;
-
     // Pass the tex coords to the fragment shader
     varTexCoord = UNIT_TRI[triID].xy;
 

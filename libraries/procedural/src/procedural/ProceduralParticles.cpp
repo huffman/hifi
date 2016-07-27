@@ -241,8 +241,8 @@ bool ProceduralParticles::ready() {
     return _shadersCompiled;
 }
 
-// Overlays.addOverlay("particles", {"userData": {"ProceduralParticles": {"shaderUrl": "https://hifi-content.s3.amazonaws.com/samuel/loadingParticles.fs", "uniforms": [{"numObjects":[2,0,0,0]}, {"objects":[[5, 5, 5, 0], [1, 1, 1, 0], [10, 10, 10, 0], [3, 3, 3, 0]]}]}}});
-// Overlays.addOverlay("particles", {"maxParticles": 50000, "userData": {"ProceduralParticles": {"shaderUrl": "https://hifi-content.s3.amazonaws.com/samuel/loadingParticles.fs", "uniforms": []}}});
+// Overlays.addOverlay("particles", {"dimensions": {x: 2000, y: 2000, z: 2000}, "userData": {"ProceduralParticles": {"shaderUrl": "https://hifi-content.s3.amazonaws.com/samuel/loadingParticles.fs", "uniforms": [{"numObjects":[2,0,0,0]}, {"objects":[[5, 5, 5, 0], [1, 1, 1, 0], [10, 10, 10, 0], [3, 3, 3, 0]]}]}}});
+// Overlays.addOverlay("particles", {"dimensions": {x: 2000, y: 2000, z: 2000}, "maxParticles": 100000, "userData": {"ProceduralParticles": {"shaderUrl": "https://hifi-content.s3.amazonaws.com/samuel/loadingParticles.fs", "uniforms": []}}})
 void ProceduralParticles::setupUniforms() {
     // Always setup the particle buffer so the particle uniforms are updated
     memcpy(&editParticleUniforms(), &_particleUniforms, sizeof(ParticleUniforms));
@@ -280,7 +280,7 @@ void ProceduralParticles::setupUniforms() {
         }
 
         // Only send as much data as we're using
-        memcpy(&editHifiUniforms(index), &_hifiBufferData[0], index * sizeof(float));
+        //memcpy(&editHifiUniforms(index), &_hifiBufferData[0], index * sizeof(float));
     }
 }
 
@@ -316,7 +316,7 @@ void ProceduralParticles::render(RenderArgs* args) {
     // Update the particles in the other FBO based on the current FBO's texture
     batch.setPipeline(_updatePipeline);
     batch.setUniformBuffer(UPDATE_PARTICLES_BUFFER, _uniformBuffer);
-    batch.setUniformBuffer(UPDATE_HIFI_BUFFER, _hifiBuffer);
+    //batch.setUniformBuffer(UPDATE_HIFI_BUFFER, _hifiBuffer);
     batch.setFramebuffer(_particleBuffers[(int)!_evenPass]);
     glm::ivec4 viewport = glm::ivec4(0, 0, _particleBuffers[(int)!_evenPass]->getWidth(), _particleBuffers[(int)!_evenPass]->getHeight());
     batch.setViewportTransform(viewport);
@@ -332,14 +332,13 @@ void ProceduralParticles::render(RenderArgs* args) {
         batch.setUniformBuffer(DRAW_BUFFER, _uniformBuffer);
         batch.setResourceTexture(DRAW_PARTICLES, _particleBuffers[(int)!_evenPass]->getRenderBuffer(0));
         batch.setResourceTexture(DRAW_TEXTURE, _texture->getGPUTexture());
-    }
-    else {
+    } else {
         batch.setPipeline(_untexturedPipeline);
         batch.setUniformBuffer(NOTEX_DRAW_BUFFER, _uniformBuffer);
         batch.setResourceTexture(NOTEX_DRAW_PARTICLES, _particleBuffers[(int)!_evenPass]->getRenderBuffer(0));
     }
 
-    //batch.setModelTransform(Transform());
+    batch.setModelTransform(Transform());
 
     batch.draw(gpu::TRIANGLES, VERTEX_PER_PARTICLE * _particleUniforms.iResolution.z);
     //batch.drawInstanced((gpu::uint32)_particleUniforms.iResolution.z, gpu::TRIANGLES, (gpu::uint32)VERTEX_PER_PARTICLE);
@@ -399,14 +398,7 @@ void ProceduralParticles::createPipelines() {
     _hifiBuffer = std::make_shared<Buffer>(hifiBufferSize, (const gpu::Byte*) &_hifiBufferData[0]);
     UPDATE_PARTICLES = program->getTextures().findLocation(particlesTex);
 
-//    int test;
-//    glGetIntegerv(35371, &test);
-//
-//    glGetIntegerv(35373, &test);
-//
-//    glGetIntegerv(35376, &test);
-
-    if (UPDATE_PARTICLES_BUFFER == -1 || UPDATE_HIFI_BUFFER == -1 || UPDATE_PARTICLES == -1) {
+    if (UPDATE_PARTICLES_BUFFER == -1 /*|| UPDATE_HIFI_BUFFER == -1*/ || UPDATE_PARTICLES == -1) {
         success = false;
     }
 

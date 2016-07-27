@@ -61,7 +61,7 @@ void ParticleOverlay::setMaxParticles(uint maxParticles) {
 }
 
 void ParticleOverlay::setProperties(const QVariantMap& properties) {
-    Base3DOverlay::setProperties(properties);
+    Volume3DOverlay::setProperties(properties);
 
     auto color = properties["color"];
     if (color.isValid()) {
