@@ -49,8 +49,7 @@ public:
         PolyVox,
         PolyLine,
         Shape,
-        ProceduralParticles,
-        LAST = ProceduralParticles
+        LAST = Shape
     } EntityType;
 
     static const QString& getEntityTypeName(EntityType entityType);

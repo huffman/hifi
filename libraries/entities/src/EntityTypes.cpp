@@ -22,7 +22,6 @@
 #include "LightEntityItem.h"
 #include "ModelEntityItem.h"
 #include "ParticleEffectEntityItem.h"
-#include "ProceduralParticlesEntityItem.h"
 #include "TextEntityItem.h"
 #include "WebEntityItem.h"
 #include "ZoneEntityItem.h"
@@ -49,7 +48,6 @@ REGISTER_ENTITY_TYPE(Line)
 REGISTER_ENTITY_TYPE(PolyVox)
 REGISTER_ENTITY_TYPE(PolyLine)
 REGISTER_ENTITY_TYPE(Shape)
-REGISTER_ENTITY_TYPE(ProceduralParticles)
 REGISTER_ENTITY_TYPE_WITH_FACTORY(Box, ShapeEntityItem::boxFactory)
 REGISTER_ENTITY_TYPE_WITH_FACTORY(Sphere, ShapeEntityItem::sphereFactory)
 

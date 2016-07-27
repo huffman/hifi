@@ -38,7 +38,6 @@
 #include "LightEntityItem.h"
 #include "LineEntityItem.h"
 #include "ParticleEffectEntityItem.h"
-#include "ProceduralParticlesEntityItem.h"
 #include "PolyVoxEntityItem.h"
 #include "SimulationOwner.h"
 #include "SkyboxPropertyGroup.h"
@@ -60,7 +59,6 @@ class EntityItemProperties {
     friend class LightEntityItem; // TODO: consider removing this friend relationship and use public methods
     friend class TextEntityItem; // TODO: consider removing this friend relationship and use public methods
     friend class ParticleEffectEntityItem; // TODO: consider removing this friend relationship and use public methods
-    friend class ProceduralParticlesEntityItem; // TODO: consider removing this friend relationship and use public methods
     friend class ZoneEntityItem; // TODO: consider removing this friend relationship and use public methods
     friend class WebEntityItem; // TODO: consider removing this friend relationship and use public methods
     friend class LineEntityItem; // TODO: consider removing this friend relationship and use public methods
