@@ -14,6 +14,7 @@
 
 #include <gpu/Texture.h>
 
+#include <ui/overlays/LoadingParticleOverlay.h>
 
 // Handles the drawing of the overlays to the screen
 // TODO, move divide up the rendering, displaying and input handling
@@ -51,6 +52,10 @@ private:
     gpu::TexturePointer _overlayDepthTexture;
     gpu::TexturePointer _overlayColorTexture;
     gpu::FramebufferPointer _overlayFramebuffer;
+
+    // This will handle everything about the overlay itself
+    // It just needs to be here to be instantiated
+    LoadingParticleOverlay _loadingParticles;
 };
 
 #endif // hifi_ApplicationOverlay_h

@@ -241,9 +241,6 @@ bool ProceduralParticles::ready() {
     return _shadersCompiled;
 }
 
-// Overlays.addOverlay("particles", {"dimensions": {x: 2000, y: 2000, z: 2000}, "userData": {"ProceduralParticles": {"shaderUrl": "https://hifi-content.s3.amazonaws.com/samuel/loadingParticles.fs", "uniforms": [{"numObjects":[2,0,0,0]}, {"objects":[[5, 5, 5, 0], [1, 1, 1, 0], [10, 10, 10, 0], [3, 3, 3, 0]]}]}}});
-// Overlays.editOverlay(, {"userData": {"ProceduralParticles": {"shaderUrl": "https://hifi-content.s3.amazonaws.com/samuel/loadingParticles.fs", "uniforms": [{"numObjects":[0,0,0,0]}]}}});
-// Overlays.addOverlay("particles", {"dimensions": {x: 2000, y: 2000, z: 2000}, "maxParticles": 10000, "userData": {"ProceduralParticles": {"shaderUrl": "https://hifi-content.s3.amazonaws.com/samuel/loadingParticles.fs", "uniforms": []}}})
 void ProceduralParticles::setupUniforms() {
     // Always setup the particle buffer so the particle uniforms are updated
     memcpy(&editParticleUniforms(), &_particleUniforms, sizeof(ParticleUniforms));
