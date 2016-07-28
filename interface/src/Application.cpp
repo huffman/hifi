@@ -3750,6 +3750,7 @@ void Application::update(float deltaTime) {
         PROFILE_RANGE_EX("Overlays", 0xffff0000, (uint64_t)getActiveDisplayPlugin()->presentCount());
         PerformanceTimer perfTimer("overlays");
         _overlays.update(deltaTime);
+        _applicationOverlay.update();
     }
 
     // Update _viewFrustum with latest camera and view frustum data...

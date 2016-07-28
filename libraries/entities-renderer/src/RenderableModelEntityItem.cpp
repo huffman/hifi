@@ -373,8 +373,16 @@ void RenderableModelEntityItem::render(RenderArgs* args) {
     assert(getType() == EntityTypes::Model);
 
     if (hasModel()) {
+        render::ScenePointer scene = AbstractViewStateInterface::instance()->getMain3DScene();
+
         // Prepare the current frame
         {
+            bool success = false;
+            AABox bounds = getAABox(success);
+            if ((!_model || (_model && !_model->isLoaded())) && success) {
+                scene->updateUnrezzedObject(getEntityItemID(), bounds);
+            }
+
             if (!_model || _needsModelReload) {
                 // TODO: this getModel() appears to be about 3% of model render time. We should optimize
                 PerformanceTimer perfTimer("getModel");
@@ -386,6 +394,10 @@ void RenderableModelEntityItem::render(RenderArgs* args) {
             }
 
             if (_model) {
+                if (_model->isLoaded()) {
+                    scene->removeUnrezzedObject(getEntityItemID());
+                }
+
                 if (hasRenderAnimation()) {
                     if (!jointsMapped()) {
                         QStringList modelJointNames = _model->getJointNames();
@@ -418,9 +430,6 @@ void RenderableModelEntityItem::render(RenderArgs* args) {
 
         // Enqueue updates for the next frame
         if (_model) {
-
-            render::ScenePointer scene = AbstractViewStateInterface::instance()->getMain3DScene();
-
             // FIXME: this seems like it could be optimized if we tracked our last known visible state in
             //        the renderable item. As it stands now the model checks it's visible/invisible state
             //        so most of the time we don't do anything in this function.

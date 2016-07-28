@@ -24,34 +24,60 @@ LoadingParticleOverlay::LoadingParticleOverlay() {
     QVariantMap particleProperties;
     particleProperties.insert("shaderUrl", "https://hifi-content.s3.amazonaws.com/samuel/loadingParticles.fs");
 
-    QList<QVariant> uniforms;
-
-    QVariantMap numObjects;
-    QList<QVariant> numObjectsVal = { 2, 0, 0, 0 };
-    numObjects.insert("numObjects", numObjectsVal);
-    uniforms.append(numObjects);
-
-    QVariantMap objects;
-    QList<QVariant> objectsVal = { 5, 5, 5, 0,
-                                   1, 1, 1, 0,
-                                   10, 10, 10, 0,
-                                   3, 3, 3, 0 };
-    objects.insert("objects", objectsVal);
-    uniforms.append(objects);
-
-    particleProperties.insert("uniforms", uniforms);
-
     QVariantMap userData;
     userData.insert("ProceduralParticles", particleProperties);
 
     // Set the dimensions to be as big as the domain so the effect is never frustum culled
     properties.insert("dimensions", QVector3D(TREE_SCALE, TREE_SCALE, TREE_SCALE));
-    properties.insert("maxParticles", 10000);
+    const int NUM_PARTICLES = 10000;
+    properties.insert("maxParticles", NUM_PARTICLES);
     properties.insert("userData", userData);
 
     _overlayID = qApp->getOverlays().addOverlay("particles", properties);
 }
 
 void LoadingParticleOverlay::update() {
+    quint64 unrezzedLastUpdatedTime = qApp->getMain3DScene()->getUnrezzedLastUpdatedTime();
+    if (_particlesLastUpdatedTime < unrezzedLastUpdatedTime) {
+        _particlesLastUpdatedTime = unrezzedLastUpdatedTime;
+        auto objectList = qApp->getMain3DScene()->getUnrezzedObjects();
 
+        QVariantMap properties;
+        QVariantMap particleProperties;
+        particleProperties.insert("shaderUrl", "https://hifi-content.s3.amazonaws.com/samuel/loadingParticles.fs");
+
+        QList<QVariant> uniforms;
+
+        QVariantMap numObjects;
+        QList<QVariant> numObjectsVal = { objectList.size(), 0, 0, 0 };
+        numObjects.insert("numObjects", numObjectsVal);
+        uniforms.append(numObjects);
+
+        QVariantMap objects;
+        QList<QVariant> objectsVal;
+
+        const int MAX_OBJECTS = 50;
+        for(int i = 0; i < std::min(objectList.length(), MAX_OBJECTS); i++) {
+            auto center = objectList[i].calcCenter();
+            auto dim = objectList[i].getDimensions();
+
+            objectsVal.push_back(center.x);
+            objectsVal.push_back(center.y);
+            objectsVal.push_back(center.z);
+            objectsVal.push_back(dim.x);
+            objectsVal.push_back(dim.y);
+            objectsVal.push_back(dim.z);
+        }
+
+        objects.insert("objects", objectsVal);
+        uniforms.append(objects);
+
+        particleProperties.insert("uniforms", uniforms);
+
+        QVariantMap userData;
+        userData.insert("ProceduralParticles", particleProperties);
+        properties.insert("userData", userData);
+
+        qApp->getOverlays().editOverlay(_overlayID, properties);
+    }
 }

@@ -27,6 +27,8 @@ public:
 
     void renderOverlay(RenderArgs* renderArgs);
 
+    void update();
+
     gpu::TexturePointer acquireOverlay(); 
     void releaseOverlay(gpu::TexturePointer pointer);
 

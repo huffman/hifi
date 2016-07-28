@@ -21,6 +21,7 @@ public:
 
 private:
     unsigned int _overlayID;
+    quint64 _particlesLastUpdatedTime { 0 };
 
 };
 

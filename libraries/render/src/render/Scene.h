@@ -72,6 +72,20 @@ public:
     // Process the penging changes equeued
     void processPendingChangesQueue();
 
+    // Keep track of any objects that are in the processing of rezzing, but can't be displayed yet
+    QList<AABox> getUnrezzedObjects() { return _unrezzedObjects.values(); }
+    void updateUnrezzedObject(QUuid entityID, AABox bounds) {
+        _unrezzedObjects.insert(entityID, bounds);
+        _unrezzedLastUpdatedTime = usecTimestampNow();
+    }
+    void removeUnrezzedObject(QUuid entityID) {
+        int numRemoved = _unrezzedObjects.remove(entityID);
+        if (numRemoved > 0) {
+            _unrezzedLastUpdatedTime = usecTimestampNow();
+        }
+    }
+    quint64 getUnrezzedLastUpdatedTime() { return _unrezzedLastUpdatedTime; }
+
     // This next call are  NOT threadsafe, you have to call them from the correct thread to avoid any potential issues
 
     // Access a particular item form its ID
@@ -101,6 +115,9 @@ protected:
     void resetItems(const ItemIDs& ids, Payloads& payloads);
     void removeItems(const ItemIDs& ids);
     void updateItems(const ItemIDs& ids, UpdateFunctors& functors);
+
+    QHash<QUuid, AABox> _unrezzedObjects;
+    quint64 _unrezzedLastUpdatedTime { 0 };
 
     friend class Engine;
 };

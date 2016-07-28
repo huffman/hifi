@@ -133,6 +133,8 @@ bool ProceduralParticles::parseUrl(const QUrl& shaderUrl) {
         }
         _networkShader.reset();
         return false;
+    } else if (shaderUrl == _shaderUrl) {
+        return true;
     }
 
     _shaderUrl = shaderUrl;
@@ -146,8 +148,7 @@ bool ProceduralParticles::parseUrl(const QUrl& shaderUrl) {
             _networkShader.reset();
             return false;;
         }
-    }
-    else {
+    } else {
         qDebug() << "Shader url: " << _shaderUrl;
         _networkShader = ShaderCache::instance().getShader(_shaderUrl);
     }

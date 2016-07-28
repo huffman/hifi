@@ -90,6 +90,10 @@ void ApplicationOverlay::renderOverlay(RenderArgs* renderArgs) {
     renderArgs->_batch = nullptr; // so future users of renderArgs don't try to use our batch
 }
 
+void ApplicationOverlay::update() {
+    _loadingParticles.update();
+}
+
 void ApplicationOverlay::renderQmlUi(RenderArgs* renderArgs) {
     PROFILE_RANGE(__FUNCTION__);
     if (_uiTexture) {
