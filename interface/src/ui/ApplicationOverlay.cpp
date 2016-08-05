@@ -55,6 +55,7 @@ ApplicationOverlay::~ApplicationOverlay() {
 // Renders the overlays either to a texture or to the screen
 void ApplicationOverlay::renderOverlay(RenderArgs* renderArgs) {
     PROFILE_RANGE(__FUNCTION__);
+    return;
     PerformanceWarning warn(Menu::getInstance()->isOptionChecked(MenuOption::PipelineWarnings), "ApplicationOverlay::displayOverlay()");
 
     buildFramebufferObject();
@@ -127,6 +128,7 @@ void ApplicationOverlay::renderAudioScope(RenderArgs* renderArgs) {
 
 void ApplicationOverlay::renderOverlays(RenderArgs* renderArgs) {
     PROFILE_RANGE(__FUNCTION__);
+    return;
 
     gpu::Batch& batch = *renderArgs->_batch;
     auto geometryCache = DependencyManager::get<GeometryCache>();
