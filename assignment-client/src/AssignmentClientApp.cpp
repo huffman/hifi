@@ -96,6 +96,9 @@ AssignmentClientApp::AssignmentClientApp(int argc, char* argv[]) :
     const QCommandLineOption logDirectoryOption(ASSIGNMENT_LOG_DIRECTORY, "directory to store logs", "log-directory");
     parser.addOption(logDirectoryOption);
 
+    const QCommandLineOption dataDirectoryOption(ASSIGNMENT_LOG_DIRECTORY, "directory for reading/storing data", "data-directory");
+    parser.addOption(dataDirectoryOption);
+
     if (!parser.parse(QCoreApplication::arguments())) {
         qCritical() << parser.errorText() << endl;
         parser.showHelp();
@@ -145,6 +148,10 @@ AssignmentClientApp::AssignmentClientApp(int argc, char* argv[]) :
         logDirectory = parser.value(logDirectoryOption);
     }
 
+    QString dataDirectory;
+    if (parser.isSet(dataDirectoryOption)) {
+        dataDirectory = parser.value(dataDirectoryOption);
+    }
 
     Assignment::Type requestAssignmentType = Assignment::AllTypes;
     if (argumentVariantMap.contains(ASSIGNMENT_TYPE_OVERRIDE_OPTION)) {
@@ -220,7 +227,7 @@ AssignmentClientApp::AssignmentClientApp(int argc, char* argv[]) :
         monitor->setParent(this);
         connect(this, &QCoreApplication::aboutToQuit, monitor, &AssignmentClientMonitor::aboutToQuit);
     } else {
-        AssignmentClient* client = new AssignmentClient(requestAssignmentType, assignmentPool, listenPort,
+        AssignmentClient* client = new AssignmentClient(requestAssignmentType, assignmentPool, listenPort, dataDirectory,
                                                         walletUUID, assignmentServerHostname,
                                                         assignmentServerPort, monitorPort);
         client->setParent(this);

@@ -26,6 +26,7 @@
 #include "Model.h"
 
 #include "RenderUtilsLogging.h"
+#include <Trace.h>
 
 using namespace std;
 
@@ -906,6 +907,7 @@ Blender::Blender(ModelPointer model, int blendNumber, const std::weak_ptr<Networ
 }
 
 void Blender::run() {
+    trace::Duration d("Blender::run", trace::cResource, { { "url", _model->getURL().toString() } });
     PROFILE_RANGE(__FUNCTION__);
     QVector<glm::vec3> vertices, normals;
     if (_model) {

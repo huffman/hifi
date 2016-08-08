@@ -43,6 +43,8 @@
 
 #include <gl/QOpenGLContextWrapper.h>
 
+#include <StatTracker.h>
+#include "Trace.h"
 #include <ResourceScriptingInterface.h>
 #include <AccountManager.h>
 #include <AddressManager.h>
@@ -407,6 +409,7 @@ bool setupEssentials(int& argc, char** argv) {
 
     // Set dependencies
     DependencyManager::set<AccountManager>(std::bind(&Application::getUserAgent, qApp));
+    DependencyManager::set<StatTracker>();
     DependencyManager::set<ScriptEngines>();
     DependencyManager::set<Preferences>();
     DependencyManager::set<recording::Deck>();
@@ -517,7 +520,7 @@ Application::Application(int& argc, char** argv, QElapsedTimer& startupTimer) :
     // (main thread, present thread, random OS load)
     // More threads == faster concurrent loads, but also more concurrent
     // load on the GPU until we can serialize GPU transfers (off the main thread)
-    QThreadPool::globalInstance()->setMaxThreadCount(2);
+    QThreadPool::globalInstance()->setMaxThreadCount(12);
     thread()->setPriority(QThread::HighPriority);
     thread()->setObjectName("Main Thread");
 
@@ -728,7 +731,7 @@ Application::Application(int& argc, char** argv, QElapsedTimer& startupTimer) :
     connect(&identityPacketTimer, &QTimer::timeout, getMyAvatar(), &MyAvatar::sendIdentityPacket);
     identityPacketTimer.start(AVATAR_IDENTITY_PACKET_SEND_INTERVAL_MSECS);
 
-    ResourceCache::setRequestLimit(3);
+    ResourceCache::setRequestLimit(16);
 
     _glWidget = new GLCanvas();
     getApplicationCompositor().setRenderingWidget(_glWidget);
@@ -1608,6 +1611,17 @@ void Application::initializeUi() {
 }
 
 void Application::paintGL() {
+    //trace::Duration duration { "paintGL" };
+    trace::COUNTER("fps", "stats", { { "fps", _frameCounter.rate() } });
+    trace::COUNTER("downloads", "stats", {
+        { "current", ResourceCache::getLoadingRequests().length() },
+        { "pending", ResourceCache::getPendingRequestCount() }
+    });
+    trace::COUNTER("processing", "stats", {
+        { "current", DependencyManager::get<StatTracker>()->getStat("Processing") },
+        { "pending", DependencyManager::get<StatTracker>()->getStat("PendingProcessing") }
+    });
+
     // Some plugins process message events, allowing paintGL to be called reentrantly.
     if (_inPaint || _aboutToQuit) {
         return;
@@ -1975,7 +1989,6 @@ bool Application::importSVOFromURL(const QString& urlString) {
 }
 
 bool Application::event(QEvent* event) {
-
     if (!Menu::getInstance()) {
         return false;
     }
@@ -3463,6 +3476,8 @@ void Application::updateDialogs(float deltaTime) const {
     }
 }
 
+static bool domainLoadingInProgress = false;
+
 void Application::update(float deltaTime) {
 
     PROFILE_RANGE_EX(__FUNCTION__, 0xffff0000, (uint64_t)_frameCount + 1);
@@ -3473,6 +3488,11 @@ void Application::update(float deltaTime) {
     updateLOD();
 
     if (!_physicsEnabled) {
+        if (!domainLoadingInProgress) {
+            trace::ASYNC_BEGIN("Scene Loading", trace::cDomainLoading, 0);
+            domainLoadingInProgress = true;
+        }
+
         // we haven't yet enabled physics.  we wait until we think we have all the collision information
         // for nearby entities before starting bullet up.
         quint64 now = usecTimestampNow();
@@ -3502,6 +3522,9 @@ void Application::update(float deltaTime) {
                 }
             }
         }
+    } else if (domainLoadingInProgress) {
+        domainLoadingInProgress = false;
+        trace::ASYNC_END("Scene Loading", trace::cDomainLoading, 0);
     }
 
     {

@@ -12,6 +12,7 @@
 #include "Texture.h"
 
 #include <glm/gtc/constants.hpp>
+#include <Trace.h>
 
 #include <NumericalConstants.h>
 
@@ -674,6 +675,7 @@ void sphericalHarmonicsEvaluateDirection(float * result, int order,  const glm::
 }
 
 bool sphericalHarmonicsFromTexture(const gpu::Texture& cubeTexture, std::vector<glm::vec3> & output, const uint order) {
+    trace::Duration dur("sphericalHarmonicsFromTexture", "Texture");
     const uint sqOrder = order*order;
 
     // allocate memory for calculations
@@ -704,6 +706,7 @@ bool sphericalHarmonicsFromTexture(const gpu::Texture& cubeTexture, std::vector<
 
     // for each face of cube texture
     for(int face=0; face < gpu::Texture::NUM_CUBE_FACES; face++) {
+        trace::Duration processFace("ProcessFace", "Texture");
 
         auto numComponents = cubeTexture.accessStoredMipFace(0,face)->getFormat().getScalarCount();
         auto data = cubeTexture.accessStoredMipFace(0,face)->readData();
@@ -718,6 +721,7 @@ bool sphericalHarmonicsFromTexture(const gpu::Texture& cubeTexture, std::vector<
         // step between two texels for range [-1, 1]
         float invWidthBy2 = 2.0f / float(width);
 
+        trace::Duration d2("d2", "Texture");
         for(int y=0; y < width; y++) {
             // texture coordinate V in range [-1 to 1]
             const float fV = negativeBound + float(y) * invWidthBy2;

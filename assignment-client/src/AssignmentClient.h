@@ -23,7 +23,7 @@ class AssignmentClient : public QObject {
     Q_OBJECT
 public:
     AssignmentClient(Assignment::Type requestAssignmentType, QString assignmentPool,
-                     quint16 listenPort,
+                     quint16 listenPort, QString dataDirectory,
                      QUuid walletUUID, QString assignmentServerHostname, quint16 assignmentServerPort,
                      quint16 assignmentMonitorPort);
     ~AssignmentClient();
@@ -34,8 +34,12 @@ private slots:
     void sendStatusPacketToACM();
     void stopAssignmentClient();
 
+
 public slots:
     void aboutToQuit();
+
+protected:
+    QString _dataDirectory;
 
 private slots:
     void handleCreateAssignmentPacket(QSharedPointer<ReceivedMessage> message);

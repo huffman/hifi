@@ -23,6 +23,8 @@ class Sound : public Resource {
 
 public:
     Sound(const QUrl& url, bool isStereo = false);
+
+    QString getType() const override { return "Sound"; }
     
     bool isStereo() const { return _isStereo; }    
     bool isReady() const { return _isReady; }

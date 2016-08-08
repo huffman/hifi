@@ -13,6 +13,7 @@
 #include <QImage>
 #include <QPainter>
 #include <QDebug>
+#include <Trace.h>
 
 #include "ModelLogging.h"
 
@@ -661,6 +662,7 @@ const int CubeLayout::NUM_CUBEMAP_LAYOUTS = sizeof(CubeLayout::CUBEMAP_LAYOUTS) 
 
 gpu::Texture* TextureUsage::processCubeTextureColorFromImage(const QImage& srcImage, const std::string& srcImageName, bool isLinear, bool doCompress, bool generateMips, bool generateIrradiance) {
 
+    trace::Duration process("processCubeTextureColorFromImage", "Texture");
     bool validAlpha = false;
     bool alphaAsMask = true;
     QImage image = process2DImageColor(srcImage, validAlpha, alphaAsMask);
@@ -675,19 +677,23 @@ gpu::Texture* TextureUsage::processCubeTextureColorFromImage(const QImage& srcIm
         // Find the layout of the cubemap in the 2D image
         int foundLayout = CubeLayout::findLayout(image.width(), image.height());
         
-        std::vector<QImage> faces;
+        //std::vector<QImage> faces;
+        QImage faces[gpu::Texture::NUM_CUBE_FACES];
+        bool facesCreated = false;
         // If found, go extract the faces as separate images
         if (foundLayout >= 0) {
             auto& layout = CubeLayout::CUBEMAP_LAYOUTS[foundLayout];
+            trace::Duration l("layout", "Texture");
             if (layout._type == CubeLayout::FLAT) {
                 int faceWidth = image.width() / layout._widthRatio;
 
-                faces.push_back(image.copy(QRect(layout._faceXPos._x * faceWidth, layout._faceXPos._y * faceWidth, faceWidth, faceWidth)).mirrored(layout._faceXPos._horizontalMirror, layout._faceXPos._verticalMirror));
-                faces.push_back(image.copy(QRect(layout._faceXNeg._x * faceWidth, layout._faceXNeg._y * faceWidth, faceWidth, faceWidth)).mirrored(layout._faceXNeg._horizontalMirror, layout._faceXNeg._verticalMirror));
-                faces.push_back(image.copy(QRect(layout._faceYPos._x * faceWidth, layout._faceYPos._y * faceWidth, faceWidth, faceWidth)).mirrored(layout._faceYPos._horizontalMirror, layout._faceYPos._verticalMirror));
-                faces.push_back(image.copy(QRect(layout._faceYNeg._x * faceWidth, layout._faceYNeg._y * faceWidth, faceWidth, faceWidth)).mirrored(layout._faceYNeg._horizontalMirror, layout._faceYNeg._verticalMirror));
-                faces.push_back(image.copy(QRect(layout._faceZPos._x * faceWidth, layout._faceZPos._y * faceWidth, faceWidth, faceWidth)).mirrored(layout._faceZPos._horizontalMirror, layout._faceZPos._verticalMirror));
-                faces.push_back(image.copy(QRect(layout._faceZNeg._x * faceWidth, layout._faceZNeg._y * faceWidth, faceWidth, faceWidth)).mirrored(layout._faceZNeg._horizontalMirror, layout._faceZNeg._verticalMirror));
+                faces[0] = (image.copy(QRect(layout._faceXPos._x * faceWidth, layout._faceXPos._y * faceWidth, faceWidth, faceWidth)).mirrored(layout._faceXPos._horizontalMirror, layout._faceXPos._verticalMirror));
+                faces[1] = (image.copy(QRect(layout._faceXNeg._x * faceWidth, layout._faceXNeg._y * faceWidth, faceWidth, faceWidth)).mirrored(layout._faceXNeg._horizontalMirror, layout._faceXNeg._verticalMirror));
+                faces[2] = (image.copy(QRect(layout._faceYPos._x * faceWidth, layout._faceYPos._y * faceWidth, faceWidth, faceWidth)).mirrored(layout._faceYPos._horizontalMirror, layout._faceYPos._verticalMirror));
+                faces[3] = (image.copy(QRect(layout._faceYNeg._x * faceWidth, layout._faceYNeg._y * faceWidth, faceWidth, faceWidth)).mirrored(layout._faceYNeg._horizontalMirror, layout._faceYNeg._verticalMirror));
+                faces[4] = (image.copy(QRect(layout._faceZPos._x * faceWidth, layout._faceZPos._y * faceWidth, faceWidth, faceWidth)).mirrored(layout._faceZPos._horizontalMirror, layout._faceZPos._verticalMirror));
+                faces[5] = (image.copy(QRect(layout._faceZNeg._x * faceWidth, layout._faceZNeg._y * faceWidth, faceWidth, faceWidth)).mirrored(layout._faceZNeg._horizontalMirror, layout._faceZNeg._verticalMirror));
+                facesCreated = true;
             } else if (layout._type == CubeLayout::EQUIRECTANGULAR) {
                 // THe face width is estimated from the input image
                 const int EQUIRECT_FACE_RATIO_TO_WIDTH = 4;
@@ -695,8 +701,9 @@ gpu::Texture* TextureUsage::processCubeTextureColorFromImage(const QImage& srcIm
                 int faceWidth = std::min(image.width() / EQUIRECT_FACE_RATIO_TO_WIDTH, EQUIRECT_MAX_FACE_WIDTH);
                 for (int face = gpu::Texture::CUBE_FACE_RIGHT_POS_X; face < gpu::Texture::NUM_CUBE_FACES; face++) {
                     QImage faceImage = CubeLayout::extractEquirectangularFace(image, (gpu::Texture::CubeFace) face, faceWidth);
-                    faces.push_back(faceImage);
+                    faces[face] = faceImage;
                 }
+                facesCreated = true;
             }
         } else {
             qCDebug(modelLog) << "Failed to find a known cube map layout from this image:" << QString(srcImageName.c_str());
@@ -704,20 +711,29 @@ gpu::Texture* TextureUsage::processCubeTextureColorFromImage(const QImage& srcIm
         }
 
         // If the 6 faces have been created go on and define the true Texture
-        if (faces.size() == gpu::Texture::NUM_FACES_PER_TYPE[gpu::Texture::TEX_CUBE]) {
-            theTexture = gpu::Texture::createCube(formatGPU, faces[0].width(), gpu::Sampler(gpu::Sampler::FILTER_MIN_MAG_MIP_LINEAR, gpu::Sampler::WRAP_CLAMP));
-            int f = 0;
-            for (auto& face : faces) {
-                theTexture->assignStoredMipFace(0, formatMip, face.byteCount(), face.constBits(), f);
-                f++;
+        if (facesCreated) {
+            trace::Duration generate("generate", "Texture");
+            {
+                trace::Duration generateCreateCube("generateStoreMip", "Texture");
+                theTexture = gpu::Texture::createCube(formatGPU, faces[0].width(), gpu::Sampler(gpu::Sampler::FILTER_MIN_MAG_MIP_LINEAR, gpu::Sampler::WRAP_CLAMP));
+            }
+            {
+                trace::Duration generateStoreMip("generateStoreMip", "Texture");
+                int f = 0;
+                for (auto& face : faces) {
+                    theTexture->assignStoredMipFace(0, formatMip, face.byteCount(), face.constBits(), f);
+                    f++;
+                }
             }
 
             if (generateMips) {
+                trace::Duration generateMips("generateMips", "Texture");
                 theTexture->autoGenerateMips(-1);
             }
 
             // Generate irradiance while we are at it
             if (generateIrradiance) {
+                trace::Duration generateIrr("generateIrradiance", "Texture");
                 theTexture->generateIrradiance();
             }
         }
