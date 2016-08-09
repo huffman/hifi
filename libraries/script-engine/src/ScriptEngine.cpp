@@ -62,6 +62,112 @@
 
 #include "MIDIEvent.h"
 
+static const QString VEC_SOURCE = R"(
+Vec3 = {
+reflect: function(a, b) {
+},
+
+cross : function(a, b) {
+    return {
+    x: a.y * b.z - a.z * b.y,
+       y : a.z * b.x - a.x * b.x,
+        z : a.x * b.y - a.y * b.x
+    };
+},
+dot: function(a, b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+},
+multiply : function(a, f) {
+    if (f.x) {
+        var t = a;
+        a = f;
+        f = a;
+    }
+    return {
+    x: a.x * f,
+       y : a.y * f,
+        z : a.z * f
+    }
+},
+multiplyQbyV: function(q, a) {
+        var x = a.x, y = a.y, z = a.z,
+            qx = q.x, qy = q.y, qz = q.z, qw = q.w,
+
+            // calculate quat * vec
+            ix = qw * x + qy * z - qz * y,
+            iy = qw * y + qz * x - qx * z,
+            iz = qw * z + qx * y - qy * x,
+            iw = -qx * x - qy * y - qz * z;
+
+        return {
+        x: ix * qw + iw * -qx + iy * -qz - iz * -qy,
+           y : iy * qw + iw * -qy + iz * -qx - ix * -qz,
+            z : iz * qw + iw * -qz + ix * -qy - iy * -qx
+        };
+    },
+        sum: function(a, b) {
+        return {
+        x: a.x + b.x,
+           y : a.y + b.y,
+            z : a.z + b.z
+        }
+    },
+        subtract:function(a, b) {
+            return {
+            x: a.x - b.x,
+               y : a.y - b.y,
+                z : a.z - b.z,
+            };
+        },
+            length: function(a) {
+            var dx = a.x,
+                dy = a.y,
+                dz = a.z;
+            return Math.sqrt(dx * dx + dy * dy + dz * dz);
+        },
+            distance : function(v) {
+            var dx = b.x - a.x,
+                dy = b.y - a.y,
+                dz = b.z - a.z;
+            return Math.sqrt(dx * dx + dy * dy + dz * dz);
+        },
+            normalize : function(v) {
+            var max = Math.max(v.x, Math.max(v.y, v.z));
+            return {
+            x: v.x / max,
+               y : v.y / max,
+                z : v.z / max,
+            };
+        },
+
+            //float orientedAngle(const glm::vec3& v1, const glm::vec3& v2, const glm::vec3& v3);
+
+            mix: function(a, b, m) {
+            var dx = b.x - a.x,
+                dy = b.y - a.y,
+                dz = b.z - a.z;
+            return {
+            x: a.x + dx * m,
+               y : a.y + dy * m,
+                z : a.z + dz * m,
+            };
+        },
+            print: function(label, v) {
+            print(label, v.x, v.y, v.z);
+        },
+            equal : function(a, b) {
+            return a.x == b.x && a.y == b.y && a.z == b.z;
+        }
+        //bool withinEpsilon(const glm::vec3& v1, const glm::vec3& v2, float epsilon);
+        // FIXME misnamed, should be 'spherical' or 'euler' depending on the implementation
+        //glm::vec3 toPolar(const glm::vec3& v);
+        //glm::vec3 fromPolar(const glm::vec3& polar);
+        //glm::vec3 fromPolar(float elevation, float azimuth);
+
+}
+)";
+
+
 static const QString SCRIPT_EXCEPTION_FORMAT = "[UncaughtException] %1 in %2:%3";
 
 Q_DECLARE_METATYPE(QScriptEngine::FunctionSignature)
@@ -452,6 +558,8 @@ void ScriptEngine::init() {
     auto entityScriptingInterface = DependencyManager::get<EntityScriptingInterface>();
     entityScriptingInterface->init();
 
+    evaluate(VEC_SOURCE, "");
+
     // register various meta-types
     registerMetaTypes(this);
     registerMIDIMetaTypes(this);
@@ -497,7 +605,7 @@ void ScriptEngine::init() {
     registerGlobalObject("Audio", &AudioScriptingInterface::getInstance());
     registerGlobalObject("Entities", entityScriptingInterface.data());
     registerGlobalObject("Quat", &_quatLibrary);
-    registerGlobalObject("Vec3", &_vec3Library);
+    //registerGlobalObject("Vec3", &_vec3Library);
     registerGlobalObject("Mat4", &_mat4Library);
     registerGlobalObject("Uuid", &_uuidLibrary);
     registerGlobalObject("Messages", DependencyManager::get<MessagesClient>().data());
