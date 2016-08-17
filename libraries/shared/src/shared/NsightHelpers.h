@@ -18,12 +18,6 @@ public:
     ProfileRange(const char *name, uint32_t argbColor, uint64_t payload);
     ~ProfileRange();
 };
-
-#define PROFILE_RANGE(name) ProfileRange profileRangeThis(name);
-#define PROFILE_RANGE_EX(name, argbColor, payload) ProfileRange profileRangeThis(name, argbColor, (uint64_t)payload);
-#else
-#define PROFILE_RANGE(name)
-#define PROFILE_RANGE_EX(name, argbColor, payload)
 #endif
 
 #endif
