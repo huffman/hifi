@@ -20,15 +20,15 @@ AssetResourceRequest::~AssetResourceRequest() {
     if (_assetRequest || _assetMappingRequest) {
         if (_assetMappingRequest) {
             _assetMappingRequest->deleteLater();
-            trace::ASYNC_END("AssetResourceRequestMapping", trace::cResource, _url.toString());
+            //trace::ASYNC_END("AssetResourceRequestMapping", trace::cResource, _url.toString());
         }
         
         if (_assetRequest) {
             _assetRequest->deleteLater();
-            trace::ASYNC_END("AssetResourceRequestData", trace::cResource, _url.toString());
+            //trace::ASYNC_END("AssetResourceRequestData", trace::cResource, _url.toString());
         }
 
-        trace::ASYNC_END("AssetResourceRequest", trace::cResource, _url.toString());
+        //trace::ASYNC_END("AssetResourceRequest", trace::cResource, _url.toString());
     }
 }
 
@@ -40,7 +40,7 @@ bool AssetResourceRequest::urlIsAssetHash() const {
 }
 
 void AssetResourceRequest::doSend() {
-    trace::ASYNC_BEGIN("AssetResourceRequest", trace::cResource, _url.toString(), { { "url", _url.toString() } });
+    //trace::ASYNC_BEGIN("AssetResourceRequest", trace::cResource, _url.toString(), { { "url", _url.toString() } });
     auto parts = _url.path().split(".", QString::SkipEmptyParts);
     auto hash = parts.length() > 0 ? parts[0] : "";
     auto extension = parts.length() > 1 ? parts[1] : "";
@@ -63,7 +63,7 @@ void AssetResourceRequest::doSend() {
 }
 
 void AssetResourceRequest::requestMappingForPath(const AssetPath& path) {
-    trace::ASYNC_BEGIN("AssetResourceRequestMapping", trace::cResource, _url.toString());
+    //trace::ASYNC_BEGIN("AssetResourceRequestMapping", trace::cResource, _url.toString());
 
     auto assetClient = DependencyManager::get<AssetClient>();
     _assetMappingRequest = assetClient->createGetMappingRequest(path);
@@ -73,7 +73,7 @@ void AssetResourceRequest::requestMappingForPath(const AssetPath& path) {
         Q_ASSERT(_state == InProgress);
         Q_ASSERT(request == _assetMappingRequest);
 
-        trace::ASYNC_END("AssetResourceRequestMapping", trace::cResource, _url.toString());
+        //trace::ASYNC_END("AssetResourceRequestMapping", trace::cResource, _url.toString());
 
         switch (request->getError()) {
             case MappingRequest::NoError:
@@ -102,7 +102,7 @@ void AssetResourceRequest::requestMappingForPath(const AssetPath& path) {
                 _state = Finished;
                 emit finished();
 
-                trace::ASYNC_END("AssetResourceRequest", trace::cResource, _url.toString());
+                //trace::ASYNC_END("AssetResourceRequest", trace::cResource, _url.toString());
 
                 break;
             }
@@ -116,7 +116,7 @@ void AssetResourceRequest::requestMappingForPath(const AssetPath& path) {
 }
 
 void AssetResourceRequest::requestHash(const AssetHash& hash) {
-    trace::ASYNC_BEGIN("AssetResourceRequestData", trace::cResource, _url.toString());
+    //trace::ASYNC_BEGIN("AssetResourceRequestData", trace::cResource, _url.toString());
 
     // Make request to atp
     auto assetClient = DependencyManager::get<AssetClient>();
@@ -128,7 +128,7 @@ void AssetResourceRequest::requestHash(const AssetHash& hash) {
         Q_ASSERT(req == _assetRequest);
         Q_ASSERT(req->getState() == AssetRequest::Finished);
 
-        trace::ASYNC_END("AssetResourceRequestData", trace::cResource, _url.toString());
+        //trace::ASYNC_END("AssetResourceRequestData", trace::cResource, _url.toString());
         
         switch (req->getError()) {
             case AssetRequest::Error::NoError:
@@ -155,7 +155,7 @@ void AssetResourceRequest::requestHash(const AssetHash& hash) {
         _assetRequest->deleteLater();
         _assetRequest = nullptr;
 
-        trace::ASYNC_END("AssetResourceRequest", trace::cResource, _url.toString());
+        //trace::ASYNC_END("AssetResourceRequest", trace::cResource, _url.toString());
     });
 
     _assetRequest->start();

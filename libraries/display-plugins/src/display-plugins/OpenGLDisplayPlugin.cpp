@@ -573,7 +573,7 @@ void OpenGLDisplayPlugin::internalPresent() {
 void OpenGLDisplayPlugin::present() {
     incrementPresentCount();
 
-    PROFILE_RANGE_EX(__FUNCTION__, 0xff00ff00, (uint64_t)presentCount())
+    PROFILE_RANGE_EX("render", __FUNCTION__, 0xff00ff00, (uint64_t)presentCount())
 
     updateTextures();
     if (_currentSceneTexture) {

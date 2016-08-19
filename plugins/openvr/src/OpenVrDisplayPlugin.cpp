@@ -213,7 +213,7 @@ bool OpenVrDisplayPlugin::beginFrameRender(uint32_t frameIndex) {
 }
 
 void OpenVrDisplayPlugin::hmdPresent() {
-    PROFILE_RANGE_EX(__FUNCTION__, 0xff00ff00, (uint64_t)_currentPresentFrameIndex)
+    PROFILE_RANGE_EX("render", __FUNCTION__, 0xff00ff00, (uint64_t)_currentPresentFrameIndex)
 
     // Flip y-axis since GL UV coords are backwards.
     static vr::VRTextureBounds_t leftBounds { 0, 0, 0.5f, 1 };
@@ -226,7 +226,7 @@ void OpenVrDisplayPlugin::hmdPresent() {
 }
 
 void OpenVrDisplayPlugin::postPreview() {
-    PROFILE_RANGE_EX(__FUNCTION__, 0xff00ff00, (uint64_t)_currentPresentFrameIndex)
+    PROFILE_RANGE_EX("render", __FUNCTION__, 0xff00ff00, (uint64_t)_currentPresentFrameIndex)
 
     vr::TrackedDevicePose_t currentTrackedDevicePose[vr::k_unMaxTrackedDeviceCount];
     _compositor->WaitGetPoses(currentTrackedDevicePose, vr::k_unMaxTrackedDeviceCount, nullptr, 0);

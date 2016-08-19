@@ -13,7 +13,8 @@
 #include <QImage>
 #include <QPainter>
 #include <QDebug>
-#include <Trace.h>
+
+#include <Profile.h>
 
 #include "ModelLogging.h"
 
@@ -662,7 +663,7 @@ const int CubeLayout::NUM_CUBEMAP_LAYOUTS = sizeof(CubeLayout::CUBEMAP_LAYOUTS) 
 
 gpu::Texture* TextureUsage::processCubeTextureColorFromImage(const QImage& srcImage, const std::string& srcImageName, bool isLinear, bool doCompress, bool generateMips, bool generateIrradiance) {
 
-    trace::Duration process("processCubeTextureColorFromImage", "Texture");
+    PROFILE_RANGE("texture", "processCubeTextureColorFromImage");
     bool validAlpha = false;
     bool alphaAsMask = true;
     QImage image = process2DImageColor(srcImage, validAlpha, alphaAsMask);
@@ -683,7 +684,7 @@ gpu::Texture* TextureUsage::processCubeTextureColorFromImage(const QImage& srcIm
         // If found, go extract the faces as separate images
         if (foundLayout >= 0) {
             auto& layout = CubeLayout::CUBEMAP_LAYOUTS[foundLayout];
-            trace::Duration l("layout", "Texture");
+            PROFILE_RANGE("texture", "layout");
             if (layout._type == CubeLayout::FLAT) {
                 int faceWidth = image.width() / layout._widthRatio;
 
@@ -712,13 +713,13 @@ gpu::Texture* TextureUsage::processCubeTextureColorFromImage(const QImage& srcIm
 
         // If the 6 faces have been created go on and define the true Texture
         if (facesCreated) {
-            trace::Duration generate("generate", "Texture");
+            PROFILE_RANGE("texture", "generate");
             {
-                trace::Duration generateCreateCube("generateStoreMip", "Texture");
+                PROFILE_RANGE("texture", "generateStoreMip");
                 theTexture = gpu::Texture::createCube(formatGPU, faces[0].width(), gpu::Sampler(gpu::Sampler::FILTER_MIN_MAG_MIP_LINEAR, gpu::Sampler::WRAP_CLAMP));
             }
             {
-                trace::Duration generateStoreMip("generateStoreMip", "Texture");
+                PROFILE_RANGE("texture", "generateStoreMip");
                 int f = 0;
                 for (auto& face : faces) {
                     theTexture->assignStoredMipFace(0, formatMip, face.byteCount(), face.constBits(), f);
@@ -727,13 +728,13 @@ gpu::Texture* TextureUsage::processCubeTextureColorFromImage(const QImage& srcIm
             }
 
             if (generateMips) {
-                trace::Duration generateMips("generateMips", "Texture");
+                PROFILE_RANGE("texture", "generateMips");
                 theTexture->autoGenerateMips(-1);
             }
 
             // Generate irradiance while we are at it
             if (generateIrradiance) {
-                trace::Duration generateIrr("generateIrradiance", "Texture");
+                PROFILE_RANGE("texture", "generateIrradiance");
                 theTexture->generateIrradiance();
             }
         }

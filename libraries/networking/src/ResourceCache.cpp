@@ -24,6 +24,7 @@
 
 #include "ResourceCache.h"
 #include <Trace.h>
+#include <Profile.h>
 
 #define clamp(x, min, max) (((x) < (min)) ? (min) :\
                            (((x) > (max)) ? (max) :\
@@ -651,12 +652,12 @@ void Resource::reinsert() {
 
 void Resource::makeRequest() {
     if (_request) {
-        trace::ASYNC_END("Resource:" + getType(), trace::cResource, _requestID);
+        PROFILE_ASYNC_END("resource", "Resource:" + getType(), _requestID);
         _request->disconnect();
         _request->deleteLater();
     }
 
-    trace::ASYNC_BEGIN("Resource:" + getType(), trace::cResource, _requestID, { { "url", _url.toString() }, { "activeURL", _activeUrl.toString() } });
+    PROFILE_ASYNC_BEGIN("resource", "Resource:" + getType(), _requestID, { { "url", _url.toString() }, { "activeURL", _activeUrl.toString() } });
 
     _request = ResourceManager::createResourceRequest(this, _activeUrl);
 
@@ -664,7 +665,7 @@ void Resource::makeRequest() {
         qCDebug(networking).noquote() << "Failed to get request for" << _url.toDisplayString();
         ResourceCache::requestCompleted(_self);
         finishedLoading(false);
-        trace::ASYNC_END("Resource:" + getType(), trace::cResource, _requestID);
+        PROFILE_ASYNC_END("resource", "Resource:" + getType(), _requestID);
         return;
     }
     
@@ -689,7 +690,7 @@ void Resource::handleDownloadProgress(uint64_t bytesReceived, uint64_t bytesTota
 void Resource::handleReplyFinished() {
     Q_ASSERT_X(_request, "Resource::handleReplyFinished", "Request should not be null while in handleReplyFinished");
 
-    trace::ASYNC_END("Resource:" + getType(), trace::cResource, _requestID, {
+    PROFILE_ASYNC_END("resource", "Resource:" + getType(), _requestID, 0, {
         { "from_cache", _request->loadedFromCache() },
         { "size_mb", _bytesTotal / 1000000.0 }
     });

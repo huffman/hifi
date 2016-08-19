@@ -44,7 +44,7 @@ int main(int argc, const char* argv[]) {
     CrashReporter crashReporter { BUG_SPLAT_DATABASE, BUG_SPLAT_APPLICATION_NAME, BuildInfo::VERSION };
 #endif
 
-    Tracer::getInstance();
+    tracing::Tracer::getInstance();
 
     disableQtBearerPoll(); // Fixes wifi ping spikes
     
@@ -241,7 +241,7 @@ int main(int argc, const char* argv[]) {
                 }
                 if (timesInactive >= 40) {
                     QObject::disconnect(&checkTimer, 0, qApp, 0);
-                    Tracer::getInstance()->traceEvent("FinishedLoading", Instant, inactiveTimestamp,
+                    tracing::Tracer::getInstance()->traceEvent("FinishedLoading", tracing::Instant, inactiveTimestamp,
                         QCoreApplication::applicationPid(), int64_t(QThread::currentThreadId()), "", "", {}, { { "s", "g" } });
                     qApp->quit();
                 }
@@ -264,8 +264,8 @@ int main(int argc, const char* argv[]) {
 
     //QString traceFilename = parser.value(traceFilenameOption);
     QString traceFilename = getCmdOption(argc, argv, "--trace");
-    Tracer::getInstance()->setEnabled(false);
-    Tracer::getInstance()->writeToFile(traceFilename);
+    tracing::Tracer::getInstance()->setEnabled(false);
+    tracing::Tracer::getInstance()->writeToFile(traceFilename);
 
     qCDebug(interfaceapp, "Normal exit.");
 #if !defined(DEBUG) && !defined(Q_OS_LINUX)

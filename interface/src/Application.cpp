@@ -1634,7 +1634,7 @@ void Application::paintGL() {
     _frameCounter.increment();
 
     auto lastPaintBegin = usecTimestampNow();
-    PROFILE_RANGE_EX(__FUNCTION__, 0xff0000ff, (uint64_t)_frameCount);
+    PROFILE_RANGE_EX("render", __FUNCTION__, 0xff0000ff, (uint64_t)_frameCount);
     PerformanceTimer perfTimer("paintGL");
 
     if (nullptr == _displayPlugin) {
@@ -3480,7 +3480,7 @@ static bool domainLoadingInProgress = false;
 
 void Application::update(float deltaTime) {
 
-    PROFILE_RANGE_EX(__FUNCTION__, 0xffff0000, (uint64_t)_frameCount + 1);
+    PROFILE_RANGE_EX("update", __FUNCTION__, 0xffff0000, (uint64_t)_frameCount + 1);
 
     bool showWarnings = Menu::getInstance()->isOptionChecked(MenuOption::PipelineWarnings);
     PerformanceWarning warn(showWarnings, "Application::update()");
@@ -3618,12 +3618,12 @@ void Application::update(float deltaTime) {
     QSharedPointer<AvatarManager> avatarManager = DependencyManager::get<AvatarManager>();
 
     if (_physicsEnabled) {
-        PROFILE_RANGE_EX("Physics", 0xffff0000, (uint64_t)getActiveDisplayPlugin()->presentCount());
+        PROFILE_RANGE_EX("update", "Physics", 0xffff0000, (uint64_t)getActiveDisplayPlugin()->presentCount());
 
         PerformanceTimer perfTimer("physics");
 
         {
-            PROFILE_RANGE_EX("UpdateStats", 0xffffff00, (uint64_t)getActiveDisplayPlugin()->presentCount());
+            PROFILE_RANGE_EX("update", "UpdateStats", 0xffffff00, (uint64_t)getActiveDisplayPlugin()->presentCount());
 
             PerformanceTimer perfTimer("updateStates)");
             static VectorOfMotionStates motionStates;
@@ -3657,14 +3657,14 @@ void Application::update(float deltaTime) {
             });
         }
         {
-            PROFILE_RANGE_EX("StepSimulation", 0xffff8000, (uint64_t)getActiveDisplayPlugin()->presentCount());
+            PROFILE_RANGE_EX("update", "StepSimulation", 0xffff8000, (uint64_t)getActiveDisplayPlugin()->presentCount());
             PerformanceTimer perfTimer("stepSimulation");
             getEntities()->getTree()->withWriteLock([&] {
                 _physicsEngine->stepSimulation();
             });
         }
         {
-            PROFILE_RANGE_EX("HarvestChanges", 0xffffff00, (uint64_t)getActiveDisplayPlugin()->presentCount());
+            PROFILE_RANGE_EX("update", "HarvestChanges", 0xffffff00, (uint64_t)getActiveDisplayPlugin()->presentCount());
             PerformanceTimer perfTimer("harvestChanges");
             if (_physicsEngine->hasOutgoingChanges()) {
                 getEntities()->getTree()->withWriteLock([&] {
@@ -3701,20 +3701,20 @@ void Application::update(float deltaTime) {
         _avatarSimCounter.increment();
 
         {
-            PROFILE_RANGE_EX("OtherAvatars", 0xffff00ff, (uint64_t)getActiveDisplayPlugin()->presentCount());
+            PROFILE_RANGE_EX("update", "OtherAvatars", 0xffff00ff, (uint64_t)getActiveDisplayPlugin()->presentCount());
             avatarManager->updateOtherAvatars(deltaTime);
         }
 
         qApp->updateMyAvatarLookAtPosition();
 
         {
-            PROFILE_RANGE_EX("MyAvatar", 0xffff00ff, (uint64_t)getActiveDisplayPlugin()->presentCount());
+            PROFILE_RANGE_EX("update", "MyAvatar", 0xffff00ff, (uint64_t)getActiveDisplayPlugin()->presentCount());
             avatarManager->updateMyAvatar(deltaTime);
         }
     }
 
     {
-        PROFILE_RANGE_EX("Overlays", 0xffff0000, (uint64_t)getActiveDisplayPlugin()->presentCount());
+        PROFILE_RANGE_EX("update", "Overlays", 0xffff0000, (uint64_t)getActiveDisplayPlugin()->presentCount());
         PerformanceTimer perfTimer("overlays");
         _overlays.update(deltaTime);
     }
@@ -3734,7 +3734,7 @@ void Application::update(float deltaTime) {
 
     // Update my voxel servers with my current voxel query...
     {
-        PROFILE_RANGE_EX("QueryOctree", 0xffff0000, (uint64_t)getActiveDisplayPlugin()->presentCount());
+        PROFILE_RANGE_EX("update", "QueryOctree", 0xffff0000, (uint64_t)getActiveDisplayPlugin()->presentCount());
         QMutexLocker viewLocker(&_viewMutex);
         PerformanceTimer perfTimer("queryOctree");
         quint64 sinceLastQuery = now - _lastQueriedTime;
@@ -3774,7 +3774,7 @@ void Application::update(float deltaTime) {
     avatarManager->postUpdate(deltaTime);
 
     {
-        PROFILE_RANGE_EX("PreRenderLambdas", 0xffff0000, (uint64_t)0);
+        PROFILE_RANGE_EX("update", "PreRenderLambdas", 0xffff0000, (uint64_t)0);
 
         std::unique_lock<std::mutex> guard(_postUpdateLambdasLock);
         for (auto& iter : _postUpdateLambdas) {

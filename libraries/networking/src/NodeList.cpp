@@ -245,7 +245,7 @@ void NodeList::sendDomainServerCheckIn() {
     }
 
     if (false) {
-        trace::INSTANT("DomainServerCheckIn", "g");
+        //trace::INSTANT("DomainServerCheckIn", "g");
     }
     
     if (_publicSockAddr.isNull()) {

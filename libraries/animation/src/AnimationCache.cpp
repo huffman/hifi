@@ -16,6 +16,7 @@
 #include "AnimationLogging.h"
 #include <Trace.h>
 #include <StatTracker.h>
+#include <Profile.h>
 
 int animationPointerMetaTypeId = qRegisterMetaType<AnimationPointer>();
 
@@ -51,11 +52,10 @@ AnimationReader::AnimationReader(const QUrl& url, const QByteArray& data) :
 }
 
 void AnimationReader::run() {
-    //trace::ASYNC_BEGIN("AnimationReader::run", trace::cResource, _url.toString(), { { "url", _url.toString() } });
     DependencyManager::get<StatTracker>()->decrementStat("PendingProcessing");
     CounterStat counter("Processing");
 
-    trace::Duration d("AnimationReader::run", trace::cResource, { { "url", _url.toString() } });
+    PROFILE_RANGE("resource", __FUNCTION__, { { "url", _url.toString() } });
     auto originalPriority = QThread::currentThread()->priority();
     if (originalPriority == QThread::InheritPriority) {
         originalPriority = QThread::NormalPriority;

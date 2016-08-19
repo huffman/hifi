@@ -20,4 +20,6 @@ public:
 };
 #endif
 
+#include "../Profile.h"
+
 #endif

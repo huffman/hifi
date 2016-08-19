@@ -329,7 +329,7 @@ void HmdDisplayPlugin::compositePointer() {
 
 void HmdDisplayPlugin::internalPresent() {
 
-    PROFILE_RANGE_EX(__FUNCTION__, 0xff00ff00, (uint64_t)presentCount())
+    PROFILE_RANGE_EX("render", __FUNCTION__, 0xff00ff00, (uint64_t)presentCount())
 
     // Composite together the scene, overlay and mouse cursor
     hmdPresent();

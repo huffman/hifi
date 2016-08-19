@@ -319,10 +319,9 @@ void ImageReader::run() {
     DependencyManager::get<StatTracker>()->decrementStat("PendingProcessing");
 
     CounterStat counter("Processing");
-    trace::Duration d("ImageReader::run", trace::cResource, { { "url", _url.toString() } });
 
-    trace::DURATION_BEGIN("ImageReader::threadSetup", trace::cResource, { { "url", _url.toString() } });
-    PROFILE_RANGE_EX(__FUNCTION__, 0xffff0000, nullptr);
+    //trace::DURATION_BEGIN("ImageReader::threadSetup", trace::cResource, { { "url", _url.toString() } });
+    PROFILE_RANGE_EX("resource", __FUNCTION__, 0xffff0000, 0, { { "url", _url.toString() } });
     auto originalPriority = QThread::currentThread()->priority();
     if (originalPriority == QThread::InheritPriority) {
         originalPriority = QThread::NormalPriority;
@@ -334,12 +333,8 @@ void ImageReader::run() {
 
     if (!_resource.data()) {
         qCWarning(modelnetworking) << "Abandoning load of" << _url << "; could not get strong ref";
-        trace::DURATION_END("ImageReader::threadSetup", trace::cResource);
         return;
     }
-    trace::DURATION_END("ImageReader::threadSetup", trace::cResource);
-
-    trace::DURATION_BEGIN("ImageReader::process", trace::cResource);
     listSupportedImageFormats();
 
     // Help the QImage loader by extracting the image file format from the url filename ext.
@@ -359,32 +354,23 @@ void ImageReader::run() {
         } else {
             qCDebug(modelnetworking) << "QImage failed to create from content" << _url;
         }
-        trace::DURATION_END("ImageReader::process", trace::cResource);
         return;
     }
-    trace::DURATION_END("ImageReader::process", trace::cResource);
-
-    trace::DURATION_BEGIN("ImageReader::texture", trace::cResource);
     gpu::TexturePointer texture = nullptr;
     {
         // Double-check the resource still exists between long operations.
         auto resource = _resource.toStrongRef();
         if (!resource) {
             qCWarning(modelnetworking) << "Abandoning load of" << _url << "; could not get strong ref";
-            trace::DURATION_END("ImageReader::texture", trace::cResource);
             return;
         }
 
         auto url = _url.toString().toStdString();
 
-        PROFILE_RANGE_EX(__FUNCTION__"::textureLoader", 0xffffff00, nullptr);
-        trace::DURATION_BEGIN("ImageReader::load", trace::cResource, { { "type", resource.dynamicCast<NetworkTexture>()->getTextureType() } });
+        PROFILE_RANGE_EX("resource", __FUNCTION__, 0xffffff00, 0);
         texture.reset(resource.dynamicCast<NetworkTexture>()->getTextureLoader()(image, url));
-        trace::DURATION_END("ImageReader::load", trace::cResource);
     }
-    trace::DURATION_END("ImageReader::texture", trace::cResource);
 
-    trace::DURATION_BEGIN("ImageReader::finish", trace::cResource);
     // Ensure the resource has not been deleted
     auto resource = _resource.toStrongRef();
     if (!resource) {
@@ -394,7 +380,6 @@ void ImageReader::run() {
             Q_ARG(gpu::TexturePointer, texture),
             Q_ARG(int, originalWidth), Q_ARG(int, originalHeight));
     }
-    trace::DURATION_END("ImageReader::finish", trace::cResource);
 }
 
 void NetworkTexture::setImage(gpu::TexturePointer texture, int originalWidth,
