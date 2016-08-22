@@ -36,7 +36,7 @@ bool Context::makeProgram(Shader& shader, const Shader::BindingSet& bindings) {
 }
 
 void Context::render(Batch& batch) {
-    PROFILE_RANGE(__FUNCTION__);
+    PROFILE_RANGE("render", __FUNCTION__);
     _backend->render(batch);
 }
 
@@ -66,7 +66,7 @@ void Context::getStereoViews(mat4* eyeViews) const {
 
 
 void Context::syncCache() {
-    PROFILE_RANGE(__FUNCTION__);
+    PROFILE_RANGE("render", __FUNCTION__);
     _backend->syncCache();
 }
 

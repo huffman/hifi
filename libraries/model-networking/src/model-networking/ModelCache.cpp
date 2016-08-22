@@ -54,7 +54,7 @@ private:
 };
 
 void GeometryMappingResource::downloadFinished(const QByteArray& data) {
-    trace::ASYNC_BEGIN("GeometryMappingResource::downloadFinished", trace::cResource, _url.toString(),
+    PROFILE_ASYNC_BEGIN("resource", "GeometryMappingResource::downloadFinished", _url.toString(),
                          { { "url", _url.toString() } });
 
     auto mapping = FSTReader::readMapping(data);
@@ -108,7 +108,7 @@ void GeometryMappingResource::onGeometryMappingLoaded(bool success) {
         disconnect(_connection); // FIXME Should not have to do this
     }
 
-    trace::ASYNC_END("GeometryMappingResource::downloadFinished", trace::cResource, _url.toString());
+    PROFILE_ASYNC_END("resource", "GeometryMappingResource::downloadFinished", _url.toString());
     finishedLoading(success);
 }
 
@@ -119,11 +119,11 @@ public:
         _resource(resource), _url(url), _mapping(mapping), _data(data) {
 
         DependencyManager::get<StatTracker>()->incrementStat("PendingProcessing");
-        trace::FLOW_BEGIN("GeometryReader", trace::cResource, _url.toString(), { { "url", _url.toString() } });
+        //trace::FLOW_BEGIN("GeometryReader", trace::cResource, _url.toString(), { { "url", _url.toString() } });
         
     }
     virtual ~GeometryReader() {
-        trace::FLOW_END("GeometryReader", trace::cResource, _url.toString(), { { "url", _url.toString() } });
+        //trace::FLOW_END("GeometryReader", trace::cResource, _url.toString(), { { "url", _url.toString() } });
     }
 
     virtual void run() override;
@@ -139,7 +139,7 @@ void GeometryReader::run() {
     DependencyManager::get<StatTracker>()->decrementStat("PendingProcessing");
     //trace::ASYNC_BEGIN("GeometryReader::run", trace::cResource, _url.toString(), { { "url", _url.toString() } });
     CounterStat counter("Processing");
-    trace::Duration d("GeometryReader::run", trace::cResource, { { "url", _url.toString() } });
+    PROFILE_RANGE_EX("resource", "GeometryReader::run", 0xFF00FF00, 0, { { "url", _url.toString() } });
     auto originalPriority = QThread::currentThread()->priority();
     if (originalPriority == QThread::InheritPriority) {
         originalPriority = QThread::NormalPriority;

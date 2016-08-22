@@ -94,7 +94,7 @@ void GL45Backend::GL45Texture::transferMip(uint16_t mipLevel, uint8_t face) cons
 // This should never happen on the main thread
 // Move content bits from the CPU to the GPU
 void GL45Backend::GL45Texture::transfer() const {
-    PROFILE_RANGE(__FUNCTION__);
+    PROFILE_RANGE("render", __FUNCTION__);
     //qDebug() << "Transferring texture: " << _privateTexture;
     // Need to update the content of the GPU object from the source sysmem of the texture
     if (_contentStamp >= _gpuObject.getDataStamp()) {

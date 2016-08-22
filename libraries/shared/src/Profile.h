@@ -12,9 +12,8 @@
 
 #if defined(NSIGHT_FOUND)
 #include "nvToolsExt.h"
-#endif
-
 #define NSIGHT_TRACING
+#endif
 
 #define TRACING_ENABLED 
 
@@ -53,16 +52,16 @@ private:
     QString _category;
 };
 
-inline void asyncBegin(QString name, QString category, QVariantMap args, QVariantMap extra = {}) {
+inline void asyncBegin(QString name, QString category, QString id, QVariantMap args = {}, QVariantMap extra = {}) {
 #ifdef CHROME_TRACING
-    tracing::Tracer::getInstance()->traceEvent(name, tracing::AsyncNestableStart, "", category, args, extra);
+    tracing::Tracer::getInstance()->traceEvent(name, tracing::AsyncNestableStart, id, category, args, extra);
 #endif
 }
 
 
-inline void asyncEnd(QString name, QString category, QVariantMap args, QVariantMap extra = {}) {
+inline void asyncEnd(QString name, QString category, QString id, QVariantMap args = {}, QVariantMap extra = {}) {
 #ifdef CHROME_TRACING
-    tracing::Tracer::getInstance()->traceEvent(name, tracing::AsyncNestableEnd, "", category, args, extra);
+    tracing::Tracer::getInstance()->traceEvent(name, tracing::AsyncNestableEnd, id, category, args, extra);
 #endif
 }
 
@@ -83,15 +82,15 @@ inline void counter(QString name, QString category, QVariantMap args, QVariantMa
 
 #if defined(CHROME_TRACING) || defined(NSIGHT_TRACING)
 
-    #define PROFILE_RANGE(name) Duration profileRangeThis("", name);
+    #define PROFILE_RANGE(category, name) Duration profileRangeThis(category, name);
     #define PROFILE_RANGE_EX(category, name, argbColor, payload, ...) Duration profileRangeThis(category, name, argbColor, (uint64_t)payload, ##__VA_ARGS__);
 
-    #define PROFILE_ASYNC_BEGIN(category, name) asyncBegin(category, name);
-    #define PROFILE_ASYNC_END(category, name) asyncEnd(category, name);
+    #define PROFILE_ASYNC_BEGIN(category, name, id, ...) asyncBegin(category, name, id, ##__VA_ARGS__);
+    #define PROFILE_ASYNC_END(category, name, id, ...) asyncEnd(category, name, id, ##__VA_ARGS__);
 
-    #define PROFILE_COUNTER(category, name) counter(name, category);
+    #define PROFILE_COUNTER(category, name, ...) counter(name, category, ##__VA_ARGS__);
 
-    #define PROFILE_INSTANT(category, name, args, extra) instant(name);
+    #define PROFILE_INSTANT(category, name, ...) instant(name, category, ##__VA_ARGS__);
 
 #else
 

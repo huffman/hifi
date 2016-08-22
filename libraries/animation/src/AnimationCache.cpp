@@ -55,7 +55,7 @@ void AnimationReader::run() {
     DependencyManager::get<StatTracker>()->decrementStat("PendingProcessing");
     CounterStat counter("Processing");
 
-    PROFILE_RANGE("resource", __FUNCTION__, { { "url", _url.toString() } });
+    PROFILE_RANGE_EX("resource", __FUNCTION__, 0xFF00FF00, 0, { { "url", _url.toString() } });
     auto originalPriority = QThread::currentThread()->priority();
     if (originalPriority == QThread::InheritPriority) {
         originalPriority = QThread::NormalPriority;

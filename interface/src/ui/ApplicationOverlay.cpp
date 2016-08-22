@@ -54,7 +54,7 @@ ApplicationOverlay::~ApplicationOverlay() {
 
 // Renders the overlays either to a texture or to the screen
 void ApplicationOverlay::renderOverlay(RenderArgs* renderArgs) {
-    PROFILE_RANGE(__FUNCTION__);
+    PROFILE_RANGE("application", __FUNCTION__);
     PerformanceWarning warn(Menu::getInstance()->isOptionChecked(MenuOption::PipelineWarnings), "ApplicationOverlay::displayOverlay()");
 
     buildFramebufferObject();
@@ -91,7 +91,7 @@ void ApplicationOverlay::renderOverlay(RenderArgs* renderArgs) {
 }
 
 void ApplicationOverlay::renderQmlUi(RenderArgs* renderArgs) {
-    PROFILE_RANGE(__FUNCTION__);
+    PROFILE_RANGE("render", __FUNCTION__);
     if (_uiTexture) {
         gpu::Batch& batch = *renderArgs->_batch;
         auto geometryCache = DependencyManager::get<GeometryCache>();
@@ -107,7 +107,7 @@ void ApplicationOverlay::renderQmlUi(RenderArgs* renderArgs) {
 }
 
 void ApplicationOverlay::renderAudioScope(RenderArgs* renderArgs) {
-    PROFILE_RANGE(__FUNCTION__);
+    PROFILE_RANGE("render", __FUNCTION__);
 
     gpu::Batch& batch = *renderArgs->_batch;
     auto geometryCache = DependencyManager::get<GeometryCache>();
@@ -126,7 +126,7 @@ void ApplicationOverlay::renderAudioScope(RenderArgs* renderArgs) {
 }
 
 void ApplicationOverlay::renderOverlays(RenderArgs* renderArgs) {
-    PROFILE_RANGE(__FUNCTION__);
+    PROFILE_RANGE("render", __FUNCTION__);
 
     gpu::Batch& batch = *renderArgs->_batch;
     auto geometryCache = DependencyManager::get<GeometryCache>();
@@ -251,7 +251,7 @@ using Lock = std::unique_lock<std::mutex>;
 std::queue<gpu::TexturePointer> _availableTextures;
 
 void ApplicationOverlay::buildFramebufferObject() {
-    PROFILE_RANGE(__FUNCTION__);
+    PROFILE_RANGE("render", __FUNCTION__);
 
     auto uiSize = qApp->getUiSize();
     if (!_overlayFramebuffer || uiSize != _overlayFramebuffer->getSize()) {

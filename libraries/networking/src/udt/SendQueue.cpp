@@ -31,6 +31,7 @@
 #include "../UserActivityLogger.h"
 #include "Socket.h"
 #include <Trace.h>
+#include <Profile.h>
 
 using namespace udt;
 using namespace std::chrono;
@@ -85,7 +86,7 @@ SendQueue::SendQueue(Socket* socket, HifiSockAddr dest) :
     _socket(socket),
     _destination(dest)
 {
-    trace::ASYNC_BEGIN("SendQueue", "Connection", _destination.toString());
+    PROFILE_ASYNC_BEGIN("connection", "SendQueue", _destination.toString());
 
     // setup psuedo-random number generation for all instances of SendQueue
     static std::random_device rd;
@@ -102,7 +103,7 @@ SendQueue::SendQueue(Socket* socket, HifiSockAddr dest) :
 }
 
 SendQueue::~SendQueue() {
-    trace::ASYNC_END("SendQueue", "Connection", _destination.toString());
+    PROFILE_ASYNC_END("SendQueue", "Connection", _destination.toString());
 }
 
 void SendQueue::queuePacket(std::unique_ptr<Packet> packet) {
@@ -213,7 +214,7 @@ void SendQueue::sendHandshake() {
     if (!_hasReceivedHandshakeACK) {
         // we haven't received a handshake ACK from the client, send another now
         auto handshakePacket = ControlPacket::create(ControlPacket::Handshake, sizeof(SequenceNumber));
-        trace::ASYNC_BEGIN("SendQueue:Handshake", "Connection", _destination.toString());
+        PROFILE_ASYNC_BEGIN("connection", "SendQueue:Handshake", _destination.toString());
 
         handshakePacket->writePrimitive(_initialSequenceNumber);
         _socket->writeBasePacket(*handshakePacket, _destination);
@@ -230,7 +231,7 @@ void SendQueue::handshakeACK(SequenceNumber initialSequenceNumber) {
             std::lock_guard<std::mutex> locker { _handshakeMutex };
             _hasReceivedHandshakeACK = true;
         }
-        trace::ASYNC_END("SendQueue:Handshake", "Connection", _destination.toString());
+        PROFILE_ASYNC_END("connection", "SendQueue:Handshake", _destination.toString());
 
         // Notify on the handshake ACK condition
         _handshakeACKCondition.notify_one();

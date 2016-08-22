@@ -1611,13 +1611,12 @@ void Application::initializeUi() {
 }
 
 void Application::paintGL() {
-    //trace::Duration duration { "paintGL" };
-    trace::COUNTER("fps", "stats", { { "fps", _frameCounter.rate() } });
-    trace::COUNTER("downloads", "stats", {
+    PROFILE_COUNTER("stats", "fps", { { "fps", _frameCounter.rate() } });
+    PROFILE_COUNTER("stats", "downloads", {
         { "current", ResourceCache::getLoadingRequests().length() },
         { "pending", ResourceCache::getPendingRequestCount() }
     });
-    trace::COUNTER("processing", "stats", {
+    PROFILE_COUNTER("stats", "processing", {
         { "current", DependencyManager::get<StatTracker>()->getStat("Processing") },
         { "pending", DependencyManager::get<StatTracker>()->getStat("PendingProcessing") }
     });
@@ -1816,7 +1815,7 @@ void Application::paintGL() {
     auto finalFramebuffer = framebufferCache->getFramebuffer();
 
     {
-        PROFILE_RANGE(__FUNCTION__ "/mainRender");
+        PROFILE_RANGE("render", __FUNCTION__ "/mainRender");
         PerformanceTimer perfTimer("mainRender");
         renderArgs._boomOffset = boomOffset;
         // Viewport is assigned to the size of the framebuffer
@@ -1875,7 +1874,7 @@ void Application::paintGL() {
 
     // deliver final composited scene to the display plugin
     {
-        PROFILE_RANGE(__FUNCTION__ "/pluginOutput");
+        PROFILE_RANGE("render", __FUNCTION__ "/pluginOutput");
         PerformanceTimer perfTimer("pluginOutput");
 
         auto finalTexture = finalFramebuffer->getRenderBuffer(0);
@@ -1884,7 +1883,7 @@ void Application::paintGL() {
 
         Q_ASSERT(isCurrentContext(_offscreenContext->getContext()));
         {
-            PROFILE_RANGE(__FUNCTION__ "/pluginSubmitScene");
+            PROFILE_RANGE("render", __FUNCTION__ "/pluginSubmitScene");
             PerformanceTimer perfTimer("pluginSubmitScene");
             displayPlugin->submitSceneTexture(_frameCount, finalTexture);
         }
@@ -1945,7 +1944,7 @@ void Application::resizeEvent(QResizeEvent* event) {
 }
 
 void Application::resizeGL() {
-    PROFILE_RANGE(__FUNCTION__);
+    PROFILE_RANGE("render", __FUNCTION__);
     if (nullptr == _displayPlugin) {
         return;
     }
@@ -2567,7 +2566,7 @@ void Application::maybeToggleMenuVisible(QMouseEvent* event) const {
 }
 
 void Application::mouseMoveEvent(QMouseEvent* event) {
-    PROFILE_RANGE(__FUNCTION__);
+    PROFILE_RANGE("input", __FUNCTION__);
 
     if (_aboutToQuit) {
         return;
@@ -2855,7 +2854,7 @@ void Application::idle(float nsecsElapsed) {
         connect(offscreenUi.data(), &OffscreenUi::showDesktop, this, &Application::showDesktop);
     }
 
-    PROFILE_RANGE(__FUNCTION__);
+    PROFILE_RANGE("application", __FUNCTION__);
 
     float secondsSinceLastUpdate = nsecsElapsed / NSECS_PER_MSEC / MSECS_PER_SECOND;
 
@@ -3489,7 +3488,7 @@ void Application::update(float deltaTime) {
 
     if (!_physicsEnabled) {
         if (!domainLoadingInProgress) {
-            trace::ASYNC_BEGIN("Scene Loading", trace::cDomainLoading, 0);
+            PROFILE_ASYNC_BEGIN("loading", "Scene Loading", "");
             domainLoadingInProgress = true;
         }
 
@@ -3524,7 +3523,7 @@ void Application::update(float deltaTime) {
         }
     } else if (domainLoadingInProgress) {
         domainLoadingInProgress = false;
-        trace::ASYNC_END("Scene Loading", trace::cDomainLoading, 0);
+        PROFILE_ASYNC_END("lading", "Scene Loading", "");
     }
 
     {
@@ -4052,7 +4051,7 @@ QRect Application::getDesirableApplicationGeometry() const {
 //
 void Application::loadViewFrustum(Camera& camera, ViewFrustum& viewFrustum) {
     PerformanceTimer perfTimer("loadViewFrustum");
-    PROFILE_RANGE(__FUNCTION__);
+    PROFILE_RANGE("application", __FUNCTION__);
     // We will use these below, from either the camera or head vectors calculated above
     viewFrustum.setProjection(camera.getProjection());
 
@@ -4207,7 +4206,7 @@ void Application::displaySide(RenderArgs* renderArgs, Camera& theCamera, bool se
     myAvatar->preDisplaySide(renderArgs);
 
     activeRenderingThread = QThread::currentThread();
-    PROFILE_RANGE(__FUNCTION__);
+    PROFILE_RANGE("application", __FUNCTION__);
     PerformanceTimer perfTimer("display");
     PerformanceWarning warn(Menu::getInstance()->isOptionChecked(MenuOption::PipelineWarnings), "Application::displaySide()");
 

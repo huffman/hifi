@@ -290,7 +290,7 @@ public:
 
     void run(const SceneContextPointer& sceneContext, const RenderContextPointer& renderContext) {
         PerformanceTimer perfTimer(_name.c_str());
-        PROFILE_RANGE(_name.c_str());
+        PROFILE_RANGE("render", _name.c_str());
         auto start = usecTimestampNow();
 
         _concept->run(sceneContext, renderContext);

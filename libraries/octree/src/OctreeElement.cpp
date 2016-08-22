@@ -16,6 +16,8 @@
 
 #include <QtCore/QDebug>
 
+#include <Profile.h>
+
 #include <LogHandler.h>
 #include <NodeList.h>
 #include <PerfStat.h>
@@ -390,7 +392,7 @@ OctreeElementPointer OctreeElement::addChildAtIndex(int childIndex) {
 
         _isDirty = true;
         markWithChangedTime();
-        trace::INSTANT("EntityAdd", "g");
+        PROFILE_INSTANT("entity", "EntityAdd", "g");
     }
     return childAt;
 }

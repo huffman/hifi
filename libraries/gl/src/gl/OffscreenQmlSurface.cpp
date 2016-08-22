@@ -321,7 +321,7 @@ void OffscreenQmlRenderThread::render() {
     _quickWindow->setRenderTarget(GetName(*_fbo), QSize(_size.x, _size.y));
 
     try {
-        PROFILE_RANGE("qml_render")
+        PROFILE_RANGE("render", "qml_render")
 
         TexturePtr texture = _textures.getNextTexture();
 
@@ -338,7 +338,7 @@ void OffscreenQmlRenderThread::render() {
         }
 
         {
-            PROFILE_RANGE("qml_render->rendercontrol")
+            PROFILE_RANGE("render", "qml_render->rendercontrol")
             _renderControl->render();
             // FIXME The web browsers seem to be leaving GL in an error state.
             // Need a debug context with sync logging to figure out why.
@@ -559,7 +559,7 @@ void OffscreenQmlSurface::updateQuick() {
     }
 
     if (_render) {
-        PROFILE_RANGE(__FUNCTION__);
+        PROFILE_RANGE("render", __FUNCTION__);
         // Lock the GUI size while syncing
         QMutexLocker locker(&(_renderer->_mutex));
         _renderer->_queue.add(RENDER);
