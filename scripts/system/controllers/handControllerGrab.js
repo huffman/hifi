@@ -186,6 +186,10 @@ var STATE_FAR_TRIGGER = 5;
 var STATE_HOLD = 6;
 var STATE_ENTITY_TOUCHING = 7;
 
+var holdEnabled = true;
+var nearGrabEnabled = true;
+var farGrabEnabled = true;
+
 // "collidesWith" is specified by comma-separated list of group names
 // the possible group names are:  static, dynamic, kinematic, myAvatar, otherAvatar
 var COLLIDES_WITH_WHILE_GRABBED = "dynamic,otherAvatar";
@@ -1427,7 +1431,7 @@ function MyController(hand) {
 
         var potentialEquipHotspot = this.chooseBestEquipHotspot(candidateHotSpotEntities);
         if (potentialEquipHotspot) {
-            if (this.triggerSmoothedGrab()) {
+            if (this.triggerSmoothedGrab() && holdEnabled) {
                 this.grabbedHotspot = potentialEquipHotspot;
                 this.grabbedEntity = potentialEquipHotspot.entityID;
                 this.setState(STATE_HOLD, "equipping '" + entityPropertiesCache.getProps(this.grabbedEntity).name + "'");
@@ -1470,7 +1474,7 @@ function MyController(hand) {
                     // potentialNearTriggerEntity = entity;
                 }
             } else {
-                if (this.triggerSmoothedGrab()) {
+                if (this.triggerSmoothedGrab() && nearGrabEnabled) {
                     var props = entityPropertiesCache.getProps(entity);
                     var grabProps = entityPropertiesCache.getGrabProps(entity);
                     var refCount = grabProps.refCount ? grabProps.refCount : 0;
@@ -1558,7 +1562,7 @@ function MyController(hand) {
                     // potentialFarTriggerEntity = entity;
                 }
             } else if (this.entityIsDistanceGrabbable(rayPickInfo.entityID, handPosition)) {
-                if (this.triggerSmoothedGrab() && !isEditing()) {
+                if (this.triggerSmoothedGrab() && !isEditing() && farGrabEnabled) {
                     this.grabbedEntity = entity;
                     this.setState(STATE_DISTANCE_HOLDING, "distance hold '" + name + "'");
                     return;
@@ -1576,7 +1580,9 @@ function MyController(hand) {
             equipHotspotBuddy.highlightHotspot(potentialEquipHotspot);
         }
 
-        this.searchIndicatorOn(rayPickInfo.searchRay);
+        if (farGrabEnabled) {
+            this.searchIndicatorOn(rayPickInfo.searchRay);
+        }
         Reticle.setVisible(false);
     };
 
@@ -2195,7 +2201,9 @@ function MyController(hand) {
                 if (intersection.intersects) {
                     this.intersectionDistance = Vec3.distance(pickRay.origin, intersection.intersection);
                 }
-                this.searchIndicatorOn(pickRay);
+                if (farGrabEnabled) {
+                    this.searchIndicatorOn(pickRay);
+                }
             }
         }
 
@@ -2299,7 +2307,9 @@ function MyController(hand) {
             }
 
             this.intersectionDistance = intersectInfo.distance;
-            this.searchIndicatorOn(intersectInfo.searchRay);
+            if (farGrabEnabled) {
+                this.searchIndicatorOn(intersectInfo.searchRay);
+            }
             Reticle.setVisible(false);
         } else {
             this.setState(STATE_OFF, "grabbed entity was destroyed");
@@ -2656,6 +2666,7 @@ function update(deltaTime) {
     entityPropertiesCache.update();
 }
 
+Messages.subscribe('Hifi-Grab-Disable');
 Messages.subscribe('Hifi-Hand-Disabler');
 Messages.subscribe('Hifi-Hand-Grab');
 Messages.subscribe('Hifi-Hand-RayPick-Blacklist');
@@ -2680,6 +2691,17 @@ var handleHandMessages = function(channel, message, sender) {
 
                 }
                 handToDisable = message;
+            }
+        } else if (channel === 'Hifi-Grab-Disable') {
+            data = JSON.parse(message);
+            if (data.holdEnabled !== undefined) {
+                holdEnabled = data.holdEnabled;
+            }
+            if (data.nearGrabEnabled !== undefined) {
+                nearGrabEnabled = data.nearGrabEnabled;
+            }
+            if (data.farGrabEnabled !== undefined) {
+                farGrabEnabled = data.farGrabEnabled;
             }
         } else if (channel === 'Hifi-Hand-Grab') {
             try {
