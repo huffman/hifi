@@ -1032,6 +1032,9 @@ function MyController(hand) {
 
     this.secondaryPress = function(value) {
         _this.rawSecondaryValue = value;
+        if (value > 0) {
+            _this.release();
+        }
     };
 
     this.updateSmoothedTrigger = function() {
