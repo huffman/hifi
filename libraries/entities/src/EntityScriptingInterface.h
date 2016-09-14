@@ -134,7 +134,9 @@ public slots:
     /// If the scripting context has visible entities, this will determine a ray intersection, the results
     /// may be inaccurate if the engine is unable to access the visible entities, in which case result.accurate
     /// will be false.
-    Q_INVOKABLE RayToEntityIntersectionResult findRayIntersection(const PickRay& ray, bool precisionPicking = false, const QScriptValue& entityIdsToInclude = QScriptValue(), const QScriptValue& entityIdsToDiscard = QScriptValue(), bool visibleOnly = false);
+    Q_INVOKABLE RayToEntityIntersectionResult findRayIntersection(const PickRay& ray, bool precisionPicking = false,
+        const QScriptValue& entityIdsToInclude = QScriptValue(), const QScriptValue& entityIdsToDiscard = QScriptValue(),
+        bool visibleOnly = false, bool collidableOnly = false);
 
     /// If the scripting context has visible entities, this will determine a ray intersection, and will block in
     /// order to return an accurate result
@@ -244,7 +246,8 @@ private:
 
     /// actually does the work of finding the ray intersection, can be called in locking mode or tryLock mode
     RayToEntityIntersectionResult findRayIntersectionWorker(const PickRay& ray, Octree::lockType lockType,
-        bool precisionPicking, const QVector<EntityItemID>& entityIdsToInclude, const QVector<EntityItemID>& entityIdsToDiscard, bool visibleOnly = false);
+        bool precisionPicking, const QVector<EntityItemID>& entityIdsToInclude, const QVector<EntityItemID>& entityIdsToDiscard,
+        bool visibleOnly = false, bool collidableOnly = false);
 
     EntityTreePointer _entityTree;
 
