@@ -31,7 +31,7 @@ public:
     virtual const QString& getName() const override { return NAME; }
     virtual const QString& getID() const override { return HYDRA_ID_STRING; }
 
-    bool isHandController() const override { return true; }
+    bool isHandController() const override { return false; }
 
     virtual bool activate() override;
     virtual void deactivate() override;

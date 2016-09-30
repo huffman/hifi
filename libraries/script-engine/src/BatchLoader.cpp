@@ -46,6 +46,7 @@ void BatchLoader::start() {
         }
         connect(request, &ResourceRequest::finished, this, [=]() {
             if (request->getResult() == ResourceRequest::Success) {
+                qCDebug(scriptengine) << "Successfully downloaded script: " << url;
                 _data.insert(url, request->getData());
             } else {
                 _data.insert(url, QString());

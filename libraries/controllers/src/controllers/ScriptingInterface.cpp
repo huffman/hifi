@@ -64,7 +64,7 @@ controller::ScriptingInterface::ScriptingInterface() {
     for (const auto& namedInput : userInputMapper->getActionInputs()) {
         const QString& actionName = namedInput.second;
         const Input& actionInput = namedInput.first;
-        qCDebug(controllers) << "\tAction: " << actionName << " " << actionInput.getChannel();
+        qCDebug(controllers) << "\tAction: " << actionName << " id:" << actionInput.getID() << " channel:" << actionInput.getChannel();
 
         // Expose the IDs to JS
         QString cleanActionName = QString(actionName).remove(SANITIZE_NAME_EXPRESSION);

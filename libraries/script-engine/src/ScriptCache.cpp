@@ -78,6 +78,8 @@ void ScriptCache::scriptDownloaded() {
     ResourceRequest* req = qobject_cast<ResourceRequest*>(sender());
     QUrl url = req->getUrl();
 
+    qDebug() << "Script downloads: " << url;
+
     Lock lock(_containerLock);
     QList<ScriptUser*> scriptUsers = _scriptUsers.values(url);
     _scriptUsers.remove(url);

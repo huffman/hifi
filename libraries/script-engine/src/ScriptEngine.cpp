@@ -144,6 +144,7 @@ ScriptEngine::ScriptEngine(const QString& scriptContents, const QString& fileNam
     _fileNameString(fileNameString),
     _arrayBufferClass(new ArrayBufferClass(this))
 {
+    _assetScriptingInterface.moveToThread(thread());
     DependencyManager::get<ScriptEngines>()->addScriptEngine(this);
 
     connect(this, &QScriptEngine::signalHandlerException, this, [this](const QScriptValue& exception) {
@@ -1027,6 +1028,8 @@ void ScriptEngine::timerFired() {
         return; // bail early
     }
 
+    //qDebug() << "Timer fired!";
+
     QTimer* callingTimer = reinterpret_cast<QTimer*>(sender());
     CallbackData timerData = _timerFunctionMap.value(callingTimer);
 
@@ -1038,6 +1041,7 @@ void ScriptEngine::timerFired() {
 
     // call the associated JS function, if it exists
     if (timerData.function.isValid()) {
+        //qDebug() << "calling timer function!";
         callWithEnvironment(timerData.definingEntityIdentifier, timerData.definingSandboxURL, timerData.function, timerData.function, QScriptValueList());
     }
 }
@@ -1075,6 +1079,7 @@ QObject* ScriptEngine::setTimeout(const QScriptValue& function, int timeoutMS) {
         return NULL; // bail early
     }
 
+    qDebug() << "Setting up timer, " << timeoutMS;
     return setupTimerWithInterval(function, timeoutMS, true);
 }
 
@@ -1093,11 +1098,13 @@ QUrl ScriptEngine::resolvePath(const QString& include) const {
         return expandScriptUrl(url);
     }
 
+    //qDebug() << "backtrace: " << currentContext()->backtrace();
     QScriptContextInfo contextInfo { currentContext()->parentContext() };
 
     // we apparently weren't a fully qualified url, so, let's assume we're relative
     // to the original URL of our script
     QUrl parentURL = contextInfo.fileName();
+    //qDebug() << "backtrace filename: " << contextInfo.fileName();
     if (parentURL.isEmpty()) {
         if (_parentURL.isEmpty()) {
             parentURL = QUrl(_fileNameString);
