@@ -48,8 +48,10 @@ macro(PACKAGE_LIBRARIES_FOR_DEPLOYMENT)
     add_custom_command(
       TARGET ${TARGET_NAME}
       POST_BUILD
-      COMMAND if exist ${QTAUDIO_PATH}/qtaudio_windows.dll ( ${CMAKE_COMMAND} -E remove ${QTAUDIO_PATH}/qtaudio_windows.dll && ${CMAKE_COMMAND} -E copy ${WASAPI_DLL_PATH}/qtaudio_wasapi.dll ${QTAUDIO_PATH} && ${CMAKE_COMMAND} -E copy ${WASAPI_DLL_PATH}/qtaudio_wasapi.pdb ${QTAUDIO_PATH} )
-      COMMAND if exist ${QTAUDIO_PATH}/qtaudio_windowsd.dll ( ${CMAKE_COMMAND} -E remove ${QTAUDIO_PATH}/qtaudio_windowsd.dll && ${CMAKE_COMMAND} -E copy ${WASAPI_DLL_PATH}/qtaudio_wasapid.dll ${QTAUDIO_PATH} && ${CMAKE_COMMAND} -E copy ${WASAPI_DLL_PATH}/qtaudio_wasapid.pdb ${QTAUDIO_PATH} )
+      COMMAND if (NOT DEPLOY_PACKAGE AND exist ${QTAUDIO_PATH}/qtaudio_windows.dll AND (NOT ${CMAKE_SYSTEM_VERSION} LESS 6.2)) ( ${CMAKE_COMMAND} -E remove ${QTAUDIO_PATH}/qtaudio_windows.dll && ${CMAKE_COMMAND} -E copy ${WASAPI_DLL_PATH}/qtaudio_wasapi.dll ${QTAUDIO_PATH} && ${CMAKE_COMMAND} -E copy ${WASAPI_DLL_PATH}/qtaudio_wasapi.pdb ${QTAUDIO_PATH} )
+      COMMAND if (NOT DEPLOY_PACKAGE AND exist ${QTAUDIO_PATH}/qtaudio_windowsd.dll AND (NOT ${CMAKE_SYSTEM_VERSION} LESS 6.2)) ( ${CMAKE_COMMAND} -E remove ${QTAUDIO_PATH}/qtaudio_windowsd.dll && ${CMAKE_COMMAND} -E copy ${WASAPI_DLL_PATH}/qtaudio_wasapid.dll ${QTAUDIO_PATH} && ${CMAKE_COMMAND} -E copy ${WASAPI_DLL_PATH}/qtaudio_wasapid.pdb ${QTAUDIO_PATH} )
+      COMMAND if (DEPLOY_PACKAGE) ( ${CMAKE_COMMAND} -E copy ${WASAPI_DLL_PATH}/qtaudio_wasapi.dll ${QTAUDIO_PATH}/qtaudio_wasapi.dll && ${CMAKE_COMMAND} -E copy ${WASAPI_DLL_PATH}/qtaudio_wasapi.pdb ${QTAUDIO_PATH}/qtaudio_wasapi.pdb )
+      COMMAND if (DEPLOY_PACKAGE) ( ${CMAKE_COMMAND} -E copy ${WASAPI_DLL_PATH}/qtaudio_wasapid.dll ${QTAUDIO_PATH}/qtaudio_wasapi.dll && ${CMAKE_COMMAND} -E copy ${WASAPI_DLL_PATH}/qtaudio_wasapid.pdb ${QTAUDIO_PATH}/qtaudio_wasapi.pdb )
     )
 
   endif ()

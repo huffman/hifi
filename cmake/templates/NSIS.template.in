@@ -623,6 +623,17 @@ Section "-Core installation"
   RMDir /r "$INSTDIR\Interface"
   Delete "$INSTDIR\vcredist_x64.exe"
 
+  ; The installer is shipped with 2 copies of qtaudio, one for >= Win 8 (qtaudio_wasapi),
+  ; and one for < Win 8 (qtaudio_windows). Because Qt can't choose the correct
+  ; dll at runtime, we delete the incorrect one here.
+  ${If} ${AtLeastWin8}
+    Delete "$INSTDIR\audio\qtaudio_windows.dll"
+    Delete "$INSTDIR\audio\qtaudio_windows.pdb"
+  ${Else}
+    Delete "$INSTDIR\audio\qtaudio_wasapi.dll"
+    Delete "$INSTDIR\audio\qtaudio_wasapi.pdb"
+  ${EndIf}
+
   ;Use the entire tree produced by the INSTALL target.  Keep the
   ;list of directories here in sync with the RMDir commands below.
   SetOutPath "$INSTDIR"
