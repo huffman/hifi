@@ -24,6 +24,10 @@
   InstallDir "@CPACK_NSIS_INSTALL_ROOT@\@CPACK_PACKAGE_INSTALL_DIRECTORY@"
 
 ;--------------------------------
+;Include WinVer for Windows version checking
+  !include WinVer.nsh
+
+;--------------------------------
 ;General
   ; leverage the UAC NSIS plugin to promote uninstaller to elevated privileges
   !include UAC.nsh
