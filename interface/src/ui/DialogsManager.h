@@ -17,6 +17,7 @@
 #include <DependencyManager.h>
 
 #include "HMDToolsDialog.h"
+#include <QtQuick/QQuickItem>
 
 class AnimationsDialog;
 class AttachmentsDialog;
@@ -28,6 +29,7 @@ class OctreeStatsDialog;
 class ScriptEditorWindow;
 class QMessageBox;
 class DomainConnectionDialog;
+class ConnectionFailureDialog;
 
 class DialogsManager : public QObject, public Dependency {
     Q_OBJECT
@@ -45,6 +47,7 @@ public slots:
     void showAddressBar();
     void showFeed();
     void indicateDomainConnectionFailure();
+    void setDomainConnectionFailureVisibility(bool visible);
     void toggleDiskCacheEditor();
     void toggleLoginDialog();
     void showLoginDialog();
@@ -84,6 +87,7 @@ private:
     QPointer<OctreeStatsDialog> _octreeStatsDialog;
     QPointer<ScriptEditorWindow> _scriptEditor;
     QPointer<DomainConnectionDialog> _domainConnectionDialog;
+    QPointer<ConnectionFailureDialog> _connectionFailureDialog;
 };
 
 #endif // hifi_DialogsManager_h
