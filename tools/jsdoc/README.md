@@ -11,3 +11,9 @@ To generate html documentation for the High Fidelity JavaScript API
 `jsdoc . -c config.json`
 
 The out folder should contain index.html
+
+
+
+
+
+`?action=raw` can be used at the end of a URL to get the raw wiki text of a page

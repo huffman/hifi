@@ -4,5 +4,8 @@
             "outputSourceFiles": false
         }
     },
+    "opts": {
+        "template": "templates/wiki"
+    },
     "plugins": ["plugins/hifi"]
 }
