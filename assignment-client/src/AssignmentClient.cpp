@@ -38,14 +38,17 @@
 #include "AssignmentClient.h"
 #include "AssignmentClientLogging.h"
 #include "avatars/ScriptableAvatar.h"
+#include <Trace.h>
 
 const QString ASSIGNMENT_CLIENT_TARGET_NAME = "assignment-client";
 const long long ASSIGNMENT_REQUEST_INTERVAL_MSECS = 1 * 1000;
 
 AssignmentClient::AssignmentClient(Assignment::Type requestAssignmentType, QString assignmentPool,
-                                   quint16 listenPort, QUuid walletUUID, QString assignmentServerHostname,
-                                   quint16 assignmentServerPort, quint16 assignmentMonitorPort) :
-    _assignmentServerHostname(DEFAULT_ASSIGNMENT_SERVER_HOSTNAME)
+                                   quint16 listenPort, QString dataDirectory, QUuid walletUUID,
+                                   QString assignmentServerHostname, quint16 assignmentServerPort,
+                                   quint16 assignmentMonitorPort) :
+    _assignmentServerHostname(DEFAULT_ASSIGNMENT_SERVER_HOSTNAME),
+    _dataDirectory(dataDirectory)
 {
     LogUtils::init();
 
@@ -66,6 +69,8 @@ AssignmentClient::AssignmentClient(Assignment::Type requestAssignmentType, QStri
     auto actionFactory = DependencyManager::set<AssignmentActionFactory>();
     DependencyManager::set<ResourceScriptingInterface>();
 
+    Tracer::getInstance();
+
     // setup a thread for the NodeList and its PacketReceiver
     QThread* nodeThread = new QThread(this);
     nodeThread->setObjectName("NodeList Thread");
@@ -84,7 +89,8 @@ AssignmentClient::AssignmentClient(Assignment::Type requestAssignmentType, QStri
     LogHandler::getInstance().setShouldOutputProcessID(true);
 
     // setup our _requestAssignment member variable from the passed arguments
-    _requestAssignment = Assignment(Assignment::RequestCommand, requestAssignmentType, assignmentPool);
+    _requestAssignment = Assignment(Assignment::RequestCommand, requestAssignmentType, assignmentPool, Assignment::LocalLocation,
+                                    _dataDirectory);
 
     // check for a wallet UUID on the command line or in the config
     // this would represent where the user running AC wants funds sent to

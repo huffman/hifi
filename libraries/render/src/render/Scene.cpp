@@ -77,7 +77,7 @@ void consolidateChangeQueue(PendingChangesQueue& queue, PendingChanges& singleBa
 }
  
 void Scene::processPendingChangesQueue() {
-    PROFILE_RANGE(__FUNCTION__);
+    PROFILE_RANGE("render", __FUNCTION__);
     _changeQueueMutex.lock();
     PendingChanges consolidatedPendingChanges;
     consolidateChangeQueue(_changeQueue, consolidatedPendingChanges);

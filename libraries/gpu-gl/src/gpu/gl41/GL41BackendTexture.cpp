@@ -123,7 +123,7 @@ void GL41Texture::transferMip(uint16_t mipLevel, uint8_t face) const {
 }
 
 void GL41Texture::startTransfer() {
-    PROFILE_RANGE(__FUNCTION__);
+    PROFILE_RANGE("render", __FUNCTION__);
     Parent::startTransfer();
 
     glBindTexture(_target, _id);

@@ -100,7 +100,7 @@ void AssetServer::completeSetup() {
     }
 
     auto assetsPathString = assetsJSONValue.toString();
-    QDir assetsPath { assetsPathString };
+    QDir assetsPath { _dataDirectory.isNull() ? assetsPathString : _dataDirectory };
     QString absoluteFilePath = assetsPath.absolutePath();
 
     if (assetsPath.isRelative()) {

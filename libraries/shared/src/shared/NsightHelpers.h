@@ -22,12 +22,8 @@ public:
 private:
     uint64_t _rangeId{ 0 };
 };
-
-#define PROFILE_RANGE(name) ProfileRange profileRangeThis(name);
-#define PROFILE_RANGE_EX(name, argbColor, payload) ProfileRange profileRangeThis(name, argbColor, (uint64_t)payload);
-#else
-#define PROFILE_RANGE(name)
-#define PROFILE_RANGE_EX(name, argbColor, payload)
 #endif
+
+#include "../Profile.h"
 
 #endif

@@ -101,7 +101,7 @@ void Overlays::cleanupOverlaysToDelete() {
 }
 
 void Overlays::renderHUD(RenderArgs* renderArgs) {
-    PROFILE_RANGE(__FUNCTION__);
+    PROFILE_RANGE("render", __FUNCTION__);
     QReadLocker lock(&_lock);
     gpu::Batch& batch = *renderArgs->_batch;
 
