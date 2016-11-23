@@ -882,7 +882,7 @@ void Rig::updateAnimationStateHandlers() { // called on avatar update thread (wh
 
 void Rig::updateAnimations(float deltaTime, glm::mat4 rootTransform) {
 
-    PROFILE_RANGE_EX(__FUNCTION__, 0xffff00ff, 0);
+    PROFILE_RANGE_EX("resource", __FUNCTION__, 0xffff00ff, 0);
 
     setModelOffset(rootTransform);
 
