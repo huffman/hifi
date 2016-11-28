@@ -2,19 +2,25 @@
 
 #include <QCoreApplication>
 #include <QThread>
-#include "SharedUtil.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 
 #include <QFile>
+
+#include <chrono>
+
+#include "PortableHighResolutionClock.h"
 #include <windows.h>
 
-void tracing::Tracer::writeToFile(QString path) {
-    if (_enabled) {
+void tracing::Tracer::stopTracingAndWriteToFile(QString path) {
+    if (!_enabled) {
+        qDebug() << "Cannot stop tracing and write to file, already disabled";
         return;
     }
+
+    _enabled = false;
 
     std::lock_guard<std::mutex> guard(_eventsMutex);
     QJsonArray traceEvents;
@@ -38,13 +44,11 @@ void tracing::Tracer::writeToFile(QString path) {
         traceEvents.append(ev);
     }
 
-
     QJsonObject root {
         { "traceEvents", traceEvents }
     };
     QJsonDocument document { root };
 
-//    QFile file("F:///trace.json");
     QFile file(path);
     if (file.open(QIODevice::WriteOnly)) {
         auto data = document.toJson(QJsonDocument::Compact);
@@ -82,15 +86,21 @@ void tracing::Tracer::traceEvent(QString name, EventType type, uint64_t timestam
     _events.push_back(event);
 }
 
+void tracing::Tracer::startTracing(std::vector<QString> categoryBlacklist, std::vector<QString> categoryWhitelist) {
+    if (_enabled) {
+        qDebug() << "Tried to enable tracer, but already enabled";
+        return;
+    }
 
-const long long g_Frequency = []() -> long long {
-    LARGE_INTEGER frequency;
-    QueryPerformanceFrequency(&frequency);
-    return frequency.QuadPart;
-}();
+    _categoryBlacklist = categoryBlacklist;
+    _categoryWhitelist = categoryWhitelist;
+}
 
-#include <chrono>
-#include "PortableHighResolutionClock.h"
+//const long long g_Frequency = []() -> long long {
+//    LARGE_INTEGER frequency;
+//    QueryPerformanceFrequency(&frequency);
+//    return frequency.QuadPart;
+//}();
 
 void tracing::Tracer::traceEvent(QString name, EventType type, QString category, QString id, QVariantMap args, QVariantMap extra) {
     if (!_enabled) {
@@ -109,7 +119,7 @@ void tracing::Tracer::traceEvent(QString name, EventType type, QString category,
         "assetRequest"
     };
 
-    if (categoryBlacklist.contains(category)) {
+    if (find(_categoryBlacklist.begin(), _categoryBlacklist.end(), category) != _categoryBlacklist.end()) {
         return;
     }
 

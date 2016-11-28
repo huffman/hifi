@@ -69,17 +69,20 @@ namespace tracing {
             return &tracer;
         };
 
-        void traceEvent(QString name, EventType type, uint64_t timestamp, int64_t processID, int64_t threadID, QString id = "",
-            QString category = "", QVariantMap args = {}, QVariantMap extra = {});
         void traceEvent(QString name, EventType type, QString category = "", QString id = "", QVariantMap args = {}, QVariantMap extra = {});
 
-        void setEnabled(bool enabled) { _enabled = enabled; }
-        void writeToFile(QString path);
+        void startTracing(std::vector<QString> categoryBlacklist, std::vector<QString> categoryWhitelist);
+        void stopTracingAndWriteToFile(QString path);
 
     private:
+        void traceEvent(QString name, EventType type, uint64_t timestamp, int64_t processID, int64_t threadID, QString id = "",
+            QString category = "", QVariantMap args = {}, QVariantMap extra = {});
+
         bool _enabled { true };
         std::vector<TraceEvent> _events;
         std::mutex _eventsMutex;
+        std::vector<QString> _categoryBlacklist;
+        std::vector<QString> _categoryWhitelist;
     };
 
 }

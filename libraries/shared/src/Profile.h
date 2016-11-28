@@ -98,6 +98,9 @@ inline void counter(QString name, QString category, QVariantMap args, QVariantMa
     #define PROFILE_RANGE(name)
     #define PROFILE_RANGE_EX(name, argbColor, payload)
 
+    #define PROFILE_ASYNC_BEGIN(category, name, id, ...)
+    #define PROFILE_ASYNC_END(category, name, id, ...)
+
     #define PROFILE_COUNTER(category, name, args, extra)
 
     #define PROFILE_INSTANT(category, name, args, extra)

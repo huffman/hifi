@@ -282,8 +282,9 @@ int main(int argc, const char* argv[]) {
                 }
                 if (timesInactive >= 40) {
                     QObject::disconnect(&checkTimer, 0, qApp, 0);
-                    tracing::Tracer::getInstance()->traceEvent("FinishedLoading", tracing::Instant, inactiveTimestamp,
-                        QCoreApplication::applicationPid(), int64_t(QThread::currentThreadId()), "", "", {}, { { "s", "g" } });
+//                    tracing::Tracer::getInstance()->traceEvent("FinishedLoading", tracing::Instant, inactiveTimestamp,
+//                        QCoreApplication::applicationPid(), int64_t(QThread::currentThreadId()), "", "", {}, { { "s", "g" } });
+                    //PROFILE_INSTANT("general", "FinishedLoading", 
                     qApp->quit();
                 }
             });
@@ -306,8 +307,7 @@ int main(int argc, const char* argv[]) {
 
     //QString traceFilename = parser.value(traceFilenameOption);
     QString traceFilename = getCmdOption(argc, argv, "--trace");
-    tracing::Tracer::getInstance()->setEnabled(false);
-    tracing::Tracer::getInstance()->writeToFile(traceFilename);
+    tracing::Tracer::getInstance()->stopTracingAndWriteToFile(traceFilename);
 
     qCDebug(interfaceapp, "Normal exit.");
 #if !defined(DEBUG) && !defined(Q_OS_LINUX)
