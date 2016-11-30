@@ -3,6 +3,7 @@
 <html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     
     <title>Gesture Manager</title>
+    <link href="assets/css/edit-style.css" rel="stylesheet">
     <script type="text/javascript" src="qrc:///qtwebchannel/qwebchannel.js"></script>
     <script>
       var EventBridge;
@@ -20,7 +21,7 @@
         document.getElementsByTagName('head')[0].appendChild(link);
       };
 
-      appendStyleSheet(systemPath + 'html/css/edit-style.css');
+      appendStyleSheet(systemPath);// + 'html/css/edit-style.css');
 
       var openEventBridge = function(callback) {
         var WebChannel = new QWebChannel(qt.webChannelTransport, function (channel) {
@@ -123,6 +124,18 @@
       var onUpdate = function () {
         if (isUpdating) { return; }
         isUpdating = true;
+
+        var urls = {}; 
+        var inputs = document.getElementsByClassName('spell-url');
+
+        for (var i = 0; i < inputs.length; i++) {
+          var inputElement = inputs.item(i);
+          urls[inputElement.id] = inputElement.value;
+        }
+        emit('update', {
+            urls: urls
+        });
+        return;
 
         var promises = [];
         var inputs = document.getElementsByClassName('spell-url');

@@ -5,20 +5,22 @@
 
 (function () {
   'use strict';
+  Script.include("promise.js");
 
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   //  Configuration
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   var MINIMUM_CAST_TIME = 0.2; // in seconds
-  var CASTING_SOUND_URL = 'http://hifi-content.s3.amazonaws.com/caitlyn/production/sounds/connected.wav';
-  var CASTING_PARTICLE_TEXTURE_URL = 'http://hifi-content.s3.amazonaws.com/caitlyn/production/particles/smoke.png';
-  var WINDOW_URL = 'http://mpassets.highfidelity.com/0a5e847a-1e1f-4fb9-9081-a07b226397a5-v1/GestureManager.html';
-  var ICON_URL = 'http://mpassets.highfidelity.com/0a5e847a-1e1f-4fb9-9081-a07b226397a5-v1/assets/images/tools/spells.svg';
+  var CASTING_SOUND_URL = Script.resolvePath('assets/sounds/connected.wav');
+  var CASTING_PARTICLE_TEXTURE_URL = Script.resolvePath('assets/particles/smoke.png');
+  var WINDOW_URL = Script.resolvePath('GestureManager.html');
+  var ICON_URL = Script.resolvePath('assets/images/tools/spells.svg');
   var DEFAULT_SPELL_SCRIPT_URLS = {
-    circle: 'http://mpassets.highfidelity.com/0a5e847a-1e1f-4fb9-9081-a07b226397a5-v1/decreaseAvatarSize.js',
-    square: 'http://mpassets.highfidelity.com/0a5e847a-1e1f-4fb9-9081-a07b226397a5-v1/increaseAvatarSize.js',
-    triangle: 'http://mpassets.highfidelity.com/0a5e847a-1e1f-4fb9-9081-a07b226397a5-v1/resetAvatarSize.js',
+    circle: Script.resolvePath('decreaseAvatarSize.js'),
+    square: Script.resolvePath('increaseAvatarSize.js'),
+    triangle: Script.resolvePath('resetAvatarSize.js'),
   };
+  print("Resolved to: ", CASTING_SOUND_URL);
 
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   //  Shape Detector
@@ -685,6 +687,7 @@
       defaultState: 1
     });
 
+    WINDOW_URL += "#" + Script.resolvePath("file:/~/system/html/css/edit-style.css");
     var spellsWindow = new OverlayWebWindow({
       //title: 'Gesture System',
       source: WINDOW_URL,
@@ -721,41 +724,120 @@
       });
     };
 
+      var requestFile = function (shape, url) {
+        return new Promise(function (resolve, reject) {
+          if (!url) {
+            resolve({shape: shape});
+            return;
+          }
+          var xhr = new XMLHttpRequest();
+          xhr.open('GET', url, true);
+          xhr.onreadystatechange = function () {
+              print("Got state change", xhr.readyState);
+              if (xhr.readyState === xhr.DONE) {
+                  print("Got response");
+
+
+                resolve({
+                  shape: shape,
+                  url: url,
+                  data: xhr.responseText
+                });
+              }
+          };
+          xhr.onerror = function () {
+              print("got error");
+            resolve({shape: shape});
+          };
+          xhr.send();
+          print("Sent xhr");
+        });
+      };
+
     // Called when a user clicks the 'Update' button
     spellsWindowListeners.update = function (event) {
-      var spells = event.spells || [];
-      var results = {};
-	  log("SPELLS:"+JSON.stringify(spells));
-      for (i in spells) {
-        var spell = spells[i];
-        var shape = spell.key;
-        var code = spell.data;
-        var spellFunction = false;
-		log("CM:"+JSON.stringify(spell));
-		log("CM:"+JSON.stringify(code));
-        if (code) {
-          var wrappedCode = '(function (context) { ' + code + ' })';
-          spellFunction = Script.evaluate(wrappedCode, shape + '.js', 0);
-		  log("CM: "+spellFunction);
+        print('here');
+        print("got urls: ", event.urls);
+
+        var urls = event.urls;
+        var results = {};
+        var promises = [];
+        for (var shape in urls) {
+          promises.push(requestFile(shape, urls[shape]));
         }
 
-        if (spellFunction) {
-          MagicSpells.spellbook[shape] = spellFunction;
-          results[shape] = 'success';
-        } else {
-          log('Failed to load script for ' + shape);
-          MagicSpells.spellbook[shape] = false;
-          results[shape] = 'failure';
-        }
+        print("Starting requests");
+        Promise.all(promises)
+          .then(function (requestResults) {
+            // emit('update', {
+            //   spells: results
+            // });
 
-        spellUrls[shape] = spell.url;
-      }
+              var results = {};
+              requestResults.forEach(function(res) {
+                  var shape = res.shape;
+                  var code = res.data;
+                  var spellFunction = undefined;
+                  log("CM:"+JSON.stringify(res));
+                  log("CM:"+JSON.stringify(code));
+                  if (code) {
+                      var wrappedCode = '(function (context) { ' + code + ' })';
+                      spellFunction = Script.evaluate(wrappedCode, shape + '.js', 0);
+                      log("CM: "+spellFunction);
+                  }
+                  if (spellFunction) {
+                      MagicSpells.spellbook[shape] = spellFunction;
+                      results[shape] = 'success';
+                  } else {
+                      log('Failed to load script for ' + shape);
+                      MagicSpells.spellbook[shape] = false;
+                      results[shape] = 'failure';
+                  }
+              });
 
-      emit('updateComplete', {
-        results: results
-      });
 
-      Settings.setValue('com.magicspells.spells', spellUrls);
+              print("done loading spell scripts");
+              emit('updateComplete', {
+                results: results
+              });
+
+              Settings.setValue('com.magicspells.spells', urls);
+          })['catch'](function (error) {
+            print('error', error);
+              emit('updateComplete', {
+                results: results
+              });
+          });
+
+        //return;
+      // var spells = event.spells || [];
+      // var results = {};
+	  // log("SPELLS:"+JSON.stringify(spells));
+      // for (i in spells) {
+      //   var spell = spells[i];
+      //   var shape = spell.key;
+      //   var code = spell.data;
+      //   var spellFunction = false;
+		// log("CM:"+JSON.stringify(spell));
+		// log("CM:"+JSON.stringify(code));
+      //   if (code) {
+      //     var wrappedCode = '(function (context) { ' + code + ' })';
+      //     spellFunction = Script.evaluate(wrappedCode, shape + '.js', 0);
+		//   log("CM: "+spellFunction);
+      //   }
+      //
+      //   if (spellFunction) {
+      //     MagicSpells.spellbook[shape] = spellFunction;
+      //     results[shape] = 'success';
+      //   } else {
+      //     log('Failed to load script for ' + shape);
+      //     MagicSpells.spellbook[shape] = false;
+      //     results[shape] = 'failure';
+      //   }
+      //
+      //   spellUrls[shape] = spell.url;
+      // }
+
     };
 
     // Called when a user clicks the 'Enabled' checkbox
