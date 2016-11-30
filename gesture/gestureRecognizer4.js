@@ -808,36 +808,6 @@
                 results: results
               });
           });
-
-        //return;
-      // var spells = event.spells || [];
-      // var results = {};
-	  // log("SPELLS:"+JSON.stringify(spells));
-      // for (i in spells) {
-      //   var spell = spells[i];
-      //   var shape = spell.key;
-      //   var code = spell.data;
-      //   var spellFunction = false;
-		// log("CM:"+JSON.stringify(spell));
-		// log("CM:"+JSON.stringify(code));
-      //   if (code) {
-      //     var wrappedCode = '(function (context) { ' + code + ' })';
-      //     spellFunction = Script.evaluate(wrappedCode, shape + '.js', 0);
-		//   log("CM: "+spellFunction);
-      //   }
-      //
-      //   if (spellFunction) {
-      //     MagicSpells.spellbook[shape] = spellFunction;
-      //     results[shape] = 'success';
-      //   } else {
-      //     log('Failed to load script for ' + shape);
-      //     MagicSpells.spellbook[shape] = false;
-      //     results[shape] = 'failure';
-      //   }
-      //
-      //   spellUrls[shape] = spell.url;
-      // }
-
     };
 
     // Called when a user clicks the 'Enabled' checkbox
