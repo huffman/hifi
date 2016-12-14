@@ -3,8 +3,7 @@ if ("OculusTouch" in Controller.Hardware) {
 
     var lastCameraMode = null;
 
-    mirrorMapping = Controller.newMapping(MAPPING_NAME);
-    mirrorMapping.from([Controller.Hardware.OculusTouch.B, Controller.Hardware.OculusTouch.Y]).to(function(value) {
+    function toggleMirrorAction(value) {
         if (value > 0) {
             // Button down
             lastCameraMode = Camera.mode;
@@ -16,7 +15,12 @@ if ("OculusTouch" in Controller.Hardware) {
                 lastCameraMode = null;
             }
         }
-    });
+    }
+
+    mirrorMapping = Controller.newMapping(MAPPING_NAME);
+
+    mirrorMapping.from(Controller.Standard.B).to(toggleMirrorAction);
+    mirrorMapping.from(Controller.Standard.Y).to(toggleMirrorAction);
 
     Controller.enableMapping(MAPPING_NAME);
 
