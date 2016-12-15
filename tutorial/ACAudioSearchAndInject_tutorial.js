@@ -38,6 +38,8 @@ var DEFAULT_SOUND_DATA = {
     playbackGapRange: 0 // in ms
 };
 
+var AGENT_AVATAR_POSITION = { x: -2.83785, y: 1.45243, z: -13.6042 };
+
 //var isACScript = this.EntityViewer !== undefined;
 var isACScript = true;
 
@@ -45,6 +47,7 @@ Script.include("http://hifi-content.s3.amazonaws.com/ryan/development/utils_ryan
 if (isACScript) {
     Agent.isAvatar = true; // This puts a robot at 0,0,0, but is currently necessary in order to use AvatarList.
     Avatar.skeletonModelURL = "http://hifi-content.s3.amazonaws.com/ozan/dev/avatars/invisible_avatar/invisible_avatar.fst";
+    Avatar.position = AGENT_AVATAR_POSITION;
 }
 function ignore() {}
 function debug() { // Display the arguments not just [Object object].
@@ -93,6 +96,7 @@ function EntityDatum(entityIdentifier) { // Just the data of an entity that we n
             return;
         }
         var properties, soundData; // Latest data, pulled from local octree.
+
         // getEntityProperties locks the tree, which competes with the asynchronous processing of queryOctree results.
         // Most entity updates are fast and only a very few do getEntityProperties.
         function ensureSoundData() { // We only getEntityProperities when we need to.
@@ -115,43 +119,54 @@ function EntityDatum(entityIdentifier) { // Just the data of an entity that we n
                 }
             }
         }
+
         // Stumbling on big new pile of entities will do a lot of getEntityProperties. Once.
         if (that.lastUserDataUpdate < userDataCutoff) {                      // NO DATA => SOUND DATA
             ensureSoundData();
         }
+
         if (!that.url) {                                                     // NO DATA => NO DATA
             return that.stop();
         }
+
         if (!that.sound) {                                                   // SOUND DATA => DOWNLOADING
             that.sound = SoundCache.getSound(soundData.url); // SoundCache can manage duplicates better than we can.
         }
+
         if (!that.sound.downloaded) {                                        // DOWNLOADING => DOWNLOADING
             return;
         }
+
         if (that.playAfter > now) {                                          // DOWNLOADING | WAITING => WAITING
             return;
         }
+
         ensureSoundData(); // We'll try to play/setOptions and will need position, so we might as well get soundData, too.
         if (soundData.url !== that.url) {                                    // WAITING => NO DATA (update next time around)
             return that.stop();
         }
+
         var options = {
             position: properties.position,
             loop: soundData.loop || DEFAULT_SOUND_DATA.loop,
             volume: soundData.volume || DEFAULT_SOUND_DATA.volume
         };
+
         function repeat() {
             return !options.loop && (soundData.playbackGap >= 0);
         }
+
         function randomizedNextPlay() { // time of next play or recheck, randomized to distribute the work
             var range = soundData.playbackGapRange || DEFAULT_SOUND_DATA.playbackGapRange,
                 base = repeat() ? ((that.sound.duration * MSEC_PER_SEC) + (soundData.playbackGap || DEFAULT_SOUND_DATA.playbackGap)) : RECHECK_TIME;
             return now + base + randFloat(-Math.min(base, range), range);
         }
+
         if (that.injector && soundData.playing === false) {
             that.injector.stop();
             that.injector = null;
         }
+
         if (!that.injector) {
             if (soundData.playing === false) {                                                // WAITING => PLAYING | WAITING
                 return;
@@ -165,6 +180,7 @@ function EntityDatum(entityIdentifier) { // Just the data of an entity that we n
             }
             return;
         }
+
         that.injector.setOptions(options);                                   // PLAYING => UPDATE POSITION ETC
         if (!that.injector.playing) { // Subtle: a looping sound will not check playbackGap.
             if (repeat()) {                                                  // WAITING => PLAYING
@@ -178,6 +194,7 @@ function EntityDatum(entityIdentifier) { // Just the data of an entity that we n
         }
     };
 }
+
 function internEntityDatum(entityIdentifier, timestamp, avatarPosition, avatar) {
     ignore(avatarPosition, avatar); // We could use avatars and/or avatarPositions to prioritize which ones to play.
     var entitySound = entityCache[entityIdentifier];
@@ -186,7 +203,9 @@ function internEntityDatum(entityIdentifier, timestamp, avatarPosition, avatar) 
     }
     entitySound.timestamp = timestamp; // Might be updated for multiple avatars. That's fine.
 }
+
 var nUpdates = UPDATES_PER_STATS_LOG, lastStats = Date.now();
+
 function updateAllEntityData() { // A fast update of all entities we know about. A few make sounds.
     var now = Date.now(),
         expirationCutoff = now - EXPIRATION_TIME,
@@ -266,11 +285,36 @@ function updateEntiesForAvatar(avatarIdentifier) { // Just one piece of update w
 //
 var workQueue = [];
 function updateWorkQueueForAvatarsPresent() { // when nothing else to do, fill queue with individual avatar updates
-    workQueue = AvatarList.getAvatarIdentifiers().map(function (avatarIdentifier) {
+    var avatarIdentifiers = AvatarList.getAvatarIdentifiers();
+    workQueue = avatarIdentifiers.map(function (avatarIdentifier) {
         return function () {
             updateEntiesForAvatar(avatarIdentifier);
         };
     });
+
+    // There is an issue where the Audio Mixer thinks that this Agent Avatar
+    // is at 0,0,0 if you aren't sending and receiving mic/empty data to it.
+    // This causes issue with the mute/avatar bubble because the avatar position
+    // can't be relocated to a "safe" spot - instead it's always 0,0,0, so if you
+    // go near there all of the injected audio from the AC is muted.
+    // A workaround is to set isListeningToAudioStream to true so that the avatar
+    // position is sent. We only do this while there are avatars in the domain
+    // so that we aren't wasting resources while no one is in the domain.
+    if (isACScript) {
+        if (avatarIdentifiers.length == 0) {
+            // Make sure we are NOT sending/receiving mic data
+            if (Agent.isListeningToAudioStream) {
+                print("AC Injector | Disabling isListeningToAudioStream, no known avatars");
+                Agent.isListeningToAudioStream = false;
+            }
+        } else {
+            // Make sure we are sending/receiving mic data
+            if (!Agent.isListeningToAudioStream) {
+                print("AC Injector | Enabling isListeningToAudioStream");
+                Agent.isListeningToAudioStream = true;
+            }
+        }
+    }
 }
 Script.setInterval(function () {
     // There might be thousands of EntityData known to us, but only a few will require any work to update.
