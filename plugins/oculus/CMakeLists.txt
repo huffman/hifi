@@ -13,7 +13,7 @@ if (WIN32)
 
   # if we were passed an Oculus App ID for entitlement checks, send that along
   if (DEFINED ENV{OCULUS_APP_ID})
-    add_definitions(-DOCULUS_APP_ID="$ENV{OCULUS_APP_ID}")
+    add_definitions(-DOCULUS_APP_ID="1255907384473836")
   endif ()
 
   set(TARGET_NAME oculus)
