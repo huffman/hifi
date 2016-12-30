@@ -63,6 +63,8 @@
 #include "RecordingScriptingInterface.h"
 #include "ScriptEngines.h"
 
+#include <Profile.h>
+
 #include "MIDIEvent.h"
 
 static const QString SCRIPT_EXCEPTION_FORMAT = "[UncaughtException] %1 in %2:%3";
@@ -897,10 +899,17 @@ void ScriptEngine::run() {
         // on shutdown and stop... so we want to loop and sleep until we've spent our time in 
         // purgatory, constantly checking to see if our script was asked to end
         while (!_isFinished && clock::now() < sleepUntil) {
-            QCoreApplication::processEvents(); // before we sleep again, give events a chance to process
+            {
+                PROFILE_RANGE(script, "processEvents-sleep");
+                QCoreApplication::processEvents(); // before we sleep again, give events a chance to process
+            }
+
             auto thisSleepUntil = std::min(sleepUntil, clock::now() + FRAME_DURATION);
+            //qDebug() << "Sleep until: " << std::chrono::system_clock::to_time_t(thisSleepUntil) << ", " << std::chrono::system_clock::to_time_t(clock::now());
             std::this_thread::sleep_until(thisSleepUntil);
         }
+
+        PROFILE_RANGE(script, "ScriptMainLoop");
 
 #ifdef SCRIPT_DELAY_DEBUG
         {
@@ -923,7 +932,10 @@ void ScriptEngine::run() {
             break;
         }
 
-        QCoreApplication::processEvents();
+        {
+            PROFILE_RANGE(script, "processEvents");
+            QCoreApplication::processEvents();
+        }
 
         if (_isFinished) {
             break;
@@ -946,7 +958,10 @@ void ScriptEngine::run() {
             float deltaTime = (float) (now - _lastUpdate) / (float) USECS_PER_SECOND;
             if (!_isFinished) {
                 auto preUpdate = clock::now();
-                emit update(deltaTime);
+                {
+                    PROFILE_RANGE(script, "ScriptUpdate");
+                    emit update(deltaTime);
+                }
                 auto postUpdate = clock::now();
                 auto elapsed = (postUpdate - preUpdate);
                 totalUpdates += std::chrono::duration_cast<std::chrono::microseconds>(elapsed);
