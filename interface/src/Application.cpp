@@ -3310,6 +3310,7 @@ void Application::idle(float nsecsElapsed) {
         connect(offscreenUi.data(), &OffscreenUi::showDesktop, this, &Application::showDesktop);
     }
 
+    PROFILE_COUNTER(app, "script_update_rate", { { "update_rate", _displayPlugin->getTargetFrameRate() } });
     PROFILE_COUNTER(app, "fps", { { "fps", _frameCounter.rate() } });
     PROFILE_COUNTER(app, "downloads", {
         { "current", ResourceCache::getLoadingRequests().length() },
