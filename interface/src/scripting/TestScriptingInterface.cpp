@@ -125,3 +125,8 @@ bool TestScriptingInterface::waitForCondition(qint64 maxWaitMs, std::function<bo
     return condition();
 }
 
+void TestScriptingInterface::profileRange(const QString& name, QScriptValue fn) {
+    PROFILE_RANGE(script, name);
+    fn.call();
+}
+

@@ -13,6 +13,8 @@
 #include <functional>
 #include <QtCore/QObject>
 
+class QScriptValue;
+
 class TestScriptingInterface : public QObject {
     Q_OBJECT
 
@@ -64,6 +66,8 @@ public slots:
     * Using a filename with a .gz extension will automatically compress the output file
     */
     bool stopTracing(QString filename);
+
+    Q_INVOKABLE void profileRange(const QString& name, QScriptValue function);
 
 private:
     bool waitForCondition(qint64 maxWaitMs, std::function<bool()> condition);
