@@ -875,11 +875,11 @@ void ScriptEngine::run() {
     while (!_isFinished) {
         auto beforeSleep = clock::now();
 
-        // Throttle to SCRIPT_FPS
-        // We'd like to try to keep the script at a solid SCRIPT_FPS update rate. And so we will 
+        // Throttle to _targetUpdateRate
+        // We'd like to try to keep the script at a solid _targetUpdateRate update rate. And so we will 
         // calculate a sleepUntil to be the time from our start time until the original target
         // sleepUntil for this frame.
-        const std::chrono::microseconds FRAME_DURATION(USECS_PER_SECOND / SCRIPT_FPS + 1);
+        const std::chrono::microseconds FRAME_DURATION(static_cast<int64_t>(USECS_PER_SECOND / _getTargetUpdateRate()) + 1);
         clock::time_point targetSleepUntil(startTime + thisFrame++ * FRAME_DURATION);
 
         // However, if our sleepUntil is not at least our average update time into the future
