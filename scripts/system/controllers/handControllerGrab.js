@@ -2962,20 +2962,22 @@ Menu.menuItemEvent.connect(handleMenuEvent);
 var handToDisable = 'none';
 
 function update(deltaTime) {
-    var timestamp = Date.now();
+    Test.profileRange("handControllerGrab.update", function() {
+        var timestamp = Date.now();
 
-    if (handToDisable !== LEFT_HAND && handToDisable !== 'both') {
-        leftController.update(deltaTime, timestamp);
-    } else {
-        leftController.release();
-    }
-    if (handToDisable !== RIGHT_HAND && handToDisable !== 'both') {
-        rightController.update(deltaTime, timestamp);
-    } else {
-        rightController.release();
-    }
-    equipHotspotBuddy.update(deltaTime, timestamp);
-    entityPropertiesCache.update();
+        if (handToDisable !== LEFT_HAND && handToDisable !== 'both') {
+            leftController.update(deltaTime, timestamp);
+        } else {
+            leftController.release();
+        }
+        if (handToDisable !== RIGHT_HAND && handToDisable !== 'both') {
+            rightController.update(deltaTime, timestamp);
+        } else {
+            rightController.release();
+        }
+        equipHotspotBuddy.update(deltaTime, timestamp);
+        entityPropertiesCache.update();
+    });
 }
 
 Messages.subscribe('Hifi-Grab-Disable');
@@ -3066,7 +3068,8 @@ var handleHandMessages = function(channel, message, sender) {
 
 Messages.messageReceived.connect(handleHandMessages);
 
-var BASIC_TIMER_INTERVAL_MS = 20; // 20ms = 50hz good enough
+var UPDATE_RATE_HZ = 90;
+var BASIC_TIMER_INTERVAL_MS = 1000 / UPDATE_RATE_HZ; // 20ms = 50hz good enough
 var updateIntervalTimer = Script.setInterval(function(){
     update(BASIC_TIMER_INTERVAL_MS / 1000);
 }, BASIC_TIMER_INTERVAL_MS);
