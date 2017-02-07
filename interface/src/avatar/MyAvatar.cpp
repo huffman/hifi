@@ -64,8 +64,8 @@ const float MAX_BOOST_SPEED = 0.5f * MAX_WALKING_SPEED; // action motor gets add
 const float MIN_AVATAR_SPEED = 0.05f;
 const float MIN_AVATAR_SPEED_SQUARED = MIN_AVATAR_SPEED * MIN_AVATAR_SPEED; // speed is set to zero below this
 
-const float YAW_SPEED_DEFAULT = 120.0f;   // degrees/sec
-const float PITCH_SPEED_DEFAULT = 90.0f; // degrees/sec
+const float YAW_SPEED_DEFAULT = 15.0f;   // degrees/sec
+const float PITCH_SPEED_DEFAULT = 15.0f; // degrees/sec
 
 // TODO: normalize avatar speed for standard avatar size, then scale all motion logic
 // to properly follow avatar size.
