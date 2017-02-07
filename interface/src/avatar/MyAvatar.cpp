@@ -41,6 +41,7 @@
 #include <recording/Clip.h>
 #include <recording/Frame.h>
 #include <RecordingScriptingInterface.h>
+#include <ShapeEntityItem.h>
 
 #include "Application.h"
 #include "devices/Faceshift.h"
@@ -206,10 +207,17 @@ MyAvatar::MyAvatar(RigPointer rig) :
     });
 
     connect(rig.get(), SIGNAL(onLoadComplete()), this, SIGNAL(onLoadComplete()));
+    connect(DependencyManager::get<AudioClient>().data(), &AudioClient::inputReceived, this, &MyAvatar::audioInputReceived);
 }
 
 MyAvatar::~MyAvatar() {
     _lookAtTargetAvatar.reset();
+}
+
+void MyAvatar::audioInputReceived(const QByteArray& inputSamples)
+{
+    // TODO: Check if we care about capturing the audio
+        // TODO: Add audio to some collection that the network thread can then send to our servers
 }
 
 void MyAvatar::setOrientationVar(const QVariant& newOrientationVar) {
@@ -332,6 +340,74 @@ void MyAvatar::reset(bool andRecenter, bool andReload, bool andHead) {
     }
 }
 
+float currentZ = 0;
+float currentY = 0;
+float deltaZ = 0;
+float baselineZ = currentZ;
+float nodZRange = 0.35f;
+float nodYRange = 0.35f;
+float shakeZRange = 0.2f;
+float shakeYRange = 0.2f;
+
+void MyAvatar::InitInteraction()
+{
+    const auto rot = safeEulerAngles(qApp->getCamera()->getOrientation());
+    baselineZ = rot.x;
+    currentZ = rot.x;
+    currentY = rot.y;
+    deltaZ = 0;
+    qCDebug(interfaceapp) << "Initing GestureChecks. Found " << focusedEntity->getName();
+    ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(255,255,255));
+}
+void MyAvatar::UpdateInteraction()
+{
+    if(focusedEntity)
+    {
+        const auto rot = safeEulerAngles(qApp->getCamera()->getOrientation());
+        currentZ = rot.x;
+        currentY = rot.y;
+        deltaZ = abs(currentZ - baselineZ);
+        if (deltaZ >= nodZRange && currentY <= nodYRange)
+        {
+            ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(255,0,0));// Nod
+//            focusedEntity = nullptr;
+        }
+        if (currentY >= shakeYRange && currentZ <= shakeZRange)
+        {
+            ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(0,0,255));// Shake
+//            focusedEntity = nullptr;
+        }
+    }
+}
+
+// FIXME: This doesn't really work well at all but I'll use it for now.
+EntityItemPointer MyAvatar::CheckForEntity()
+{
+    QVector<EntityItemPointer> ents;
+
+    // Attempt to build a box in front of the player
+    auto scale = getScale();
+    scale.z = 100;
+    AABox cast(getPosition(),scale);
+    cast.rotate(safeEulerAngles(qApp->getCamera()->getOrientation()));
+
+    // Get objects in box
+    qApp->getEntities()->getTree()->findEntities(cast, ents);
+
+    // Find first box
+    for(auto& ent : ents)
+    {
+        if(ent->getType() == EntityTypes::Box)
+        {
+            qCDebug(interfaceapp) << "Found a box!  I am using it!";
+//            ((ShapeEntityItem*)ent.get())->setColor(QColor::fromRgb(randomColorValue(0),randomColorValue(0),randomColorValue(0)));
+            ((ShapeEntityItem*)ent.get())->setColor(QColor::fromRgb(255,255,255));
+            return ent;
+        }
+    }
+    return nullptr;
+}
+
 void MyAvatar::update(float deltaTime) {
 
     // update moving average of HMD facing in xz plane.
@@ -393,6 +469,15 @@ void MyAvatar::update(float deltaTime) {
     emit energyChanged(currentEnergy);
 
     updateEyeContactTarget(deltaTime);
+
+    if(focusedEntity)
+        UpdateInteraction();
+    else
+    {
+        focusedEntity = CheckForEntity();
+        if(focusedEntity)
+            InitInteraction();
+    }
 }
 
 void MyAvatar::updateEyeContactTarget(float deltaTime) {

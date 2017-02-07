@@ -25,6 +25,7 @@
 #include "AtRestDetector.h"
 #include "MyCharacterController.h"
 #include <ThreadSafeValueCache.h>
+#include <EntityTypes.h>
 
 class AvatarActionHold;
 class ModelItemID;
@@ -320,6 +321,8 @@ public slots:
     glm::vec3 getPositionForAudio();
     glm::quat getOrientationForAudio();
 
+    void audioInputReceived(const QByteArray& inputSamples);
+
 signals:
     void audioListenerModeChanged();
     void transformChanged();
@@ -414,6 +417,11 @@ private:
     glm::vec3 _trackedHeadPosition;
 
     Setting::Handle<float> _realWorldFieldOfView;
+
+    EntityItemPointer focusedEntity;
+    EntityItemPointer CheckForEntity();
+    void InitInteraction();
+    void UpdateInteraction();
 
     // private methods
     void updateOrientation(float deltaTime);
