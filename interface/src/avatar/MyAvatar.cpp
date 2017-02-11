@@ -208,6 +208,8 @@ MyAvatar::MyAvatar(RigPointer rig) :
 
     connect(rig.get(), SIGNAL(onLoadComplete()), this, SIGNAL(onLoadComplete()));
     connect(DependencyManager::get<AudioClient>().data(), &AudioClient::inputReceived, this, &MyAvatar::audioInputReceived);
+    transcribeServerSocket = nullptr;
+    streamingAudioForTranscription = false;
 }
 
 MyAvatar::~MyAvatar() {
@@ -216,8 +218,18 @@ MyAvatar::~MyAvatar() {
 
 void MyAvatar::audioInputReceived(const QByteArray& inputSamples)
 {
-    // TODO: Check if we care about capturing the audio
-        // TODO: Add audio to some collection that the network thread can then send to our servers
+    if(transcribeServerSocket && transcribeServerSocket->isWritable())
+    {
+//        qCDebug(interfaceapp) << "Sending Data!";
+        transcribeServerSocket->write(inputSamples.data(), inputSamples.size());
+        transcribeServerSocket->waitForBytesWritten();
+        if(!streamingAudioForTranscription)
+        {
+            transcribeServerSocket->close();
+            delete transcribeServerSocket;
+            transcribeServerSocket = nullptr;
+        }
+    }
 }
 
 void MyAvatar::setOrientationVar(const QVariant& newOrientationVar) {
@@ -340,14 +352,38 @@ void MyAvatar::reset(bool andRecenter, bool andReload, bool andHead) {
     }
 }
 
-float currentZ = 0;
-float currentY = 0;
-float deltaZ = 0;
-float baselineZ = currentZ;
-float nodZRange = 0.35f;
-float nodYRange = 0.35f;
-float shakeZRange = 0.2f;
-float shakeYRange = 0.2f;
+void MyAvatar::TranscriptionReceived()
+{
+    while(transcribeServerSocket->bytesAvailable() > 0)
+    {
+        const QByteArray data = transcribeServerSocket->readAll();
+        qCDebug(interfaceapp) << "Data got!" << data;
+        QJsonObject json = QJsonDocument::fromJson(data.data()).object();
+        if(json["isFinal"] == true)
+        {
+            streamingAudioForTranscription = false;
+            QString finalTranscription = json["alternatives"].toArray()[0].toObject()["transcript"].toString();
+            qCDebug(interfaceapp) << "Final transcription: " << finalTranscription;
+
+            // Demo for show:
+            if(finalTranscription.contains("hello", Qt::CaseInsensitive))
+            {
+                ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(0,255,0));
+            }
+            else if(finalTranscription.contains("goodbye", Qt::CaseInsensitive))
+            {
+                ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(255,0,0));
+            }
+            else
+            {
+                ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(0,0,255));
+            }
+            focusedEntity = nullptr;
+
+            break;
+        }
+    }
+}
 
 void MyAvatar::InitInteraction()
 {
@@ -357,12 +393,23 @@ void MyAvatar::InitInteraction()
     currentY = rot.y;
     deltaZ = 0;
     qCDebug(interfaceapp) << "Initing GestureChecks. Found " << focusedEntity->getName();
+    qCDebug(interfaceapp) << "Sending: " << QString::asprintf("Authorization: \r\nfs: %i", AudioConstants::SAMPLE_RATE).toLocal8Bit();
     ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(255,255,255));
+
+    streamingAudioForTranscription = true;
+    transcribeServerSocket = new QTcpSocket(this);
+    connect(transcribeServerSocket, &QTcpSocket::readyRead, this, &MyAvatar::TranscriptionReceived);
+    transcribeServerSocket->connectToHost("104.198.96.245", 80);
+    transcribeServerSocket->waitForConnected();
+    transcribeServerSocket->write(QString::asprintf("POST / HTTP/1.1\r\nHost: gserv_devel.studiolimitless.com\r\nAuthorization: testKey\r\nfs: %i\r\n", AudioConstants::SAMPLE_RATE).toLocal8Bit());
+    transcribeServerSocket->waitForBytesWritten();
 }
-void MyAvatar::UpdateInteraction()
+
+void MyAvatar::UpdateGestureData()
 {
     if(focusedEntity)
     {
+        // Check for nods and shakes
         const auto rot = safeEulerAngles(qApp->getCamera()->getOrientation());
         currentZ = rot.x;
         currentY = rot.y;
@@ -370,13 +417,14 @@ void MyAvatar::UpdateInteraction()
         if (deltaZ >= nodZRange && currentY <= nodYRange)
         {
             ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(255,0,0));// Nod
-//            focusedEntity = nullptr;
+            focusedEntity = nullptr;
         }
         if (currentY >= shakeYRange && currentZ <= shakeZRange)
         {
             ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(0,0,255));// Shake
-//            focusedEntity = nullptr;
+            focusedEntity = nullptr;
         }
+
     }
 }
 
@@ -393,6 +441,7 @@ EntityItemPointer MyAvatar::CheckForEntity()
 
     // Get objects in box
     qApp->getEntities()->getTree()->findEntities(cast, ents);
+    qCDebug(interfaceapp) << "World has " << qApp->getEntities()->getTree()->getOctreeElementsCount() << " Entities";
 
     // Find first box
     for(auto& ent : ents)
@@ -471,7 +520,8 @@ void MyAvatar::update(float deltaTime) {
     updateEyeContactTarget(deltaTime);
 
     if(focusedEntity)
-        UpdateInteraction();
+//        UpdateGestureData(); // not currently testing this
+        ;
     else
     {
         focusedEntity = CheckForEntity();
