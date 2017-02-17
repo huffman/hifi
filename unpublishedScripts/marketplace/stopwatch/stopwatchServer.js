@@ -23,17 +23,39 @@
 
     self.chimeSound = SoundCache.getSound(Script.resolvePath("sounds/chime.wav"));
 
+    // Search for the minute and second hands which are a child of this entity.
+    //
+    // Q: Why don't we just do this in the preload? 
+    // A: It is not guaranteed that we will have received our children yet
+    //    from the entity server when preload is called. To handle that case
+    //    we occasionally check to see if they are available until we find them.
+    self.findHands = function() {
+        var childrenIDs = Entities.getChildrenIDs(self.entityID);
+
+        for (var i = 0; i < childrenIDs.length; ++i) {
+            var id = childrenIDs[i];
+            var name = Entities.getEntityProperties(id, 'name').name;
+            if (name === 'stopwatch/seconds') {
+                self.secondHandID = id;
+            } else if (name === 'stopwatch/minutes') {
+                self.minuteHandID = id;
+            }
+        }
+
+        if (self.secondHandID !== null && self.secondHandID !== null) {
+            Script.clearInterval(self.findHandsIntervalID);
+            self.findHandsIntervalID = null;
+            self.resetTimer();
+        }
+    };
+
     self.preload = function(entityID) {
         print("Preloading stopwatch: ", entityID);
         self.entityID = entityID;
         self.messageChannel = "STOPWATCH-" + entityID;
 
-        var userData = Entities.getEntityProperties(self.entityID, 'userData').userData;
-        var data = JSON.parse(userData);
-        self.secondHandID = data.secondHandID;
-        self.minuteHandID = data.minuteHandID;
-
-        self.resetTimer();
+        self.findHandsIntervalID = Script.setInterval(self.findHands, 500);
+        self.findHands();
 
         Messages.subscribe(self.messageChannel);
         Messages.messageReceived.connect(this, self.messageReceived);
@@ -67,12 +89,10 @@
             self.tickIntervalID = null;
         }
         Entities.editEntity(self.secondHandID, {
-            rotation: Quat.fromPitchYawRollDegrees(0, 0, 0),
-            angularVelocity: { x: 0, y: 0, z: 0 },
+            localRotation: Quat.fromPitchYawRollDegrees(0, 0, 0),
         });
         Entities.editEntity(self.minuteHandID, {
-            rotation: Quat.fromPitchYawRollDegrees(0, 0, 0),
-            angularVelocity: { x: 0, y: 0, z: 0 },
+            localRotation: Quat.fromPitchYawRollDegrees(0, 0, 0),
         });
         self.isActive = false;
     };
@@ -100,11 +120,11 @@
             seconds++;
             const degreesPerTick = -360 / 60;
             Entities.editEntity(self.secondHandID, {
-                rotation: Quat.fromPitchYawRollDegrees(0, seconds * degreesPerTick, 0),
+                localRotation: Quat.fromPitchYawRollDegrees(0, seconds * degreesPerTick, 0),
             });
             if (seconds % 60 == 0) {
                 Entities.editEntity(self.minuteHandID, {
-                    rotation: Quat.fromPitchYawRollDegrees(0, (seconds / 60) * degreesPerTick, 0),
+                    localRotation: Quat.fromPitchYawRollDegrees(0, (seconds / 60) * degreesPerTick, 0),
                 });
                 Audio.playSound(self.chimeSound, {
                     position: self.getStopwatchPosition(),
