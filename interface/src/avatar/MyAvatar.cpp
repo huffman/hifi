@@ -218,7 +218,7 @@ MyAvatar::~MyAvatar() {
 
 void MyAvatar::audioInputReceived(const QByteArray& inputSamples)
 {
-    if(transcribeServerSocket && transcribeServerSocket->isWritable())
+    if(transcribeServerSocket && transcribeServerSocket->isWritable() && transcribeServerSocket->state() != QAbstractSocket::SocketState::UnconnectedState)
     {
 //        qCDebug(interfaceapp) << "Sending Data!";
         transcribeServerSocket->write(inputSamples.data(), inputSamples.size());
@@ -393,16 +393,20 @@ void MyAvatar::InitInteraction()
     currentY = rot.y;
     deltaZ = 0;
     qCDebug(interfaceapp) << "Initing GestureChecks. Found " << focusedEntity->getName();
-    qCDebug(interfaceapp) << "Sending: " << QString::asprintf("Authorization: \r\nfs: %i", AudioConstants::SAMPLE_RATE).toLocal8Bit();
     ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(255,255,255));
 
     streamingAudioForTranscription = true;
     transcribeServerSocket = new QTcpSocket(this);
     connect(transcribeServerSocket, &QTcpSocket::readyRead, this, &MyAvatar::TranscriptionReceived);
-    transcribeServerSocket->connectToHost("104.198.96.245", 80);
+    static const auto host = "gserv_devel.studiolimitless.com";
+    qCDebug(interfaceapp) << "Setting up connection";
+    transcribeServerSocket->connectToHost(host, 80);
     transcribeServerSocket->waitForConnected();
-    transcribeServerSocket->write(QString::asprintf("POST / HTTP/1.1\r\nHost: gserv_devel.studiolimitless.com\r\nAuthorization: testKey\r\nfs: %i\r\n", AudioConstants::SAMPLE_RATE).toLocal8Bit());
+    QString requestHeader = QString::asprintf("Authorization: testKey\r\nfs: %i\r\n", AudioConstants::SAMPLE_RATE);
+    qCDebug(interfaceapp) << "Sending: " << requestHeader;
+    transcribeServerSocket->write(requestHeader.toLocal8Bit());
     transcribeServerSocket->waitForBytesWritten();
+    qCDebug(interfaceapp) << "Completed send";
 }
 
 void MyAvatar::UpdateGestureData()
@@ -441,7 +445,7 @@ EntityItemPointer MyAvatar::CheckForEntity()
 
     // Get objects in box
     qApp->getEntities()->getTree()->findEntities(cast, ents);
-    qCDebug(interfaceapp) << "World has " << qApp->getEntities()->getTree()->getOctreeElementsCount() << " Entities";
+//    qCDebug(interfaceapp) << "World has " << qApp->getEntities()->getTree()->getOctreeElementsCount() << " Entities";
 
     // Find first box
     for(auto& ent : ents)
@@ -519,15 +523,15 @@ void MyAvatar::update(float deltaTime) {
 
     updateEyeContactTarget(deltaTime);
 
-    if(focusedEntity)
-//        UpdateGestureData(); // not currently testing this
-        ;
-    else
-    {
-        focusedEntity = CheckForEntity();
-        if(focusedEntity)
-            InitInteraction();
-    }
+//    if(focusedEntity)
+////        UpdateGestureData(); // not currently testing this
+//        ;
+//    else
+//    {
+//        focusedEntity = CheckForEntity();
+//        if(focusedEntity)
+//            InitInteraction();
+//    }
 }
 
 void MyAvatar::updateEyeContactTarget(float deltaTime) {
