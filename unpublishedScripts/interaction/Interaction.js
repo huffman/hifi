@@ -4,84 +4,83 @@ function getForwardOffset(distance) {
 
 var NPC = false;
 var hasCenteredOnNPC = false;
-var distance = 5;
+var distance = 10;
 var r = 8;
 
-function spawnDebugSphere() {
-	Entities.addEntity({
-		type: "Sphere",
-		position: getForwardOffset(distance),
-		dimensions: {x: r, y: r, z: r},
-		lifetime: 0.1
-	});
+var baselineX = 0;
+var baselineY = 0;
+var nodRange = 35;
+var shakeRange = 20;
+
+function setBaselineRotations(rot) {
+	baselineX = rot.x;
+	baselineY = rot.y;
 }
 
-function findlookedAtNPC() {
-	var intersection = Entities.findRayIntersection({origin: MyAvatar.position, direction: Quat.getFront(Camera.getOrientation())}, true);
+function findLookedAtNPC() {
+	var intersection = AvatarList.findRayIntersection({origin: MyAvatar.position, direction: Quat.getFront(Camera.getOrientation())}, true);
 	if(intersection.intersects && intersection.distance <= distance){
-		var name = Entities.getEntityProperties(intersection.entityID, 'name').name
-		if(name.search("NPC") != -1)
-			return intersection.entityID;
+		var npcAvatar = AvatarList.getAvatar(intersection.avatarID);
+		if(npcAvatar.displayName.search("NPC") != -1) {
+			print("Found NPC!");
+			setBaselineRotations(Quat.safeEulerAngles(npcAvatar.orientation));
+			return intersection.avatarID;
+		}
 	}
 	return false;
 }
 
-function findNPCInFocusArea() {
-	// spawnDebugSphere();
-	var ents = Entities.findEntities(getForwardOffset(distance), r);
-	return ents.filter(function(x){return Entities.getEntityProperties(x, 'name').name.search("NPC") != -1;});
+function callOnNPC(message) {
+	Messages.sendMessage("intersectionComs", message + ": " + NPC);
 }
 
-var baselineX = 0;
-var baselineY = 0;
-var nodRange = 0.35;
-var shakeRange = 0.2;
+function isStillFocusedNPC() {
+	var avatarPosition = AvatarList.getAvatar(NPC).position;
+	return Vec3.distance(MyAvatar.position, avatarPosition) <= distance && Math.abs(Quat.dot(Camera.getOrientation(), Quat.lookAtSimple(MyAvatar.position, avatarPosition))) > 0.6;
+}
 
 function onWeLostFocus() {
 	print("lost NPC: " + NPC);
-	Entities.callEntityMethod(NPC, 'onLostFocused', [MyAvatar.sessionUUID]);
+	callOnNPC("onLostFocused");
 	var baselineX = 0;
 	var baselineY = 0;
 }
 
 function onWeGainedFocus() {
 	print("found NPC: " + NPC);
-	Entities.callEntityMethod(NPC, 'onFocused', [MyAvatar.sessionUUID]);
+	callOnNPC("onFocused");
 	var rotation = Quat.safeEulerAngles(Camera.getOrientation());
 	baselineX = rotation.x;
 	baselineY = rotation.y;
 }
 
-function tick () {
+function checkFocus() {
+	var newNPC = findLookedAtNPC();
 
- 	var rotation = Quat.safeEulerAngles(Camera.getOrientation());
- 	if(!NPC || NPC === "false") {
- 		// start by looking for an NPC in a direct line
- 		NPC = findlookedAtNPC();
- 		if(NPC) 
- 			onWeGainedFocus();
- 		NPC = NPC.toString();
- 	}
- 	else {
- 		print("NPC: " + NPC);
- 		print("typeof NPC: " + typeof NPC);
- 		newNPC = findNPCInFocusArea().toString();
- 		print("newNPC: " + newNPC);
- 		if(newNPC != NPC)
- 		{
-			onWeLostFocus();
-			NPC = newNPC;
-			if(newNPC && newNPC == findlookedAtNPC().toString())
-				onWeGainedFocus();
- 		}
- 		// check for a nod or shake
- 		deltaX = Math.abs(rotation.x - baselineX);
- 		deltaY = Math.abs(rotation.y - baselineY);
- 		if(deltaX >= nodRange && rotation.y <= nodRange)
- 			Entities.callEntityMethod(NPC, 'onNodReceived', [MyAvatar.sessionUUID]);
- 		else if (deltaY >= shakeRange && rotation.x <= shakeRange)
- 			Entities.callEntityMethod(NPC, 'onShakeReceived', [MyAvatar.sessionUUID]);
- 	}
+	if(NPC && (newNPC != NPC || !isStillFocusedNPC())) {
+		onLostFocused();
+		NPC = false;
+	}
+	if(!NPC && newNPC) {
+		NPC = newNPC;
+		onWeGainedFocus();
+	}
+}
+
+function checkGesture() {
+	var rotation = Quat.safeEulerAngles(Camera.getOrientation());
+
+	deltaX = Math.abs(rotation.x - baselineX);
+	deltaY = Math.abs(rotation.y - baselineY);
+	if(deltaX >= nodRange && rotation.y <= nodRange)
+		callOnNPC("onNodReceived");
+	else if (deltaY >= shakeRange && rotation.x <= shakeRange)
+		callOnNPC("onShakeReceived");
+}
+
+function tick () {
+	checkFocus();
+	checkFocus();
 }
 
 print("Avatar preload");
