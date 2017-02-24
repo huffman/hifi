@@ -6,21 +6,32 @@ var lightFST = "http://127.0.0.1:8080/beingOfLight.fst";
 var lightThankful = "http://127.0.0.1:8080/beingOfLightThankful.fbx";
 var lightWave = "http://127.0.0.1:8080/beingOfLightWave.fbx";
 
+var animationData = {url: idleAnim, lastFrame: 35};
+
+Agent.isAvatar = true;
 Avatar.skeletonModelURL = lightFST;
 Avatar.displayName = "NPC";
-Agent.isAvatar = true;
-var animationData = {url: idleAnim, lastFrame: 35};
-var millisecondsToWaitBeforeStarting = 10 * 1000;
 Avatar.position = {x: -1537, y: 53.5, z: -1118};
 Avatar.startAnimation(animationData.url, animationData.fps || 30, 1, true, false, animationData.firstFrame || 0, animationData.lastFrame);
 
+var startingOrientation = Avatar.orientation;
+
 Messages.subscribe("interactionComs");
-print("New NPC @" + Agent.sessionUUID);
 Messages.messageReceived.connect(function (channel, message, sender) {
-  print("Messaged NPC @" + Agent.sessionUUID);
-	if(channel === "interactionComs") {
-		if(message.search(Agent.sessionUUID) != -1) {
+	print(sender + " -> NPC @" + Agent.sessionUUID + ": " + message);
+	if(channel === "interactionComs" && message.search(Agent.sessionUUID) != -1) {
+		if(message.search("onFocused") != -1) {
 			Avatar.orientation = Quat.lookAtSimple(Avatar.position, AvatarList.getAvatar(sender).position);
+			Avatar.startAnimation(animationData.url, animationData.fps || 30, 1, true, false, animationData.firstFrame || 0, animationData.lastFrame);
+		}
+		else if (message.search("onLostFocused") != -1) {
+			Avatar.orientation = startingOrientation;
+			Avatar.startAnimation(animationData.url, animationData.fps || 30, 1, true, false, animationData.firstFrame || 0, animationData.lastFrame);
+		}
+		else if (message.search("onNodReceived")) {
+			Avatar.startAnimation(lightThankful, animationData.fps || 30, 1, true, false, animationData.firstFrame || 0, animationData.lastFrame);
+		}
+		else if (message.search("onShakeReceived") != -1) {
 			Avatar.startAnimation(lightWave, animationData.fps || 30, 1, true, false, animationData.firstFrame || 0, animationData.lastFrame);
 		}
 	}

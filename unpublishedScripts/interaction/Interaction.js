@@ -9,7 +9,7 @@ var r = 8;
 
 var baselineX = 0;
 var baselineY = 0;
-var nodRange = 35;
+var nodRange = 20;
 var shakeRange = 20;
 
 function setBaselineRotations(rot) {
@@ -23,7 +23,7 @@ function findLookedAtNPC() {
 		var npcAvatar = AvatarList.getAvatar(intersection.avatarID);
 		if(npcAvatar.displayName.search("NPC") != -1) {
 			print("Found NPC!");
-			setBaselineRotations(Quat.safeEulerAngles(npcAvatar.orientation));
+			setBaselineRotations(Quat.safeEulerAngles(Camera.getOrientation()));
 			return intersection.avatarID;
 		}
 	}
@@ -31,7 +31,7 @@ function findLookedAtNPC() {
 }
 
 function callOnNPC(message) {
-	Messages.sendMessage("intersectionComs", message + ": " + NPC);
+	Messages.sendMessage("interactionComs", message + ": " + NPC);
 }
 
 function isStillFocusedNPC() {
@@ -57,11 +57,11 @@ function onWeGainedFocus() {
 function checkFocus() {
 	var newNPC = findLookedAtNPC();
 
-	if(NPC && (newNPC != NPC || !isStillFocusedNPC())) {
-		onLostFocused();
+	if(NPC && newNPC != NPC && !isStillFocusedNPC()) {
+		onWeLostFocus();
 		NPC = false;
 	}
-	if(!NPC && newNPC) {
+	if(!NPC && newNPC != false) {
 		NPC = newNPC;
 		onWeGainedFocus();
 	}
@@ -71,7 +71,12 @@ function checkGesture() {
 	var rotation = Quat.safeEulerAngles(Camera.getOrientation());
 
 	deltaX = Math.abs(rotation.x - baselineX);
+	if(deltaX > 180)
+		deltaX -= 180;
 	deltaY = Math.abs(rotation.y - baselineY);
+	if(deltaY > 180)
+		deltaY -= 180;
+
 	if(deltaX >= nodRange && rotation.y <= nodRange)
 		callOnNPC("onNodReceived");
 	else if (deltaY >= shakeRange && rotation.x <= shakeRange)
@@ -80,7 +85,7 @@ function checkGesture() {
 
 function tick () {
 	checkFocus();
-	checkFocus();
+	checkGesture();
 }
 
 print("Avatar preload");
