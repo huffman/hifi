@@ -42,6 +42,7 @@
 #include <recording/Frame.h>
 #include <RecordingScriptingInterface.h>
 #include <ShapeEntityItem.h>
+#include <MessagesClient.h>
 
 #include "Application.h"
 #include "devices/Faceshift.h"
@@ -210,6 +211,7 @@ MyAvatar::MyAvatar(RigPointer rig) :
     connect(DependencyManager::get<AudioClient>().data(), &AudioClient::inputReceived, this, &MyAvatar::audioInputReceived);
     transcribeServerSocket = nullptr;
     streamingAudioForTranscription = false;
+    isTalkKeyPressed = false;
 }
 
 MyAvatar::~MyAvatar() {
@@ -350,6 +352,23 @@ void MyAvatar::reset(bool andRecenter, bool andReload, bool andHead) {
         // i.e. the along avatar's current position and orientation.
         updateSensorToWorldMatrix();
     }
+
+    auto messages = DependencyManager::get<MessagesClient>();
+    messages->subscribe(getSessionUUID().toString());
+    messages->subscribe("debugMessages");
+    connect(messages.data(), &MessagesClient::messageReceived, this, [&](QString channel, QString message, QUuid senderUUID, bool localOnly) {
+        if (getSessionUUID() == senderUUID) {
+            qDebug() << "Got a message: " << message;
+            if(message.contains("pressed") && !isTalkKeyPressed) {
+                isTalkKeyPressed = true;
+                InitInteraction();
+            }
+            else if(message.contains("released")) {
+                isTalkKeyPressed = false;
+                streamingAudioForTranscription = false;
+            }
+        }
+    });
 }
 
 void MyAvatar::TranscriptionReceived()
@@ -364,20 +383,21 @@ void MyAvatar::TranscriptionReceived()
             streamingAudioForTranscription = false;
             QString finalTranscription = json["alternatives"].toArray()[0].toObject()["transcript"].toString();
             qCDebug(interfaceapp) << "Final transcription: " << finalTranscription;
-
+            auto messages = DependencyManager::get<MessagesClient>();
+            messages->sendMessage("debugMessages", "isFinal: " + finalTranscription);
             // Demo for show:
-            if(finalTranscription.contains("hello", Qt::CaseInsensitive))
-            {
-                ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(0,255,0));
-            }
-            else if(finalTranscription.contains("goodbye", Qt::CaseInsensitive))
-            {
-                ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(255,0,0));
-            }
-            else
-            {
-                ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(0,0,255));
-            }
+//            if(finalTranscription.contains("hello", Qt::CaseInsensitive))
+//            {
+//                ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(0,255,0));
+//            }
+//            else if(finalTranscription.contains("goodbye", Qt::CaseInsensitive))
+//            {
+//                ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(255,0,0));
+//            }
+//            else
+//            {
+//                ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(0,0,255));
+//            }
             focusedEntity = nullptr;
 
             break;
@@ -387,13 +407,13 @@ void MyAvatar::TranscriptionReceived()
 
 void MyAvatar::InitInteraction()
 {
-    const auto rot = safeEulerAngles(qApp->getCamera()->getOrientation());
-    baselineZ = rot.x;
-    currentZ = rot.x;
-    currentY = rot.y;
-    deltaZ = 0;
-    qCDebug(interfaceapp) << "Initing GestureChecks. Found " << focusedEntity->getName();
-    ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(255,255,255));
+//    const auto rot = safeEulerAngles(qApp->getCamera()->getOrientation());
+//    baselineZ = rot.x;
+//    currentZ = rot.x;
+//    currentY = rot.y;
+//    deltaZ = 0;
+//    qCDebug(interfaceapp) << "Initing GestureChecks. Found " << focusedEntity->getName();
+//    ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(255,255,255));
 
     streamingAudioForTranscription = true;
     transcribeServerSocket = new QTcpSocket(this);

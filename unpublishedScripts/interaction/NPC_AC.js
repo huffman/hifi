@@ -34,5 +34,13 @@ Messages.messageReceived.connect(function (channel, message, sender) {
 		else if (message.search("onShakeReceived") != -1) {
 			Avatar.startAnimation(lightWave, animationData.fps || 30, 1, true, false, animationData.firstFrame || 0, animationData.lastFrame);
 		}
+		else if (message.search("voiceData") != -1) {
+			if(message.search("thank") != -1) {
+				Avatar.startAnimation(lightThankful, animationData.fps || 30, 1, true, false, animationData.firstFrame || 0, animationData.lastFrame);
+			}
+			else if (message.search("bye") != -1) {
+				Avatar.startAnimation(lightWave, animationData.fps || 30, 1, true, false, animationData.firstFrame || 0, animationData.lastFrame);
+			}
+		}
 	}
 });

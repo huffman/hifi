@@ -91,6 +91,28 @@ function tick () {
 
 print("Avatar preload");
 
+Messages.subscribe("debugMessages");
+Messages.messageReceived.connect(function (channel, message, sender) {
+	print("Interaction message got: " + message);
+	if(channel === "debugMessages" && message.search("isFinal") != -1 /*&& sender == MyAvatar.sessionUUID*/) {
+		print("Calling voice on NPC");
+		callOnNPC("voiceData: " + message.toLowerCase());
+	}
+});
+
+Controller.keyPressEvent.connect(function(event) {
+	if(event.text.search("TAB") != -1) {
+		print("Sending tab");
+		Messages.sendMessage("debugMessages", MyAvatar.sessionUUID + " pressed");
+	}
+});
+Controller.keyReleaseEvent.connect(function(event) {
+	if(event.text.search("TAB") != -1) {
+		print("Sending tab release");
+		Messages.sendMessage("debugMessages", MyAvatar.sessionUUID + " released");
+	}
+});
+
 if(typeof ticker === 'undefined')
 	ticker = Script.setInterval(tick, 666);
 else {

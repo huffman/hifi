@@ -538,6 +538,8 @@ private:
     float getEnergy();
     void setEnergy(float value);
     bool didTeleport();
+
+    bool isTalkKeyPressed;
 };
 
 QScriptValue audioListenModeToScriptValue(QScriptEngine* engine, const AudioListenerMode& audioListenerMode);
