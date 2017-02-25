@@ -28,7 +28,7 @@ Messages.messageReceived.connect(function (channel, message, sender) {
 			Avatar.orientation = startingOrientation;
 			Avatar.startAnimation(animationData.url, animationData.fps || 30, 1, true, false, animationData.firstFrame || 0, animationData.lastFrame);
 		}
-		else if (message.search("onNodReceived")) {
+		else if (message.search("onNodReceived") != -1) {
 			Avatar.startAnimation(lightThankful, animationData.fps || 30, 1, true, false, animationData.firstFrame || 0, animationData.lastFrame);
 		}
 		else if (message.search("onShakeReceived") != -1) {

@@ -85,7 +85,8 @@ function checkGesture() {
 
 function tick () {
 	checkFocus();
-	checkGesture();
+	if(NPC)
+		checkGesture();
 }
 
 print("Avatar preload");
