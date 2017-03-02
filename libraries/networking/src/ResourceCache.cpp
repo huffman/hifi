@@ -698,6 +698,9 @@ void Resource::handleReplyFinished() {
     Q_ASSERT_X(_request, "Resource::handleReplyFinished", "Request should not be null while in handleReplyFinished");
 
     PROFILE_ASYNC_END(resource, "Resource:" + getType(), QString::number(_requestID), {
+        { "url", _url},
+        { "load_priority", getLoadPriority() },
+        { "type", getType() },
         { "from_cache", _request->loadedFromCache() },
         { "size_mb", _bytesTotal / 1000000.0 }
     });

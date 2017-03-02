@@ -31,6 +31,8 @@
 #include <gpu/Format.h>
 #include <LogHandler.h>
 
+#include <Profile.h>
+
 #include "FBXReader.h"
 #include "ModelFormatLogging.h"
 
@@ -938,6 +940,11 @@ FBXGeometry* FBXReader::extractFBXGeometry(const QVariantHash& mapping, const QS
                         }
                     }
                     if (!content.isEmpty()) {
+                        PROFILE_INSTANT(resource_load, "fbx_embedded_texture", "t", {
+                            { "fbx_filename", "" },
+                            { "filepath", filepath },
+                            { "size", content.size() }
+                        });
                         _textureContent.insert(filepath, content);
                     }
                 } else if (object.name == "Material") {
@@ -1827,17 +1834,31 @@ FBXGeometry* FBXReader::extractFBXGeometry(const QVariantHash& mapping, const QS
     return geometryPtr;
 }
 
-FBXGeometry* readFBX(const QByteArray& model, const QVariantHash& mapping, const QString& url, bool loadLightmaps, float lightmapLevel) {
+FBXGeometry* readFBX(const QByteArray& model, const QVariantHash& mapping, const QString& url, const QString& path, bool loadLightmaps, float lightmapLevel) {
     QBuffer buffer(const_cast<QByteArray*>(&model));
     buffer.open(QIODevice::ReadOnly);
-    return readFBX(&buffer, mapping, url, loadLightmaps, lightmapLevel);
+    return readFBX(&buffer, mapping, url, path, loadLightmaps, lightmapLevel);
 }
 
-FBXGeometry* readFBX(QIODevice* device, const QVariantHash& mapping, const QString& url, bool loadLightmaps, float lightmapLevel) {
+FBXGeometry* readFBX(QIODevice* device, const QVariantHash& mapping, const QString& url, const QString& path, bool loadLightmaps, float lightmapLevel) {
     FBXReader reader;
     reader._fbxNode = FBXReader::parseFBX(device);
     reader._loadLightmaps = loadLightmaps;
     reader._lightmapLevel = lightmapLevel;
 
-    return reader.extractFBXGeometry(mapping, url);
+    auto node = reader.extractFBXGeometry(mapping, path);
+
+    if (DependencyManager::get<tracing::Tracer>()->isEnabled()) {
+        QVariantMap embeddedTextures;
+        for (auto& filename : reader._textureContent.keys()) {
+            embeddedTextures[filename] = reader._textureContent[filename].size();
+        }
+        PROFILE_INSTANT(resource_load, "fbx", "t", {
+            { "fbx_filename", url },
+            { "size", device->size() },
+            { "embedded_textures", embeddedTextures }
+        });
+    }
+
+    return node;
 }

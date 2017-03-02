@@ -45,7 +45,7 @@ bool vhacd::VHACDUtil::loadFBX(const QString filename, FBXGeometry& result) {
         if (filename.toLower().endsWith(".obj")) {
             geom = OBJReader().readOBJ(fbxContents, QVariantHash());
         } else if (filename.toLower().endsWith(".fbx")) {
-            geom = readFBX(fbxContents, QVariantHash(), filename);
+            geom = readFBX(fbxContents, QVariantHash(), filename, filename);
         } else {
             qWarning() << "file has unknown extension" << filename;
             return false;
