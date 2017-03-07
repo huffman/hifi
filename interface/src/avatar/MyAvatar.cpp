@@ -43,6 +43,7 @@
 #include <RecordingScriptingInterface.h>
 #include <ShapeEntityItem.h>
 #include <MessagesClient.h>
+#include <src/ui/AvatarInputs.h>
 
 #include "Application.h"
 #include "devices/Faceshift.h"
@@ -207,8 +208,10 @@ MyAvatar::MyAvatar(RigPointer rig) :
         }
     });
 
+    audioClient = DependencyManager::get<AudioClient>().data();
     connect(rig.get(), SIGNAL(onLoadComplete()), this, SIGNAL(onLoadComplete()));
-    connect(DependencyManager::get<AudioClient>().data(), &AudioClient::inputReceived, this, &MyAvatar::audioInputReceived);
+    connect(audioClient, &AudioClient::inputReceived, this, &MyAvatar::audioInputReceived);
+    connect(&voiceTimer, &QTimer::timeout, this, &MyAvatar::VoiceTimeout);
     transcribeServerSocket = nullptr;
     streamingAudioForTranscription = false;
     isTalkKeyPressed = false;
@@ -220,17 +223,19 @@ MyAvatar::~MyAvatar() {
 
 void MyAvatar::audioInputReceived(const QByteArray& inputSamples)
 {
-    if(transcribeServerSocket && transcribeServerSocket->isWritable() && transcribeServerSocket->state() != QAbstractSocket::SocketState::UnconnectedState)
+    if(streamingAudioForTranscription && transcribeServerSocket && transcribeServerSocket->isWritable() && transcribeServerSocket->state() != QAbstractSocket::SocketState::UnconnectedState)
     {
-//        qCDebug(interfaceapp) << "Sending Data!";
+        qCDebug(interfaceapp) << "Sending Data!";
         transcribeServerSocket->write(inputSamples.data(), inputSamples.size());
-        transcribeServerSocket->waitForBytesWritten();
-        if(!streamingAudioForTranscription)
-        {
-            transcribeServerSocket->close();
-            delete transcribeServerSocket;
-            transcribeServerSocket = nullptr;
-        }
+        if(streamingAudioForTranscription && transcribeServerSocket)
+            transcribeServerSocket->waitForBytesWritten(); // Still transcribeServerSocket becomes 0 :/
+//        if(!streamingAudioForTranscription)
+//        {
+//            qCDebug(interfaceapp) << "Closing socket!";
+//            transcribeServerSocket->close();
+//            delete transcribeServerSocket;
+//            transcribeServerSocket = nullptr;
+//        }
     }
 }
 
@@ -381,25 +386,17 @@ void MyAvatar::TranscriptionReceived()
         if(json["isFinal"] == true)
         {
             streamingAudioForTranscription = false;
+            transcribeServerSocket->waitForBytesWritten();
+            qCDebug(interfaceapp) << "Closing socket!";
+            transcribeServerSocket->close();
+            delete transcribeServerSocket;
+            transcribeServerSocket = nullptr;
+
             QString finalTranscription = json["alternatives"].toArray()[0].toObject()["transcript"].toString();
             qCDebug(interfaceapp) << "Final transcription: " << finalTranscription;
             auto messages = DependencyManager::get<MessagesClient>();
             messages->sendMessage("debugMessages", "isFinal: " + finalTranscription);
-            // Demo for show:
-//            if(finalTranscription.contains("hello", Qt::CaseInsensitive))
-//            {
-//                ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(0,255,0));
-//            }
-//            else if(finalTranscription.contains("goodbye", Qt::CaseInsensitive))
-//            {
-//                ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(255,0,0));
-//            }
-//            else
-//            {
-//                ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(0,0,255));
-//            }
             focusedEntity = nullptr;
-
             break;
         }
     }
@@ -481,6 +478,18 @@ EntityItemPointer MyAvatar::CheckForEntity()
     return nullptr;
 }
 
+void MyAvatar::VoiceTimeout() {
+    qCDebug(interfaceapp) << "Timeout timer called";
+    if(transcribeServerSocket && transcribeServerSocket->isWritable() && transcribeServerSocket->state() != QAbstractSocket::SocketState::UnconnectedState) {
+        streamingAudioForTranscription = false;
+        qCDebug(interfaceapp) << "Timeout!";
+        transcribeServerSocket->close();
+        delete transcribeServerSocket;
+        transcribeServerSocket = nullptr;
+    }
+    voiceTimer.stop();
+}
+
 void MyAvatar::update(float deltaTime) {
 
     // update moving average of HMD facing in xz plane.
@@ -542,6 +551,33 @@ void MyAvatar::update(float deltaTime) {
     emit energyChanged(currentEnergy);
 
     updateEyeContactTarget(deltaTime);
+
+    const float audioLevel = AvatarInputs::getInstance()->loudnessToAudioLevel(audioClient->getAudioAverageInputLoudness());
+
+//    qCDebug(interfaceapp) << "inputVol: " << AvatarInputs::getInstance()->loudnessToAudioLevel(audioClient->getLastInputLoudness()) << '\n'
+//                          << "averageInputLoudness: " << AvatarInputs::getInstance()->loudnessToAudioLevel(audioClient->getAudioAverageInputLoudness()) << '\n'
+//                          << "streamingData: " << streamingAudioForTranscription << '\n'
+//                          << "socketOpen: " << (transcribeServerSocket && transcribeServerSocket->isWritable() && transcribeServerSocket->state() != QAbstractSocket::SocketState::UnconnectedState);
+
+    if(audioLevel > 0.33f && !(transcribeServerSocket && transcribeServerSocket->isWritable() && transcribeServerSocket->state() != QAbstractSocket::SocketState::UnconnectedState)) {
+//        streamingAudioForTranscription = true;
+        InitInteraction();
+    }
+    else if(audioLevel == 0.f && !voiceTimer.isActive() && transcribeServerSocket && transcribeServerSocket->isWritable() && transcribeServerSocket->state() != QAbstractSocket::SocketState::UnconnectedState) {
+        voiceTimer.start(1500);
+////    else if(message.contains("released")) {
+//        isTalkKeyPressed = false;
+//        streamingAudioForTranscription = false;
+    }
+
+//    if (AvatarInputs::getInstance()->loudnessToAudioLevel() > 0.33f) {
+//        if(!streamingAudioForTranscription) {
+//            InitInteraction();
+//        }
+//    }
+//    else {
+////        streamingAudioForTranscription = false;
+//    }
 
 //    if(focusedEntity)
 ////        UpdateGestureData(); // not currently testing this

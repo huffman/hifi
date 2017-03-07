@@ -26,6 +26,7 @@
 #include "MyCharacterController.h"
 #include <ThreadSafeValueCache.h>
 #include <EntityTypes.h>
+#include "AudioClient.h"
 
 class AvatarActionHold;
 class ModelItemID;
@@ -322,6 +323,7 @@ public slots:
     glm::quat getOrientationForAudio();
 
     void audioInputReceived(const QByteArray& inputSamples);
+    void VoiceTimeout();
 
 signals:
     void audioListenerModeChanged();
@@ -418,6 +420,7 @@ private:
 
     Setting::Handle<float> _realWorldFieldOfView;
 
+    QTimer voiceTimer;
     EntityItemPointer focusedEntity;
     float currentZ = 0;
     float currentY = 0;
@@ -540,6 +543,7 @@ private:
     bool didTeleport();
 
     bool isTalkKeyPressed;
+    AudioClient* audioClient;
 };
 
 QScriptValue audioListenModeToScriptValue(QScriptEngine* engine, const AudioListenerMode& audioListenerMode);
