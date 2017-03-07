@@ -500,13 +500,6 @@ void MyAvatar::update(float deltaTime) {
     else if(audioLevel > 0.33f) { // socket is closed and we are speaking
         InitInteraction();
     }
-
-    if(audioLevel > 0.33f && !(transcribeServerSocket && transcribeServerSocket->isWritable() && transcribeServerSocket->state() != QAbstractSocket::SocketState::UnconnectedState)) {
-        InitInteraction();
-    }
-    else if(audioLevel == 0.f && !voiceTimer.isActive() && transcribeServerSocket && transcribeServerSocket->isWritable() && transcribeServerSocket->state() != QAbstractSocket::SocketState::UnconnectedState) {
-        voiceTimer.start(1500);
-    }
 }
 
 void MyAvatar::updateEyeContactTarget(float deltaTime) {
