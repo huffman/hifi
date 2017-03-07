@@ -421,21 +421,10 @@ private:
     Setting::Handle<float> _realWorldFieldOfView;
 
     QTimer voiceTimer;
-    EntityItemPointer focusedEntity;
-    float currentZ = 0;
-    float currentY = 0;
-    float deltaZ = 0;
-    float baselineZ = currentZ;
-    float nodZRange = 0.35f;
-    float nodYRange = 0.35f;
-    float shakeZRange = 0.2f;
-    float shakeYRange = 0.2f;
     QTcpSocket* transcribeServerSocket;
     void TranscriptionReceived();
     bool streamingAudioForTranscription;
-    EntityItemPointer CheckForEntity();
     void InitInteraction();
-    void UpdateGestureData();
 
     // private methods
     void updateOrientation(float deltaTime);

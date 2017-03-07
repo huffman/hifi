@@ -227,15 +227,14 @@ void MyAvatar::audioInputReceived(const QByteArray& inputSamples)
     {
         qCDebug(interfaceapp) << "Sending Data!";
         transcribeServerSocket->write(inputSamples.data(), inputSamples.size());
-        if(streamingAudioForTranscription && transcribeServerSocket)
-            transcribeServerSocket->waitForBytesWritten(); // Still transcribeServerSocket becomes 0 :/
-//        if(!streamingAudioForTranscription)
-//        {
-//            qCDebug(interfaceapp) << "Closing socket!";
-//            transcribeServerSocket->close();
-//            delete transcribeServerSocket;
-//            transcribeServerSocket = nullptr;
-//        }
+        transcribeServerSocket->waitForBytesWritten();
+        if(!streamingAudioForTranscription)
+        {
+            qCDebug(interfaceapp) << "Closing socket!";
+            transcribeServerSocket->close();
+            delete transcribeServerSocket;
+            transcribeServerSocket = nullptr;
+        }
     }
 }
 
@@ -386,17 +385,11 @@ void MyAvatar::TranscriptionReceived()
         if(json["isFinal"] == true)
         {
             streamingAudioForTranscription = false;
-            transcribeServerSocket->waitForBytesWritten();
-            qCDebug(interfaceapp) << "Closing socket!";
-            transcribeServerSocket->close();
-            delete transcribeServerSocket;
-            transcribeServerSocket = nullptr;
 
             QString finalTranscription = json["alternatives"].toArray()[0].toObject()["transcript"].toString();
             qCDebug(interfaceapp) << "Final transcription: " << finalTranscription;
             auto messages = DependencyManager::get<MessagesClient>();
             messages->sendMessage("debugMessages", "isFinal: " + finalTranscription);
-            focusedEntity = nullptr;
             break;
         }
     }
@@ -404,14 +397,6 @@ void MyAvatar::TranscriptionReceived()
 
 void MyAvatar::InitInteraction()
 {
-//    const auto rot = safeEulerAngles(qApp->getCamera()->getOrientation());
-//    baselineZ = rot.x;
-//    currentZ = rot.x;
-//    currentY = rot.y;
-//    deltaZ = 0;
-//    qCDebug(interfaceapp) << "Initing GestureChecks. Found " << focusedEntity->getName();
-//    ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(255,255,255));
-
     streamingAudioForTranscription = true;
     transcribeServerSocket = new QTcpSocket(this);
     connect(transcribeServerSocket, &QTcpSocket::readyRead, this, &MyAvatar::TranscriptionReceived);
@@ -424,58 +409,6 @@ void MyAvatar::InitInteraction()
     transcribeServerSocket->write(requestHeader.toLocal8Bit());
     transcribeServerSocket->waitForBytesWritten();
     qCDebug(interfaceapp) << "Completed send";
-}
-
-void MyAvatar::UpdateGestureData()
-{
-    if(focusedEntity)
-    {
-        // Check for nods and shakes
-        const auto rot = safeEulerAngles(qApp->getCamera()->getOrientation());
-        currentZ = rot.x;
-        currentY = rot.y;
-        deltaZ = abs(currentZ - baselineZ);
-        if (deltaZ >= nodZRange && currentY <= nodYRange)
-        {
-            ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(255,0,0));// Nod
-            focusedEntity = nullptr;
-        }
-        if (currentY >= shakeYRange && currentZ <= shakeZRange)
-        {
-            ((ShapeEntityItem*)focusedEntity.get())->setColor(QColor::fromRgb(0,0,255));// Shake
-            focusedEntity = nullptr;
-        }
-
-    }
-}
-
-// FIXME: This doesn't really work well at all but I'll use it for now.
-EntityItemPointer MyAvatar::CheckForEntity()
-{
-    QVector<EntityItemPointer> ents;
-
-    // Attempt to build a box in front of the player
-    auto scale = getScale();
-    scale.z = 100;
-    AABox cast(getPosition(),scale);
-    cast.rotate(safeEulerAngles(qApp->getCamera()->getOrientation()));
-
-    // Get objects in box
-    qApp->getEntities()->getTree()->findEntities(cast, ents);
-//    qCDebug(interfaceapp) << "World has " << qApp->getEntities()->getTree()->getOctreeElementsCount() << " Entities";
-
-    // Find first box
-    for(auto& ent : ents)
-    {
-        if(ent->getType() == EntityTypes::Box)
-        {
-            qCDebug(interfaceapp) << "Found a box!  I am using it!";
-//            ((ShapeEntityItem*)ent.get())->setColor(QColor::fromRgb(randomColorValue(0),randomColorValue(0),randomColorValue(0)));
-            ((ShapeEntityItem*)ent.get())->setColor(QColor::fromRgb(255,255,255));
-            return ent;
-        }
-    }
-    return nullptr;
 }
 
 void MyAvatar::VoiceTimeout() {
@@ -559,35 +492,21 @@ void MyAvatar::update(float deltaTime) {
 //                          << "streamingData: " << streamingAudioForTranscription << '\n'
 //                          << "socketOpen: " << (transcribeServerSocket && transcribeServerSocket->isWritable() && transcribeServerSocket->state() != QAbstractSocket::SocketState::UnconnectedState);
 
+    if(transcribeServerSocket && transcribeServerSocket->isWritable() && transcribeServerSocket->state() != QAbstractSocket::SocketState::UnconnectedState) {
+        if(audioLevel == 0.f && !voiceTimer.isActive()) { // socket is open and we stopped speaking and no timeout is set.
+            voiceTimer.start(1500);
+        }
+    }
+    else if(audioLevel > 0.33f) { // socket is closed and we are speaking
+        InitInteraction();
+    }
+
     if(audioLevel > 0.33f && !(transcribeServerSocket && transcribeServerSocket->isWritable() && transcribeServerSocket->state() != QAbstractSocket::SocketState::UnconnectedState)) {
-//        streamingAudioForTranscription = true;
         InitInteraction();
     }
     else if(audioLevel == 0.f && !voiceTimer.isActive() && transcribeServerSocket && transcribeServerSocket->isWritable() && transcribeServerSocket->state() != QAbstractSocket::SocketState::UnconnectedState) {
         voiceTimer.start(1500);
-////    else if(message.contains("released")) {
-//        isTalkKeyPressed = false;
-//        streamingAudioForTranscription = false;
     }
-
-//    if (AvatarInputs::getInstance()->loudnessToAudioLevel() > 0.33f) {
-//        if(!streamingAudioForTranscription) {
-//            InitInteraction();
-//        }
-//    }
-//    else {
-////        streamingAudioForTranscription = false;
-//    }
-
-//    if(focusedEntity)
-////        UpdateGestureData(); // not currently testing this
-//        ;
-//    else
-//    {
-//        focusedEntity = CheckForEntity();
-//        if(focusedEntity)
-//            InitInteraction();
-//    }
 }
 
 void MyAvatar::updateEyeContactTarget(float deltaTime) {
