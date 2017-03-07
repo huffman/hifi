@@ -206,6 +206,9 @@ public:
     Q_INVOKABLE controller::Pose getLeftHandTipPose() const;
     Q_INVOKABLE controller::Pose getRightHandTipPose() const;
 
+    bool shouldStartListeningForVoice;
+    Q_INVOKABLE void setListeningToVoice(bool listening);
+
     AvatarWeakPointer getLookAtTargetAvatar() const { return _lookAtTargetAvatar; }
     void updateLookAtTargetAvatar();
     void clearLookAtTargetAvatar();
@@ -323,7 +326,7 @@ public slots:
     glm::quat getOrientationForAudio();
 
     void audioInputReceived(const QByteArray& inputSamples);
-    void VoiceTimeout();
+    void voiceTimeout();
 
 signals:
     void audioListenerModeChanged();
@@ -424,7 +427,7 @@ private:
     QTcpSocket* transcribeServerSocket;
     void TranscriptionReceived();
     bool streamingAudioForTranscription;
-    void InitInteraction();
+    void connectToTranscriptionServer();
 
     // private methods
     void updateOrientation(float deltaTime);
@@ -531,7 +534,6 @@ private:
     void setEnergy(float value);
     bool didTeleport();
 
-    bool isTalkKeyPressed;
     AudioClient* audioClient;
 };
 

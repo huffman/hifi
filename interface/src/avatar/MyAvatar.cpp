@@ -208,13 +208,14 @@ MyAvatar::MyAvatar(RigPointer rig) :
         }
     });
 
-    audioClient = DependencyManager::get<AudioClient>().data();
     connect(rig.get(), SIGNAL(onLoadComplete()), this, SIGNAL(onLoadComplete()));
+
+    audioClient = DependencyManager::get<AudioClient>().data();
     connect(audioClient, &AudioClient::inputReceived, this, &MyAvatar::audioInputReceived);
-    connect(&voiceTimer, &QTimer::timeout, this, &MyAvatar::VoiceTimeout);
+    connect(&voiceTimer, &QTimer::timeout, this, &MyAvatar::voiceTimeout);
     transcribeServerSocket = nullptr;
     streamingAudioForTranscription = false;
-    isTalkKeyPressed = false;
+    shouldStartListeningForVoice = false;
 }
 
 MyAvatar::~MyAvatar() {
@@ -356,23 +357,6 @@ void MyAvatar::reset(bool andRecenter, bool andReload, bool andHead) {
         // i.e. the along avatar's current position and orientation.
         updateSensorToWorldMatrix();
     }
-
-    auto messages = DependencyManager::get<MessagesClient>();
-    messages->subscribe(getSessionUUID().toString());
-    messages->subscribe("debugMessages");
-    connect(messages.data(), &MessagesClient::messageReceived, this, [&](QString channel, QString message, QUuid senderUUID, bool localOnly) {
-        if (getSessionUUID() == senderUUID) {
-            qDebug() << "Got a message: " << message;
-            if(message.contains("pressed") && !isTalkKeyPressed) {
-                isTalkKeyPressed = true;
-                InitInteraction();
-            }
-            else if(message.contains("released")) {
-                isTalkKeyPressed = false;
-                streamingAudioForTranscription = false;
-            }
-        }
-    });
 }
 
 void MyAvatar::TranscriptionReceived()
@@ -395,8 +379,7 @@ void MyAvatar::TranscriptionReceived()
     }
 }
 
-void MyAvatar::InitInteraction()
-{
+void MyAvatar::connectToTranscriptionServer() {
     streamingAudioForTranscription = true;
     transcribeServerSocket = new QTcpSocket(this);
     connect(transcribeServerSocket, &QTcpSocket::readyRead, this, &MyAvatar::TranscriptionReceived);
@@ -411,7 +394,7 @@ void MyAvatar::InitInteraction()
     qCDebug(interfaceapp) << "Completed send";
 }
 
-void MyAvatar::VoiceTimeout() {
+void MyAvatar::voiceTimeout() {
     qCDebug(interfaceapp) << "Timeout timer called";
     if(transcribeServerSocket && transcribeServerSocket->isWritable() && transcribeServerSocket->state() != QAbstractSocket::SocketState::UnconnectedState) {
         streamingAudioForTranscription = false;
@@ -497,8 +480,8 @@ void MyAvatar::update(float deltaTime) {
             voiceTimer.start(1500);
         }
     }
-    else if(audioLevel > 0.33f) { // socket is closed and we are speaking
-        InitInteraction();
+    else if(audioLevel > 0.33f && shouldStartListeningForVoice) { // socket is closed and we are speaking
+        connectToTranscriptionServer();
     }
 }
 
@@ -810,6 +793,10 @@ controller::Pose MyAvatar::getRightHandTipPose() const {
     pose.velocity += glm::cross(pose.getAngularVelocity(), pose.getTranslation() - tipTrans);
     pose.translation = tipTrans;
     return pose;
+}
+
+void MyAvatar::setListeningToVoice(bool listening) {
+    shouldStartListeningForVoice = listening;
 }
 
 // virtual
