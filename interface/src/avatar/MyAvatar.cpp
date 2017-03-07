@@ -796,7 +796,8 @@ controller::Pose MyAvatar::getRightHandTipPose() const {
 }
 
 void MyAvatar::setListeningToVoice(bool listening) {
-    shouldStartListeningForVoice = listening;
+    // delay so that the enter key doesn't start the listening process when debugging.
+    QTimer::singleShot(100, [&]{shouldStartListeningForVoice = listening;});
 }
 
 // virtual
