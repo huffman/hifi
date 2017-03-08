@@ -41,8 +41,6 @@
 #include <recording/Clip.h>
 #include <recording/Frame.h>
 #include <RecordingScriptingInterface.h>
-#include <ShapeEntityItem.h>
-#include <MessagesClient.h>
 #include <src/ui/AvatarInputs.h>
 
 #include "Application.h"

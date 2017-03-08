@@ -25,7 +25,6 @@
 #include "AtRestDetector.h"
 #include "MyCharacterController.h"
 #include <ThreadSafeValueCache.h>
-#include <EntityTypes.h>
 #include "AudioClient.h"
 
 class AvatarActionHold;
