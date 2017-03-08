@@ -14,7 +14,7 @@
 
 /* global getEntityCustomData, flatten, Xform, Script, Quat, Vec3, MyAvatar, Entities, Overlays, Settings,
    Reticle, Controller, Camera, Messages, Mat4, getControllerWorldLocation, getGrabPointSphereOffset, setGrabCommunications,
-   Menu, HMD */
+   Menu, HMD, isInEditMode */
 /* eslint indent: ["error", 4, { "outerIIFEBody": 0 }] */
 
 (function() { // BEGIN LOCAL_SCOPE
@@ -26,6 +26,7 @@ Script.include("/~/system/libraries/controllers.js");
 //
 // add lines where the hand ray picking is happening
 //
+
 var WANT_DEBUG = false;
 var WANT_DEBUG_STATE = false;
 var WANT_DEBUG_SEARCH_NAME = null;
@@ -53,6 +54,13 @@ var HAPTIC_TEXTURE_DISTANCE = 0.002;
 var HAPTIC_DEQUIP_STRENGTH = 0.75;
 var HAPTIC_DEQUIP_DURATION = 50.0;
 
+// triggered when stylus presses a web overlay/entity
+var HAPTIC_STYLUS_STRENGTH = 1.0;
+var HAPTIC_STYLUS_DURATION = 20.0;
+
+// triggerd when ui laser presses a web overlay/entity
+var HAPTIC_LASER_UI_STRENGTH = 1.0;
+var HAPTIC_LASER_UI_DURATION = 20.0;
 
 var HAND_HEAD_MIX_RATIO = 0.0; //  0 = only use hands for search/move.  1 = only use head for search/move.
 
@@ -121,7 +129,6 @@ var CHECK_TOO_FAR_UNEQUIP_TIME = 0.3; // seconds, duration between checks
 var GRAB_POINT_SPHERE_RADIUS = NEAR_GRAB_RADIUS;
 var GRAB_POINT_SPHERE_COLOR = { red: 240, green: 240, blue: 240 };
 var GRAB_POINT_SPHERE_ALPHA = 0.85;
-
 
 //
 // other constants
@@ -392,7 +399,7 @@ function entityHasActions(entityID) {
 
 function findRayIntersection(pickRay, precise, include, exclude) {
     var entities = Entities.findRayIntersection(pickRay, precise, include, exclude, true);
-    var overlays = Overlays.findRayIntersection(pickRay);
+    var overlays = Overlays.findRayIntersection(pickRay, precise, [], [HMD.tabletID]);
     if (!overlays.intersects || (entities.intersects && (entities.distance <= overlays.distance))) {
         return entities;
     }
@@ -637,6 +644,7 @@ EquipHotspotBuddy.prototype.updateHotspot = function(hotspot, timestamp) {
 
         // override default sphere with a user specified model, if it exists.
         overlayInfoSet.overlays.push(Overlays.addOverlay("model", {
+            name: "hotspot overlay",
             url: hotspot.modelURL ? hotspot.modelURL : DEFAULT_SPHERE_MODEL_URL,
             position: hotspot.worldPosition,
             rotation: {
@@ -746,6 +754,7 @@ function MyController(hand) {
     this.previouslyUnhooked = {};
 
     this.shouldScale = false;
+    this.isScalingAvatar = false;
 
     // handPosition is where the avatar's hand appears to be, in-world.
     this.getHandPosition = function () {
@@ -768,7 +777,7 @@ function MyController(hand) {
     };
 
     this.actionID = null; // action this script created...
-    this.grabbedEntity = null; // on this entity.
+    this.grabbedThingID = null; // on this entity.
     this.grabbedOverlay = null;
     this.state = STATE_OFF;
     this.pointer = null; // entity-id of line object
@@ -818,11 +827,7 @@ function MyController(hand) {
 
     this.update = function(deltaTime, timestamp) {
         this.updateSmoothedTrigger();
-        //  If both trigger and grip buttons squeezed and nothing is held, rescale my avatar!
-        if (this.hand === RIGHT_HAND && this.state === STATE_SEARCHING &&
-            this.getOtherHandController().state === STATE_SEARCHING) {
-            this.maybeScaleMyAvatar();
-        }
+        this.maybeScaleMyAvatar();
 
         if (this.ignoreInput()) {
 
@@ -849,14 +854,19 @@ function MyController(hand) {
     };
 
     this.callEntityMethodOnGrabbed = function(entityMethodName) {
+        if (this.grabbedIsOverlay) {
+            return;
+        }
         var args = [this.hand === RIGHT_HAND ? "right" : "left", MyAvatar.sessionUUID];
-        Entities.callEntityMethod(this.grabbedEntity, entityMethodName, args);
+        Entities.callEntityMethod(this.grabbedThingID, entityMethodName, args);
     };
 
     this.setState = function(newState, reason) {
-        if ((isInEditMode() && this.grabbedEntity !== HMD.tabletID )&& (newState !== STATE_OFF &&
-                               newState !== STATE_SEARCHING &&
-                               newState !== STATE_OVERLAY_STYLUS_TOUCHING)) {
+        if ((isInEditMode() && this.grabbedThingID !== HMD.tabletID) &&
+            (newState !== STATE_OFF &&
+             newState !== STATE_SEARCHING &&
+             newState !== STATE_OVERLAY_STYLUS_TOUCHING &&
+             newState !== STATE_OVERLAY_LASER_TOUCHING)) {
             return;
         }
         setGrabCommunications((newState === STATE_DISTANCE_HOLDING) || (newState === STATE_NEAR_GRABBING));
@@ -899,6 +909,7 @@ function MyController(hand) {
 
         if (!this.grabPointSphere) {
             this.grabPointSphere = Overlays.addOverlay("sphere", {
+                name: "grabPointSphere",
                 localPosition: getGrabPointSphereOffset(this.handToController()),
                 localRotation: { x: 0, y: 0, z: 0, w: 1 },
                 dimensions: GRAB_POINT_SPHERE_RADIUS * 2,
@@ -929,6 +940,7 @@ function MyController(hand) {
         var brightColor = colorPow(color, 0.06);
         if (this.searchSphere === null) {
             var sphereProperties = {
+                name: "searchSphere",
                 position: location,
                 rotation: rotation,
                 outerRadius: size * 1.2,
@@ -951,7 +963,8 @@ function MyController(hand) {
                 innerAlpha: 1.0,
                 outerAlpha: 0.0,
                 outerRadius: size * 1.2,
-                visible: true
+                visible: true,
+                ignoreRayIntersection: true
             });
         }
     };
@@ -962,6 +975,7 @@ function MyController(hand) {
         }
 
         var stylusProperties = {
+            name: "stylus",
             url: Script.resourcesPath() + "meshes/tablet-stylus-fat.fbx",
             localPosition: Vec3.sum({ x: 0.0,
                                       y: WEB_TOUCH_Y_OFFSET,
@@ -996,6 +1010,7 @@ function MyController(hand) {
     this.overlayLineOn = function(closePoint, farPoint, color) {
         if (this.overlayLine === null) {
             var lineProperties = {
+                name: "line",
                 glow: 1.0,
                 start: closePoint,
                 end: farPoint,
@@ -1171,6 +1186,13 @@ function MyController(hand) {
             }
         }
 
+        var candidateOverlays = Overlays.findOverlays(worldHandPosition, WEB_DISPLAY_STYLUS_DISTANCE);
+        for (var j = 0; j < candidateOverlays.length; j++) {
+            if (this.isTablet(candidateOverlays[j])) {
+                nearWeb = true;
+            }
+        }
+
         if (nearWeb) {
             this.showStylus();
             var rayPickInfo = this.calcRayPickInfo(this.hand);
@@ -1184,8 +1206,8 @@ function MyController(hand) {
                     return;
                 }
             } else {
-		this.homeButtonTouched = false;
-	    }
+        this.homeButtonTouched = false;
+        }
         } else {
             this.hideStylus();
         }
@@ -1229,7 +1251,13 @@ function MyController(hand) {
         });
         if (grabbableEntities.length > 0) {
             if (!this.grabPointIntersectsEntity) {
-                Controller.triggerHapticPulse(1, 20, this.hand);
+                // don't do haptic pulse for tablet
+                var nonTabletEntities = grabbableEntities.filter(function(entityID) {
+                    return entityID != HMD.tabletID && entityID != HMD.homeButtonID;
+                });
+                if (nonTabletEntities.length > 0) {
+                    Controller.triggerHapticPulse(1, 20, this.hand);
+                }
                 this.grabPointIntersectsEntity = true;
                 this.grabPointSphereOn();
             }
@@ -1248,7 +1276,7 @@ function MyController(hand) {
             if (homeButton === hmdHomeButton) {
                 if (this.homeButtonTouched === false) {
                     this.homeButtonTouched = true;
-                    Controller.triggerHapticPulse(1, 20, this.hand);
+                    Controller.triggerHapticPulse(HAPTIC_STYLUS_STRENGTH, HAPTIC_STYLUS_DURATION, this.hand);
                     Messages.sendLocalMessage("home", homeButton);
                 }
             } else {
@@ -1266,7 +1294,7 @@ function MyController(hand) {
             if (homeButton === hmdHomeButton) {
                 if (this.homeButtonTouched === false) {
                     this.homeButtonTouched = true;
-                    Controller.triggerHapticPulse(1, 20, this.hand);
+                    Controller.triggerHapticPulse(HAPTIC_LASER_UI_STRENGTH, HAPTIC_LASER_UI_DURATION, this.hand);
                     Messages.sendLocalMessage("home", homeButton);
                 }
             } else {
@@ -1413,7 +1441,7 @@ function MyController(hand) {
 
         var okToEquipFromOtherHand = ((this.getOtherHandController().state == STATE_NEAR_GRABBING ||
                                        this.getOtherHandController().state == STATE_DISTANCE_HOLDING) &&
-                                      this.getOtherHandController().grabbedEntity == hotspot.entityID);
+                                      this.getOtherHandController().grabbedThingID == hotspot.entityID);
         var hasParent = true;
         if (props.parentID === NULL_UUID) {
             hasParent = false;
@@ -1571,7 +1599,7 @@ function MyController(hand) {
 
         var farSearching =  this.triggerSmoothedSqueezed() && (Date.now() - this.searchStartTime > FAR_SEARCH_DELAY);
 
-        this.grabbedEntity = null;
+        this.grabbedThingID = null;
         this.grabbedOverlay = null;
         this.isInitialGrab = false;
         this.preparingHoldRelease = false;
@@ -1579,7 +1607,7 @@ function MyController(hand) {
         this.checkForUnexpectedChildren();
 
         if ((this.triggerSmoothedReleased() && this.secondaryReleased())) {
-            this.grabbedEntity = null;
+            this.grabbedThingID = null;
             this.setState(STATE_OFF, "trigger released");
             return;
         }
@@ -1600,8 +1628,9 @@ function MyController(hand) {
         if (potentialEquipHotspot) {
             if ((this.triggerSmoothedGrab() || this.secondarySqueezed()) && holdEnabled) {
                 this.grabbedHotspot = potentialEquipHotspot;
-                this.grabbedEntity = potentialEquipHotspot.entityID;
-                this.setState(STATE_HOLD, "equipping '" + entityPropertiesCache.getProps(this.grabbedEntity).name + "'");
+                this.grabbedThingID = potentialEquipHotspot.entityID;
+                this.grabbedIsOverlay = false;
+                this.setState(STATE_HOLD, "equipping '" + entityPropertiesCache.getProps(this.grabbedThingID).name + "'");
 
                 return;
             }
@@ -1610,6 +1639,11 @@ function MyController(hand) {
         var candidateEntities = Entities.findEntities(handPosition, NEAR_GRAB_RADIUS);
         var grabbableEntities = candidateEntities.filter(function(entity) {
             return _this.entityIsNearGrabbable(entity, handPosition, NEAR_GRAB_MAX_DISTANCE);
+        });
+
+        var candidateOverlays = Overlays.findOverlays(handPosition, NEAR_GRAB_RADIUS);
+        var grabbableOverlays = candidateOverlays.filter(function(overlayID) {
+            return Overlays.getProperty(overlayID, "grabbable");
         });
 
         if (rayPickInfo.entityID) {
@@ -1623,6 +1657,23 @@ function MyController(hand) {
             this.intersectionDistance = 0;
         }
 
+        if (grabbableOverlays.length > 0) {
+            grabbableOverlays.sort(function(a, b) {
+                var aPosition = Overlays.getProperty(a, "position");
+                var aDistance = Vec3.distance(aPosition, handPosition);
+                var bPosition = Overlays.getProperty(b, "position");
+                var bDistance = Vec3.distance(bPosition, handPosition);
+                return aDistance - bDistance;
+            });
+            this.grabbedThingID = grabbableOverlays[0];
+            this.grabbedIsOverlay = true;
+            if ((this.triggerSmoothedGrab() || this.secondarySqueezed()) && nearGrabEnabled) {
+                this.setState(STATE_NEAR_GRABBING, "near grab overlay '" +
+                              Overlays.getProperty(this.grabbedThingID, "name") + "'");
+                return;
+            }
+        }
+
         var entity;
         if (grabbableEntities.length > 0) {
             // sort by distance
@@ -1633,7 +1684,8 @@ function MyController(hand) {
             });
             entity = grabbableEntities[0];
             name = entityPropertiesCache.getProps(entity).name;
-            this.grabbedEntity = entity;
+            this.grabbedThingID = entity;
+            this.grabbedIsOverlay = false;
             if (this.entityWantsTrigger(entity)) {
                 if (this.triggerSmoothedGrab()) {
                     this.setState(STATE_NEAR_TRIGGER, "near trigger '" + name + "'");
@@ -1644,7 +1696,7 @@ function MyController(hand) {
             } else {
                 //  If near something grabbable, grab it!
                 if ((this.triggerSmoothedGrab() || this.secondarySqueezed()) && nearGrabEnabled) {
-                    this.setState(STATE_NEAR_GRABBING, "near grab '" + name + "'");
+                    this.setState(STATE_NEAR_GRABBING, "near grab entity '" + name + "'");
                     return;
                 } else {
                     // potentialNearGrabEntity = entity;
@@ -1667,7 +1719,8 @@ function MyController(hand) {
             name = entityPropertiesCache.getProps(entity).name;
             if (this.entityWantsTrigger(entity)) {
                 if (this.triggerSmoothedGrab()) {
-                    this.grabbedEntity = entity;
+                    this.grabbedThingID = entity;
+                    this.grabbedIsOverlay = false;
                     this.setState(STATE_FAR_TRIGGER, "far trigger '" + name + "'");
                     return;
                 } else {
@@ -1675,7 +1728,9 @@ function MyController(hand) {
                 }
             } else if (this.entityIsDistanceGrabbable(rayPickInfo.entityID, handPosition)) {
                 if (this.triggerSmoothedGrab() && !isEditing() && farGrabEnabled && farSearching) {
-                    this.grabbedEntity = entity;
+                    this.grabbedThingID = entity;
+                    this.grabbedIsOverlay = false;
+                    this.grabbedDistance = rayPickInfo.distance;
                     this.setState(STATE_DISTANCE_HOLDING, "distance hold '" + name + "'");
                     return;
                 } else {
@@ -1754,8 +1809,8 @@ function MyController(hand) {
                 Entities.sendHoverOverEntity(entity, pointerEvent);
             }
 
-
-            this.grabbedEntity = entity;
+            this.grabbedThingID = entity;
+            this.grabbedIsOverlay = false;
             this.setState(STATE_ENTITY_STYLUS_TOUCHING, "begin touching entity '" + name + "'");
             return true;
 
@@ -1775,11 +1830,6 @@ function MyController(hand) {
         var pointerEvent;
         if (rayPickInfo.overlayID) {
             var overlay = rayPickInfo.overlayID;
-
-            if (!this.homeButtonTouched) {
-                Controller.triggerHapticPulse(1, 20, this.hand);
-            }
-
             if (Overlays.keyboardFocusOverlay != overlay) {
                 Entities.keyboardFocusEntity = null;
                 Overlays.keyboardFocusOverlay = overlay;
@@ -1888,7 +1938,8 @@ function MyController(hand) {
             }
 
             if (this.triggerSmoothedGrab() && (!isEditing() || this.isTablet(entity))) {
-                this.grabbedEntity = entity;
+                this.grabbedThingID = entity;
+                this.grabbedIsOverlay = false;
                 this.setState(STATE_ENTITY_LASER_TOUCHING, "begin touching entity '" + name + "'");
                 return true;
             }
@@ -1989,15 +2040,17 @@ function MyController(hand) {
         this.clearEquipHaptics();
         this.grabPointSphereOff();
 
-         this.shouldScale = false;
+        this.shouldScale = false;
 
-        var worldControllerPosition = getControllerWorldLocation(this.handToController(), true).position;
+        var controllerLocation = getControllerWorldLocation(this.handToController(), true);
+        var worldControllerPosition = controllerLocation.position;
+        var worldControllerRotation = controllerLocation.orientation;
 
         // transform the position into room space
         var worldToSensorMat = Mat4.inverse(MyAvatar.getSensorToWorldMatrix());
         var roomControllerPosition = Mat4.transformPoint(worldToSensorMat, worldControllerPosition);
 
-        var grabbedProperties = Entities.getEntityProperties(this.grabbedEntity, GRABBABLE_PROPERTIES);
+        var grabbedProperties = Entities.getEntityProperties(this.grabbedThingID, GRABBABLE_PROPERTIES);
         var now = Date.now();
 
         // add the action and initialize some variables
@@ -2006,10 +2059,15 @@ function MyController(hand) {
         this.currentObjectTime = now;
         this.currentCameraOrientation = Camera.orientation;
 
-        this.grabRadius = Vec3.distance(this.currentObjectPosition, worldControllerPosition);
+        this.grabRadius = this.grabbedDistance;
         this.grabRadialVelocity = 0.0;
 
-        // compute a constant based on the initial conditions which we use below to exagerate hand motion
+        // offset between controller vector at the grab radius and the entity position
+        var targetPosition = Vec3.multiply(this.grabRadius, Quat.getUp(worldControllerRotation));
+        targetPosition = Vec3.sum(targetPosition, worldControllerPosition);
+        this.offsetPosition = Vec3.subtract(this.currentObjectPosition, targetPosition);
+
+        // compute a constant based on the initial conditions which we use below to exaggerate hand motion
         // onto the held object
         this.radiusScalar = Math.log(this.grabRadius + 1.0);
         if (this.radiusScalar < 1.0) {
@@ -2022,7 +2080,7 @@ function MyController(hand) {
         var timeScale = this.distanceGrabTimescale(this.mass, distanceToObject);
 
         this.actionID = NULL_UUID;
-        this.actionID = Entities.addAction("spring", this.grabbedEntity, {
+        this.actionID = Entities.addAction("spring", this.grabbedThingID, {
             targetPosition: this.currentObjectPosition,
             linearTimeScale: timeScale,
             targetRotation: this.currentObjectRotation,
@@ -2047,12 +2105,12 @@ function MyController(hand) {
     this.ensureDynamic = function() {
         // if we distance hold something and keep it very still before releasing it, it ends up
         // non-dynamic in bullet.  If it's too still, give it a little bounce so it will fall.
-        var props = Entities.getEntityProperties(this.grabbedEntity, ["velocity", "dynamic", "parentID"]);
+        var props = Entities.getEntityProperties(this.grabbedThingID, ["velocity", "dynamic", "parentID"]);
         if (props.dynamic && props.parentID == NULL_UUID) {
             var velocity = props.velocity;
             if (Vec3.length(velocity) < 0.05) { // see EntityMotionState.cpp DYNAMIC_LINEAR_VELOCITY_THRESHOLD
                 velocity = { x: 0.0, y: 0.2, z:0.0 };
-                Entities.editEntity(this.grabbedEntity, { velocity: velocity });
+                Entities.editEntity(this.grabbedThingID, { velocity: velocity });
             }
         }
     };
@@ -2074,7 +2132,7 @@ function MyController(hand) {
         var worldToSensorMat = Mat4.inverse(MyAvatar.getSensorToWorldMatrix());
         var roomControllerPosition = Mat4.transformPoint(worldToSensorMat, worldControllerPosition);
 
-        var grabbedProperties = Entities.getEntityProperties(this.grabbedEntity, GRABBABLE_PROPERTIES);
+        var grabbedProperties = Entities.getEntityProperties(this.grabbedThingID, GRABBABLE_PROPERTIES);
 
         var now = Date.now();
         var deltaObjectTime = (now - this.currentObjectTime) / MSECS_PER_SEC; // convert to seconds
@@ -2126,9 +2184,10 @@ function MyController(hand) {
 
         var newTargetPosition = Vec3.multiply(this.grabRadius, Quat.getUp(worldControllerRotation));
         newTargetPosition = Vec3.sum(newTargetPosition, worldControllerPosition);
+        newTargetPosition = Vec3.sum(newTargetPosition, this.offsetPosition);
 
         var objectToAvatar = Vec3.subtract(this.currentObjectPosition, MyAvatar.position);
-        var handControllerData = getEntityCustomData('handControllerKey', this.grabbedEntity, defaultMoveWithHeadData);
+        var handControllerData = getEntityCustomData('handControllerKey', this.grabbedThingID, defaultMoveWithHeadData);
         if (handControllerData.disableMoveWithHead !== true) {
             // mix in head motion
             if (MOVE_WITH_HEAD) {
@@ -2154,10 +2213,10 @@ function MyController(hand) {
 
         var rayPickInfo = this.calcRayPickInfo(this.hand);
 
-        this.overlayLineOn(rayPickInfo.searchRay.origin, grabbedProperties.position, COLORS_GRAB_DISTANCE_HOLD);
+        this.overlayLineOn(rayPickInfo.searchRay.origin, Vec3.subtract(grabbedProperties.position, this.offsetPosition), COLORS_GRAB_DISTANCE_HOLD);
 
         var distanceToObject = Vec3.length(Vec3.subtract(MyAvatar.position, this.currentObjectPosition));
-        var success = Entities.updateAction(this.grabbedEntity, this.actionID, {
+        var success = Entities.updateAction(this.grabbedThingID, this.actionID, {
             targetPosition: newTargetPosition,
             linearTimeScale: this.distanceGrabTimescale(this.mass, distanceToObject),
             targetRotation: this.currentObjectRotation,
@@ -2174,7 +2233,7 @@ function MyController(hand) {
     };
 
     this.setupHoldAction = function() {
-        this.actionID = Entities.addAction("hold", this.grabbedEntity, {
+        this.actionID = Entities.addAction("hold", this.grabbedThingID, {
             hand: this.hand === RIGHT_HAND ? "right" : "left",
             timeScale: NEAR_GRABBING_ACTION_TIMEFRAME,
             relativePosition: this.offsetPosition,
@@ -2264,17 +2323,30 @@ function MyController(hand) {
         Controller.triggerHapticPulse(HAPTIC_PULSE_STRENGTH, HAPTIC_PULSE_DURATION, this.hand);
 
         if (this.entityActivated) {
-            var saveGrabbedID = this.grabbedEntity;
+            var saveGrabbedID = this.grabbedThingID;
             this.release();
-            this.grabbedEntity = saveGrabbedID;
+            this.grabbedThingID = saveGrabbedID;
         }
 
-        var grabbedProperties = Entities.getEntityProperties(this.grabbedEntity, GRABBABLE_PROPERTIES);
-        if (FORCE_IGNORE_IK) {
+        var grabbedProperties;
+        if (this.grabbedIsOverlay) {
+            grabbedProperties = {
+                position: Overlays.getProperty(this.grabbedThingID, "position"),
+                rotation: Overlays.getProperty(this.grabbedThingID, "rotation"),
+                parentID: Overlays.getProperty(this.grabbedThingID, "parentID"),
+                parentJointIndex: Overlays.getProperty(this.grabbedThingID, "parentJointIndex"),
+                dynamic: false,
+                shapeType: "none"
+            };
             this.ignoreIK = true;
         } else {
-            var grabbableData = getEntityCustomData(GRABBABLE_DATA_KEY, this.grabbedEntity, DEFAULT_GRABBABLE_DATA);
-            this.ignoreIK = (grabbableData.ignoreIK !== undefined) ? grabbableData.ignoreIK : true;
+            grabbedProperties = Entities.getEntityProperties(this.grabbedThingID, GRABBABLE_PROPERTIES);
+            if (FORCE_IGNORE_IK) {
+                this.ignoreIK = true;
+            } else {
+                var grabbableData = getEntityCustomData(GRABBABLE_DATA_KEY, this.grabbedThingID, DEFAULT_GRABBABLE_DATA);
+                this.ignoreIK = (grabbableData.ignoreIK !== undefined) ? grabbableData.ignoreIK : true;
+            }
         }
 
         var handRotation;
@@ -2313,7 +2385,8 @@ function MyController(hand) {
             this.offsetPosition = Vec3.multiplyQbyV(Quat.inverse(Quat.multiply(handRotation, this.offsetRotation)), offset);
         }
 
-        var isPhysical = propsArePhysical(grabbedProperties) || entityHasActions(this.grabbedEntity);
+        var isPhysical = propsArePhysical(grabbedProperties) ||
+            (!this.grabbedIsOverlay && entityHasActions(this.grabbedThingID));
         if (isPhysical && this.state == STATE_NEAR_GRABBING && grabbedProperties.parentID === NULL_UUID) {
             // grab entity via action
             if (!this.setupHoldAction()) {
@@ -2321,7 +2394,7 @@ function MyController(hand) {
             }
             Messages.sendMessage('Hifi-Object-Manipulation', JSON.stringify({
                 action: 'grab',
-                grabbedEntity: this.grabbedEntity,
+                grabbedEntity: this.grabbedThingID,
                 joint: this.hand === RIGHT_HAND ? "RightHand" : "LeftHand"
             }));
         } else {
@@ -2346,29 +2419,36 @@ function MyController(hand) {
                 reparentProps.localPosition = this.offsetPosition;
                 reparentProps.localRotation = this.offsetRotation;
             }
-            Entities.editEntity(this.grabbedEntity, reparentProps);
+
+            if (this.grabbedIsOverlay) {
+                Overlays.editOverlay(this.grabbedThingID, reparentProps);
+            } else {
+                Entities.editEntity(this.grabbedThingID, reparentProps);
+            }
 
             if (this.thisHandIsParent(grabbedProperties)) {
                 // this should never happen, but if it does, don't set previous parent to be this hand.
-                // this.previousParentID[this.grabbedEntity] = NULL;
-                // this.previousParentJointIndex[this.grabbedEntity] = -1;
+                // this.previousParentID[this.grabbedThingID] = NULL;
+                // this.previousParentJointIndex[this.grabbedThingID] = -1;
             } else {
-                this.previousParentID[this.grabbedEntity] = grabbedProperties.parentID;
-                this.previousParentJointIndex[this.grabbedEntity] = grabbedProperties.parentJointIndex;
+                this.previousParentID[this.grabbedThingID] = grabbedProperties.parentID;
+                this.previousParentJointIndex[this.grabbedThingID] = grabbedProperties.parentJointIndex;
             }
 
             Messages.sendMessage('Hifi-Object-Manipulation', JSON.stringify({
                 action: 'equip',
-                grabbedEntity: this.grabbedEntity,
+                grabbedEntity: this.grabbedThingID,
                 joint: this.hand === RIGHT_HAND ? "RightHand" : "LeftHand"
             }));
         }
 
-        Entities.editEntity(this.grabbedEntity, {
-            velocity: { x: 0, y: 0, z: 0 },
-            angularVelocity: { x: 0, y: 0, z: 0 },
-            // dynamic: false
-        });
+        if (!this.grabbedIsOverlay) {
+            Entities.editEntity(this.grabbedThingID, {
+                velocity: { x: 0, y: 0, z: 0 },
+                angularVelocity: { x: 0, y: 0, z: 0 },
+                // dynamic: false
+            });
+        }
 
         if (this.state == STATE_NEAR_GRABBING) {
             this.callEntityMethodOnGrabbed("startNearGrab");
@@ -2434,26 +2514,39 @@ function MyController(hand) {
 
             if (dropDetected && !this.waitForTriggerRelease && this.triggerSmoothedGrab()) {
                 // store the offset attach points into preferences.
-                if (USE_ATTACH_POINT_SETTINGS && this.grabbedHotspot && this.grabbedEntity) {
-                    var prefprops = Entities.getEntityProperties(this.grabbedEntity, ["localPosition", "localRotation"]);
+                if (USE_ATTACH_POINT_SETTINGS && this.grabbedHotspot && this.grabbedThingID) {
+                    var prefprops = Entities.getEntityProperties(this.grabbedThingID, ["localPosition", "localRotation"]);
                     if (prefprops && prefprops.localPosition && prefprops.localRotation) {
                         storeAttachPointForHotspotInSettings(this.grabbedHotspot, this.hand,
                                                              prefprops.localPosition, prefprops.localRotation);
                     }
                 }
 
-                var grabbedEntity = this.grabbedEntity;
+                var grabbedEntity = this.grabbedThingID;
                 this.release();
-                this.grabbedEntity = grabbedEntity;
+                this.grabbedThingID = grabbedEntity;
                 this.setState(STATE_NEAR_GRABBING, "drop gesture detected");
                 return;
             }
             this.prevDropDetected = dropDetected;
         }
 
-        var props = Entities.getEntityProperties(this.grabbedEntity, ["localPosition", "parentID", "parentJointIndex",
+        var props;
+        if (this.grabbedIsOverlay) {
+            props = {
+                localPosition: Overlays.getProperty(this.grabbedThingID, "localPosition"),
+                parentID: Overlays.getProperty(this.grabbedThingID, "parentID"),
+                parentJointIndex: Overlays.getProperty(this.grabbedThingID, "parentJointIndex"),
+                position: Overlays.getProperty(this.grabbedThingID, "position"),
+                rotation: Overlays.getProperty(this.grabbedThingID, "rotation"),
+                dimensions: Overlays.getProperty(this.grabbedThingID, "dimensions"),
+                registrationPoint: { x: 0.5, y: 0.5, z: 0.5 }
+            };
+        } else {
+            props = Entities.getEntityProperties(this.grabbedThingID, ["localPosition", "parentID", "parentJointIndex",
                                                                       "position", "rotation", "dimensions",
                                                                       "registrationPoint"]);
+        }
         if (!props.position) {
             // server may have reset, taking our equipped entity with it.  move back to "off" state
             this.callEntityMethodOnGrabbed("releaseGrab");
@@ -2465,7 +2558,7 @@ function MyController(hand) {
             // someone took it from us or otherwise edited the parentID.  end the grab.  We don't do this
             // for equipped things so that they can be adjusted while equipped.
             this.callEntityMethodOnGrabbed("releaseGrab");
-            this.grabbedEntity = null;
+            this.grabbedThingID = null;
             this.setState(STATE_OFF, "someone took it");
             return;
         }
@@ -2547,7 +2640,7 @@ function MyController(hand) {
 
         if (this.actionID && this.actionTimeout - now < ACTION_TTL_REFRESH * MSECS_PER_SEC) {
             // if less than a 5 seconds left, refresh the actions ttl
-            var success = Entities.updateAction(this.grabbedEntity, this.actionID, {
+            var success = Entities.updateAction(this.grabbedThingID, this.actionID, {
                 hand: this.hand === RIGHT_HAND ? "right" : "left",
                 timeScale: NEAR_GRABBING_ACTION_TIMEFRAME,
                 relativePosition: this.offsetPosition,
@@ -2561,14 +2654,14 @@ function MyController(hand) {
                 this.actionTimeout = now + (ACTION_TTL * MSECS_PER_SEC);
             } else {
                 print("continueNearGrabbing -- updateAction failed");
-                Entities.deleteAction(this.grabbedEntity, this.actionID);
+                Entities.deleteAction(this.grabbedThingID, this.actionID);
                 this.setupHoldAction();
             }
         }
     };
 
     this.maybeScale = function(props) {
-        if (!objectScalingEnabled || this.isTablet(this.grabbedEntity)) {
+        if (!objectScalingEnabled || this.isTablet(this.grabbedThingID) || this.grabbedIsOverlay) {
             return;
         }
 
@@ -2590,27 +2683,34 @@ function MyController(hand) {
                                                                    this.getOtherHandController().getHandPosition()));
             var currentRescale = scalingCurrentDistance / this.scalingStartDistance;
             var newDimensions = Vec3.multiply(currentRescale, this.scalingStartDimensions);
-            Entities.editEntity(this.grabbedEntity, { dimensions: newDimensions });
+            Entities.editEntity(this.grabbedThingID, { dimensions: newDimensions });
         }
     };
 
     this.maybeScaleMyAvatar = function() {
-        if (!myAvatarScalingEnabled) {
+        if (!myAvatarScalingEnabled || this.shouldScale || this.hand === LEFT_HAND) {
+            //  If scaling disabled, or if we are currently scaling an entity, don't scale avatar
+            //  and only rescale avatar for one hand (so we're not doing it twice)
             return;
         }
 
-        if (!this.shouldScale) {
+        // Only scale avatar if both triggers and grips are squeezed
+        var tryingToScale = this.secondarySqueezed() && this.getOtherHandController().secondarySqueezed() &&
+                            this.triggerSmoothedSqueezed() && this.getOtherHandController().triggerSmoothedSqueezed();
+
+
+        if (!this.isScalingAvatar) {
             //  If both secondary triggers squeezed, start scaling
-            if (this.secondarySqueezed() && this.getOtherHandController().secondarySqueezed()) {
+            if (tryingToScale) {
                 this.scalingStartDistance = Vec3.length(Vec3.subtract(this.getHandPosition(),
                                                                       this.getOtherHandController().getHandPosition()));
                 this.scalingStartAvatarScale = MyAvatar.scale;
-                this.shouldScale = true;
+                this.isScalingAvatar = true;
             }
-        } else if (!this.secondarySqueezed() || !this.getOtherHandController().secondarySqueezed()) {
-            this.shouldScale = false;
+        } else if (!tryingToScale) {
+            this.isScalingAvatar = false;
         }
-        if (this.shouldScale) {
+        if (this.isScalingAvatar) {
             var scalingCurrentDistance = Vec3.length(Vec3.subtract(this.getHandPosition(),
                                                                    this.getOtherHandController().getHandPosition()));
             var newAvatarScale = (scalingCurrentDistance / this.scalingStartDistance) * this.scalingStartAvatarScale;
@@ -2634,7 +2734,7 @@ function MyController(hand) {
     this.nearTrigger = function(deltaTime, timestamp) {
         if (this.triggerSmoothedReleased()) {
             this.callEntityMethodOnGrabbed("stopNearTrigger");
-            this.grabbedEntity = null;
+            this.grabbedThingID = null;
             this.setState(STATE_OFF, "trigger released");
             return;
         }
@@ -2644,7 +2744,7 @@ function MyController(hand) {
     this.farTrigger = function(deltaTime, timestamp) {
         if (this.triggerSmoothedReleased()) {
             this.callEntityMethodOnGrabbed("stopFarTrigger");
-            this.grabbedEntity = null;
+            this.grabbedThingID = null;
             this.setState(STATE_OFF, "trigger released");
             return;
         }
@@ -2659,9 +2759,9 @@ function MyController(hand) {
             var intersection = findRayIntersection(pickRay, true, [], [], true);
             if (intersection.accurate || intersection.overlayID) {
                 this.lastPickTime = now;
-                if (intersection.entityID != this.grabbedEntity) {
+                if (intersection.entityID != this.grabbedThingID) {
                     this.callEntityMethodOnGrabbed("stopFarTrigger");
-                    this.grabbedEntity = null;
+                    this.grabbedThingID = null;
                     this.setState(STATE_OFF, "laser moved off of entity");
                     return;
                 }
@@ -2683,13 +2783,13 @@ function MyController(hand) {
 
     this.entityTouchingEnter = function() {
         // test for intersection between controller laser and web entity plane.
-        var intersectInfo = handLaserIntersectEntity(this.grabbedEntity,
+        var intersectInfo = handLaserIntersectEntity(this.grabbedThingID,
                                                      getControllerWorldLocation(this.handToController(), true));
         if (intersectInfo) {
             var pointerEvent = {
                 type: "Press",
                 id: this.hand + 1, // 0 is reserved for hardware mouse
-                pos2D: projectOntoEntityXYPlane(this.grabbedEntity, intersectInfo.point),
+                pos2D: projectOntoEntityXYPlane(this.grabbedThingID, intersectInfo.point),
                 pos3D: intersectInfo.point,
                 normal: intersectInfo.normal,
                 direction: intersectInfo.searchRay.direction,
@@ -2697,8 +2797,8 @@ function MyController(hand) {
                 isPrimaryHeld: true
             };
 
-            Entities.sendMousePressOnEntity(this.grabbedEntity, pointerEvent);
-            Entities.sendClickDownOnEntity(this.grabbedEntity, pointerEvent);
+            Entities.sendMousePressOnEntity(this.grabbedThingID, pointerEvent);
+            Entities.sendClickDownOnEntity(this.grabbedThingID, pointerEvent);
 
             this.touchingEnterTimer = 0;
             this.touchingEnterPointerEvent = pointerEvent;
@@ -2710,11 +2810,17 @@ function MyController(hand) {
             var theta = this.state === STATE_ENTITY_STYLUS_TOUCHING ? STYLUS_PRESS_TO_MOVE_DEADSPOT_ANGLE : LASER_PRESS_TO_MOVE_DEADSPOT_ANGLE;
             this.deadspotRadius = Math.tan(theta) * intersectInfo.distance;  // dead spot radius in meters
         }
+
+        if (this.state == STATE_ENTITY_STYLUS_TOUCHING) {
+            Controller.triggerHapticPulse(HAPTIC_STYLUS_STRENGTH, HAPTIC_STYLUS_DURATION, this.hand);
+        } else if (this.state == STATE_ENTITY_LASER_TOUCHING) {
+            Controller.triggerHapticPulse(HAPTIC_LASER_UI_STRENGTH, HAPTIC_LASER_UI_DURATION, this.hand);
+        }
     };
 
     this.entityTouchingExit = function() {
         // test for intersection between controller laser and web entity plane.
-        var intersectInfo = handLaserIntersectEntity(this.grabbedEntity,
+        var intersectInfo = handLaserIntersectEntity(this.grabbedThingID,
                                                      getControllerWorldLocation(this.handToController(), true));
         if (intersectInfo) {
             var pointerEvent;
@@ -2722,7 +2828,7 @@ function MyController(hand) {
                 pointerEvent = {
                     type: "Release",
                     id: this.hand + 1, // 0 is reserved for hardware mouse
-                    pos2D: projectOntoEntityXYPlane(this.grabbedEntity, intersectInfo.point),
+                    pos2D: projectOntoEntityXYPlane(this.grabbedThingID, intersectInfo.point),
                     pos3D: intersectInfo.point,
                     normal: intersectInfo.normal,
                     direction: intersectInfo.searchRay.direction,
@@ -2735,11 +2841,11 @@ function MyController(hand) {
                 pointerEvent.isPrimaryHeld = false;
             }
 
-            Entities.sendMouseReleaseOnEntity(this.grabbedEntity, pointerEvent);
-            Entities.sendClickReleaseOnEntity(this.grabbedEntity, pointerEvent);
-            Entities.sendHoverLeaveEntity(this.grabbedEntity, pointerEvent);
+            Entities.sendMouseReleaseOnEntity(this.grabbedThingID, pointerEvent);
+            Entities.sendClickReleaseOnEntity(this.grabbedThingID, pointerEvent);
+            Entities.sendHoverLeaveEntity(this.grabbedThingID, pointerEvent);
         }
-        this.grabbedEntity = null;
+        this.grabbedThingID = null;
         this.grabbedOverlay = null;
     };
 
@@ -2747,7 +2853,7 @@ function MyController(hand) {
 
         this.touchingEnterTimer += dt;
 
-        entityPropertiesCache.addEntity(this.grabbedEntity);
+        entityPropertiesCache.addEntity(this.grabbedThingID);
 
         if (this.state == STATE_ENTITY_LASER_TOUCHING && !this.triggerSmoothedGrab()) {
             this.setState(STATE_OFF, "released trigger");
@@ -2755,7 +2861,7 @@ function MyController(hand) {
         }
 
         // test for intersection between controller laser and web entity plane.
-        var intersectInfo = handLaserIntersectEntity(this.grabbedEntity,
+        var intersectInfo = handLaserIntersectEntity(this.grabbedThingID,
                                                      getControllerWorldLocation(this.handToController(), true));
         if (intersectInfo) {
 
@@ -2765,15 +2871,15 @@ function MyController(hand) {
                 return;
             }
 
-            if (Entities.keyboardFocusEntity != this.grabbedEntity) {
+            if (Entities.keyboardFocusEntity != this.grabbedThingID) {
                 Overlays.keyboardFocusOverlay = 0;
-                Entities.keyboardFocusEntity = this.grabbedEntity;
+                Entities.keyboardFocusEntity = this.grabbedThingID;
             }
 
             var pointerEvent = {
                 type: "Move",
                 id: this.hand + 1, // 0 is reserved for hardware mouse
-                pos2D: projectOntoEntityXYPlane(this.grabbedEntity, intersectInfo.point),
+                pos2D: projectOntoEntityXYPlane(this.grabbedThingID, intersectInfo.point),
                 pos3D: intersectInfo.point,
                 normal: intersectInfo.normal,
                 direction: intersectInfo.searchRay.direction,
@@ -2784,8 +2890,8 @@ function MyController(hand) {
             var POINTER_PRESS_TO_MOVE_DELAY = 0.25; // seconds
             if (this.deadspotExpired || this.touchingEnterTimer > POINTER_PRESS_TO_MOVE_DELAY ||
                 Vec3.distance(intersectInfo.point, this.touchingEnterPointerEvent.pos3D) > this.deadspotRadius) {
-                Entities.sendMouseMoveOnEntity(this.grabbedEntity, pointerEvent);
-                Entities.sendHoldingClickOnEntity(this.grabbedEntity, pointerEvent);
+                Entities.sendMouseMoveOnEntity(this.grabbedThingID, pointerEvent);
+                Entities.sendHoldingClickOnEntity(this.grabbedThingID, pointerEvent);
                 this.deadspotExpired = true;
             }
 
@@ -2795,7 +2901,7 @@ function MyController(hand) {
             }
             Reticle.setVisible(false);
         } else {
-            this.grabbedEntity = null;
+            this.grabbedThingID = null;
             this.setState(STATE_OFF, "grabbed entity was destroyed");
             return;
         }
@@ -2828,6 +2934,12 @@ function MyController(hand) {
             var STYLUS_PRESS_TO_MOVE_DEADSPOT_ANGLE = 0.314; // radians ~ 18 degrees
             var theta = this.state === STATE_OVERLAY_STYLUS_TOUCHING ? STYLUS_PRESS_TO_MOVE_DEADSPOT_ANGLE : LASER_PRESS_TO_MOVE_DEADSPOT_ANGLE;
             this.deadspotRadius = Math.tan(theta) * intersectInfo.distance;  // dead spot radius in meters
+        }
+
+        if (this.state == STATE_OVERLAY_STYLUS_TOUCHING) {
+            Controller.triggerHapticPulse(HAPTIC_STYLUS_STRENGTH, HAPTIC_STYLUS_DURATION, this.hand);
+        } else if (this.state == STATE_OVERLAY_LASER_TOUCHING) {
+            Controller.triggerHapticPulse(HAPTIC_LASER_UI_STRENGTH, HAPTIC_LASER_UI_DURATION, this.hand);
         }
     };
 
@@ -2874,7 +2986,7 @@ function MyController(hand) {
             Overlays.sendMouseReleaseOnOverlay(this.grabbedOverlay, pointerEvent);
             Overlays.sendHoverLeaveOverlay(this.grabbedOverlay, pointerEvent);
         }
-        this.grabbedEntity = null;
+        this.grabbedThingID = null;
         this.grabbedOverlay = null;
     };
 
@@ -2882,7 +2994,6 @@ function MyController(hand) {
         this.touchingEnterTimer += dt;
 
         if (this.state == STATE_OVERLAY_STYLUS_TOUCHING && this.triggerSmoothedSqueezed()) {
-            this.setState(STATE_OFF, "trigger squeezed");
             return;
         }
 
@@ -2898,7 +3009,7 @@ function MyController(hand) {
 
             if (this.state == STATE_OVERLAY_STYLUS_TOUCHING &&
                 intersectInfo.distance > WEB_STYLUS_LENGTH / 2.0 + WEB_TOUCH_Y_OFFSET + WEB_TOUCH_Y_TOUCH_DEADZONE_SIZE) {
-                this.grabbedEntity = null;
+                this.grabbedThingID = null;
                 this.setState(STATE_OFF, "pulled away from overlay");
                 return;
             }
@@ -2955,7 +3066,7 @@ function MyController(hand) {
             }
             Reticle.setVisible(false);
         } else {
-            this.grabbedEntity = null;
+            this.grabbedThingID = null;
             this.setState(STATE_OFF, "grabbed overlay was destroyed");
             return;
         }
@@ -2964,7 +3075,7 @@ function MyController(hand) {
     this.release = function() {
         this.turnOffVisualizations();
 
-        if (this.grabbedEntity !== null) {
+        if (this.grabbedThingID !== null) {
             if (this.state === STATE_HOLD) {
                 this.callEntityMethodOnGrabbed("releaseEquip");
             }
@@ -2972,35 +3083,49 @@ function MyController(hand) {
             // Make a small release haptic pulse if we really were holding something
             Controller.triggerHapticPulse(HAPTIC_PULSE_STRENGTH, HAPTIC_PULSE_DURATION, this.hand);
             if (this.actionID !== null) {
-                Entities.deleteAction(this.grabbedEntity, this.actionID);
+                Entities.deleteAction(this.grabbedThingID, this.actionID);
             } else {
                 // no action, so it's a parenting grab
-                if (this.previousParentID[this.grabbedEntity] === NULL_UUID) {
-                    Entities.editEntity(this.grabbedEntity, {
-                        parentID: this.previousParentID[this.grabbedEntity],
-                        parentJointIndex: this.previousParentJointIndex[this.grabbedEntity]
-                    });
-                    this.ensureDynamic();
+                if (this.previousParentID[this.grabbedThingID] === NULL_UUID) {
+                    if (this.grabbedIsOverlay) {
+                        Overlays.editOverlay(this.grabbedThingID, {
+                            parentID: NULL_UUID,
+                            parentJointIndex: -1
+                        });
+                    } else {
+                        Entities.editEntity(this.grabbedThingID, {
+                            parentID: this.previousParentID[this.grabbedThingID],
+                            parentJointIndex: this.previousParentJointIndex[this.grabbedThingID]
+                        });
+                        this.ensureDynamic();
+                    }
                 } else {
-                    // we're putting this back as a child of some other parent, so zero its velocity
-                    Entities.editEntity(this.grabbedEntity, {
-                        parentID: this.previousParentID[this.grabbedEntity],
-                        parentJointIndex: this.previousParentJointIndex[this.grabbedEntity],
-                        velocity: {x: 0, y: 0, z: 0},
-                        angularVelocity: {x: 0, y: 0, z: 0}
-                    });
+                    if (this.grabbedIsOverlay) {
+                        Overlays.editOverlay(this.grabbedThingID, {
+                            parentID: this.previousParentID[this.grabbedThingID],
+                            parentJointIndex: this.previousParentJointIndex[this.grabbedThingID],
+                        });
+                    } else {
+                        // we're putting this back as a child of some other parent, so zero its velocity
+                        Entities.editEntity(this.grabbedThingID, {
+                            parentID: this.previousParentID[this.grabbedThingID],
+                            parentJointIndex: this.previousParentJointIndex[this.grabbedThingID],
+                            velocity: {x: 0, y: 0, z: 0},
+                            angularVelocity: {x: 0, y: 0, z: 0}
+                        });
+                    }
                 }
             }
 
             Messages.sendMessage('Hifi-Object-Manipulation', JSON.stringify({
                 action: 'release',
-                grabbedEntity: this.grabbedEntity,
+                grabbedEntity: this.grabbedThingID,
                 joint: this.hand === RIGHT_HAND ? "RightHand" : "LeftHand"
             }));
         }
 
         this.actionID = null;
-        this.grabbedEntity = null;
+        this.grabbedThingID = null;
         this.grabbedOverlay = null;
         this.grabbedHotspot = null;
 
@@ -3070,7 +3195,6 @@ function MyController(hand) {
                 // we appear to be holding something and this script isn't in a state that would be holding something.
                 // unhook it.  if we previously took note of this entity's parent, put it back where it was.  This
                 // works around some problems that happen when more than one hand or avatar is passing something around.
-                print("disconnecting stray child of hand: (" + _this.hand + ") " + childID);
                 if (_this.previousParentID[childID]) {
                     var previousParentID = _this.previousParentID[childID];
                     var previousParentJointIndex = _this.previousParentJointIndex[childID];
@@ -3088,9 +3212,21 @@ function MyController(hand) {
                     }
                     _this.previouslyUnhooked[childID] = now;
 
+                    if (Overlays.getProperty(childID, "grabbable")) {
+                        // only auto-unhook overlays that were flagged as grabbable.  this avoids unhooking overlays
+                        // used in tutorial.
+                        Overlays.editOverlay(childID, {
+                            parentID: previousParentID,
+                            parentJointIndex: previousParentJointIndex
+                        });
+                    }
                     Entities.editEntity(childID, { parentID: previousParentID, parentJointIndex: previousParentJointIndex });
+
                 } else {
                     Entities.editEntity(childID, { parentID: NULL_UUID });
+                    if (Overlays.getProperty(childID, "grabbable")) {
+                        Overlays.editOverlay(childID, { parentID: NULL_UUID });
+                    }
                 }
             }
         });
@@ -3158,6 +3294,7 @@ Messages.subscribe('Hifi-Hand-Disabler');
 Messages.subscribe('Hifi-Hand-Grab');
 Messages.subscribe('Hifi-Hand-RayPick-Blacklist');
 Messages.subscribe('Hifi-Object-Manipulation');
+Messages.subscribe('Hifi-Hand-Drop');
 
 var handleHandMessages = function(channel, message, sender) {
     var data;
@@ -3209,8 +3346,8 @@ var handleHandMessages = function(channel, message, sender) {
                 selectedController.release();
                 var wearableEntity = data.entityID;
                 entityPropertiesCache.addEntity(wearableEntity);
-                selectedController.grabbedEntity = wearableEntity;
-                var hotspots = selectedController.collectEquipHotspots(selectedController.grabbedEntity);
+                selectedController.grabbedThingID = wearableEntity;
+                var hotspots = selectedController.collectEquipHotspots(selectedController.grabbedThingID);
                 if (hotspots.length > 0) {
                     if (hotspotIndex >= hotspots.length) {
                         hotspotIndex = 0;
@@ -3242,6 +3379,15 @@ var handleHandMessages = function(channel, message, sender) {
 
             } catch (e) {
                 print("WARNING: handControllerGrab.js -- error parsing Hifi-Hand-RayPick-Blacklist message: " + message);
+            }
+        } else if (channel === 'Hifi-Hand-Drop') {
+            if (message === 'left') {
+                leftController.release();
+            } else if (message === 'right') {
+                rightController.release();
+            } else if (message === 'both') {
+                leftController.release();
+                rightController.release();
             }
         }
     }

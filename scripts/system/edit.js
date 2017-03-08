@@ -253,7 +253,9 @@ var toolBar = (function () {
             tablet = Tablet.getTablet("com.highfidelity.interface.tablet.system");
             activeButton = tablet.addButton({
                 icon: "icons/tablet-icons/edit-i.svg",
-                text: "EDIT"
+                activeIcon: "icons/tablet-icons/edit-a.svg",
+                text: "EDIT",
+                sortOrder: 10
             });
         }
 
@@ -461,6 +463,11 @@ var toolBar = (function () {
 
     that.setActive = function (active) {
         Settings.setValue(EDIT_SETTING, active);
+        if (active) {
+            Controller.captureEntityClickEvents();
+        } else {
+            Controller.releaseEntityClickEvents();
+        }
         if (active === isActive) {
             return;
         }
@@ -556,6 +563,11 @@ function findClickedEntity(event) {
     }
 
     var pickRay = Camera.computePickRay(event.x, event.y);
+
+    var overlayResult = Overlays.findRayIntersection(pickRay, true, [HMD.tabletID, HMD.tabletScreenID, HMD.homeButtonID]);
+    if (overlayResult.intersects) {
+        return null;
+    }
 
     var entityResult = Entities.findRayIntersection(pickRay, true); // want precision picking
     var lightResult = lightOverlayManager.findRayIntersection(pickRay);
@@ -964,6 +976,7 @@ function cleanupModelMenus() {
 }
 
 Script.scriptEnding.connect(function () {
+    toolBar.setActive(false);
     Settings.setValue(SETTING_AUTO_FOCUS_ON_SELECT, Menu.isOptionChecked(MENU_AUTO_FOCUS_ON_SELECT));
     Settings.setValue(SETTING_EASE_ON_FOCUS, Menu.isOptionChecked(MENU_EASE_ON_FOCUS));
     Settings.setValue(SETTING_SHOW_LIGHTS_IN_EDIT_MODE, Menu.isOptionChecked(MENU_SHOW_LIGHTS_IN_EDIT_MODE));
@@ -1462,8 +1475,8 @@ var PropertiesTool = function (opts) {
 
     function resetScriptStatus() {
         updateScriptStatus({
-            statusRetrieved: false,
-            isRunning: false,
+            statusRetrieved: undefined,
+            isRunning: undefined,
             status: "",
             errorInfo: ""
         });
