@@ -1,0 +1,81 @@
+{
+    "Entities": [
+        {
+            "clientOnly": 0,
+            "collisionsWillMove": 1,
+            "compoundShapeURL": "http://hifi-production.s3.amazonaws.com/tutorials/pingPongGun/Pingpong-Gun-New.obj",
+            "created": "2016-11-04T22:25:04Z",
+            "dimensions": {
+                "x": 0.17742760479450226,
+                "y": 0.38749998807907104,
+                "z": 0.99309998750686646
+            },
+            "dynamic": 1,
+            "gravity": {
+                "x": 0,
+                "y": -5,
+                "z": 0
+            },
+            "id": "{a871719d-051d-4899-81f8-f624c04c3e3a}",
+            "modelURL": "http://hifi-content.s3.amazonaws.com/alan/dev/Pingportal-Gun-New.fbx?1",
+            "name": "Tutorial Ping Pong Gun",
+            "owningAvatarID": "{00000000-0000-0000-0000-000000000000}",
+            "queryAACube": {
+                "scale": 1.0806869268417358,
+                "x": -0.54034346342086792,
+                "y": -0.54034346342086792,
+                "z": -0.54034346342086792
+            },
+            "rotation": {
+                "w": -0.14616614580154419,
+                "x": -0.68838024139404297,
+                "y": 0.69466698169708252,
+                "z": 0.14915692806243896
+            },
+            "script": "http://hifi-content.s3.amazonaws.com/alan/dev/Scripts/ping-portal-welcome.js?3",
+            "shapeType": "compound",
+            "type": "Model",
+            "userData": "{\"grabbableKey\":{\"invertSolidWhileHeld\":true},\"wearable\":{\"joints\":{\"RightHand\":[{\"x\":0.1177130937576294,\"y\":0.12922893464565277,\"z\":0.08307232707738876},{\"x\":0.4934672713279724,\"y\":0.3605862259864807,\"z\":0.6394805908203125,\"w\":-0.4664038419723511}],\"LeftHand\":[{\"x\":0.09151676297187805,\"y\":0.13639454543590546,\"z\":0.09354984760284424},{\"x\":-0.19628101587295532,\"y\":0.6418180465698242,\"z\":0.2830369472503662,\"w\":0.6851521730422974}]}}}"
+        },
+        {
+            "clientOnly": 0,
+            "color": {
+                "blue": 255,
+                "green": 166,
+                "red": 41
+            },
+            "created": "2016-11-04T22:55:39Z",
+            "cutoff": 90,
+            "dimensions": {
+                "x": 5.0777130126953125,
+                "y": 5.0777130126953125,
+                "z": 5.0777130126953125
+            },
+            "falloffRadius": 1.7000000476837158,
+            "id": "{a240a5b9-8ec5-46f7-a443-fd99ee08ba33}",
+            "intensity": 3.2999999523162842,
+            "name": "PingPortal-Light",
+            "owningAvatarID": "{00000000-0000-0000-0000-000000000000}",
+            "parentID": "{a871719d-051d-4899-81f8-f624c04c3e3a}",
+            "position": {
+                "x": -0.071898072957992554,
+                "y": 0.1922331303358078,
+                "z": 0.59060537815093994
+            },
+            "queryAACube": {
+                "scale": 8.7948570251464844,
+                "x": 6.5513162612915039,
+                "y": -4.9521479606628418,
+                "z": -150.72532653808594
+            },
+            "rotation": {
+                "w": -0.14616614580154419,
+                "x": 0.68838024139404297,
+                "y": -0.69466698169708252,
+                "z": -0.14915692806243896
+            },
+            "type": "Light"
+        }
+    ],
+    "Version": 64
+}
