@@ -333,6 +333,7 @@ signals:
     void transformChanged();
     void newCollisionSoundURL(const QUrl& url);
     void collisionWithEntity(const Collision& collision);
+    void onFinishedSpeaking(QString speech);
     void energyChanged(float newEnergy);
     void positionGoneTo();
     void onLoadComplete();
@@ -535,6 +536,7 @@ private:
     bool didTeleport();
 
     AudioClient* audioClient;
+    QString currentTranscription;
 };
 
 QScriptValue audioListenModeToScriptValue(QScriptEngine* engine, const AudioListenerMode& audioListenerMode);

@@ -1,6 +1,5 @@
-function getForwardOffset(distance) {
-	return Vec3.sum(MyAvatar.position, Vec3.multiply(distance, Quat.getFront(MyAvatar.orientation)));
-}
+// Limitelss NPC interaction
+print("loading interaction script");
 
 var NPC = false;
 var hasCenteredOnNPC = false;
@@ -11,6 +10,13 @@ var baselineX = 0;
 var baselineY = 0;
 var nodRange = 20;
 var shakeRange = 20;
+
+MyAvatar.setListeningToVoice(false);
+
+MyAvatar.onFinishedSpeaking.connect(function(speech) {
+	print("Got: " + speech);
+	callOnNPC("voiceData: " + speech);
+});
 
 function setBaselineRotations(rot) {
 	baselineX = rot.x;
@@ -44,6 +50,7 @@ function onWeLostFocus() {
 	callOnNPC("onLostFocused");
 	var baselineX = 0;
 	var baselineY = 0;
+	MyAvatar.setListeningToVoice(false);
 }
 
 function onWeGainedFocus() {
@@ -52,6 +59,7 @@ function onWeGainedFocus() {
 	var rotation = Quat.safeEulerAngles(Camera.getOrientation());
 	baselineX = rotation.x;
 	baselineY = rotation.y;
+	MyAvatar.setListeningToVoice(true);
 }
 
 function checkFocus() {
@@ -89,33 +97,11 @@ function tick () {
 		checkGesture();
 }
 
-print("Avatar preload");
-
-Messages.subscribe("debugMessages");
-Messages.messageReceived.connect(function (channel, message, sender) {
-	print("Interaction message got: " + message);
-	if(channel === "debugMessages" && message.search("isFinal") != -1 /*&& sender == MyAvatar.sessionUUID*/) {
-		print("Calling voice on NPC");
-		callOnNPC("voiceData: " + message.toLowerCase());
-	}
-});
-
-Controller.keyPressEvent.connect(function(event) {
-	if(event.text.search("TAB") != -1) {
-		print("Sending tab");
-		Messages.sendMessage("debugMessages", MyAvatar.sessionUUID + " pressed");
-	}
-});
-Controller.keyReleaseEvent.connect(function(event) {
-	if(event.text.search("TAB") != -1) {
-		print("Sending tab release");
-		Messages.sendMessage("debugMessages", MyAvatar.sessionUUID + " released");
-	}
-});
-
 if(typeof ticker === 'undefined')
 	ticker = Script.setInterval(tick, 666);
 else {
 	Script.clearInterval(ticker);
 	ticker = Script.setInterval(tick, 666);
 }
+
+print("finished loading interaction script");

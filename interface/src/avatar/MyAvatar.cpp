@@ -216,6 +216,7 @@ MyAvatar::MyAvatar(RigPointer rig) :
     transcribeServerSocket = nullptr;
     streamingAudioForTranscription = false;
     shouldStartListeningForVoice = false;
+    currentTranscription = "";
 }
 
 MyAvatar::~MyAvatar() {
@@ -224,14 +225,16 @@ MyAvatar::~MyAvatar() {
 
 void MyAvatar::audioInputReceived(const QByteArray& inputSamples)
 {
-    if(streamingAudioForTranscription && transcribeServerSocket && transcribeServerSocket->isWritable() && transcribeServerSocket->state() != QAbstractSocket::SocketState::UnconnectedState)
-    {
-        qCDebug(interfaceapp) << "Sending Data!";
-        transcribeServerSocket->write(inputSamples.data(), inputSamples.size());
-        transcribeServerSocket->waitForBytesWritten();
-        if(!streamingAudioForTranscription)
-        {
-            qCDebug(interfaceapp) << "Closing socket!";
+    if(transcribeServerSocket && transcribeServerSocket->isWritable() && transcribeServerSocket->state() != QAbstractSocket::SocketState::UnconnectedState) {
+        if(streamingAudioForTranscription) {
+            qCDebug(interfaceapp) << "Sending Data!";
+            transcribeServerSocket->write(inputSamples.data(), inputSamples.size());
+            transcribeServerSocket->waitForBytesWritten();
+        }
+        else {
+            qCDebug(interfaceapp) << "Closing socket with data: " << currentTranscription;
+            onFinishedSpeaking(currentTranscription);
+            currentTranscription = "";
             transcribeServerSocket->close();
             delete transcribeServerSocket;
             transcribeServerSocket = nullptr;
@@ -366,14 +369,11 @@ void MyAvatar::TranscriptionReceived()
         const QByteArray data = transcribeServerSocket->readAll();
         qCDebug(interfaceapp) << "Data got!" << data;
         QJsonObject json = QJsonDocument::fromJson(data.data()).object();
+        currentTranscription = json["alternatives"].toArray()[0].toObject()["transcript"].toString();
         if(json["isFinal"] == true)
         {
             streamingAudioForTranscription = false;
-
-            QString finalTranscription = json["alternatives"].toArray()[0].toObject()["transcript"].toString();
-            qCDebug(interfaceapp) << "Final transcription: " << finalTranscription;
-            auto messages = DependencyManager::get<MessagesClient>();
-            messages->sendMessage("debugMessages", "isFinal: " + finalTranscription);
+            qCDebug(interfaceapp) << "Final transcription: " << currentTranscription;
             break;
         }
     }
@@ -399,9 +399,6 @@ void MyAvatar::voiceTimeout() {
     if(transcribeServerSocket && transcribeServerSocket->isWritable() && transcribeServerSocket->state() != QAbstractSocket::SocketState::UnconnectedState) {
         streamingAudioForTranscription = false;
         qCDebug(interfaceapp) << "Timeout!";
-        transcribeServerSocket->close();
-        delete transcribeServerSocket;
-        transcribeServerSocket = nullptr;
     }
     voiceTimer.stop();
 }
@@ -797,7 +794,7 @@ controller::Pose MyAvatar::getRightHandTipPose() const {
 
 void MyAvatar::setListeningToVoice(bool listening) {
     // delay so that the enter key doesn't start the listening process when debugging.
-    QTimer::singleShot(100, [&]{shouldStartListeningForVoice = listening;});
+    QTimer::singleShot(100, [=]{shouldStartListeningForVoice = listening;});
 }
 
 // virtual
