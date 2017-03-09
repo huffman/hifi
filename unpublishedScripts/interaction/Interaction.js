@@ -97,11 +97,6 @@ function tick () {
 		checkGesture();
 }
 
-if(typeof ticker === 'undefined')
-	ticker = Script.setInterval(tick, 666);
-else {
-	Script.clearInterval(ticker);
-	ticker = Script.setInterval(tick, 666);
-}
+Script.update.connect(tick);
 
 print("finished loading interaction script");
