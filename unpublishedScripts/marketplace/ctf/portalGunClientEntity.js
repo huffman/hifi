@@ -161,7 +161,7 @@
                 collisionless: true,
                 userData: JSON.stringify({
                     //portalTargetLocation: "hifi://lionsgate.highfidelity.io/-104.376,-0.496867,-8.28224/0,0.721841,0,0.692059"
-                    portalTargetLocation: "/-59.9158,-0.3495,3.3938/0,0.91256,0,0.408942"
+                    portalTargetLocation: "/16.0555,-0.372284,18.5259/0,0.631228,0,0.775597"
                 })
             };
             Entities.addEntity(portalProperties);

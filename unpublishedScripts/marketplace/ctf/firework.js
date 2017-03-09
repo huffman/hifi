@@ -56,20 +56,20 @@ var fireworkSettings = {
     "color":{"red":205,"green":84.41176470588235,"blue":84.41176470588235},
     "maxParticles":1000,
     "lifetime": 20,
-    "lifespan":4,
-    "emitRate":1000,
-    "emitSpeed":1.5,
+    "lifespan":15,
+    "emitRate":2000,
+    "emitSpeed":2.5,
     "speedSpread":1.0,
     "emitOrientation":{"x":-0.2,"y":0,"z":0,"w":0.7000000000000001},
     "emitDimensions":{"x":0,"y":0,"z":0},
     "emitRadiusStart":0.5,
-    "polarStart":1,
-    "polarFinish":1.2,
+    "polarStart":0,
+    "polarFinish":Math.PI,
     "azimuthStart":-Math.PI,
     "azimuthFinish":Math.PI,
-    "emitAcceleration":{"x":0,"y":-0.70000001192092896,"z":0},
+    "emitAcceleration":{"x":0,"y":-1.70000001192092896,"z":0},
     "accelerationSpread":{"x":0,"y":0,"z":0},
-    "particleRadius":0.03999999910593033,
+    "particleRadius":0.02999999910593033,
     "radiusSpread":0,
     "radiusStart":0.13999999910593033,
     "radiusFinish":0.14,
@@ -78,8 +78,8 @@ var fireworkSettings = {
     "colorFinish":{"red":255,"green":255,"blue":255},
     "alpha":1,
     "alphaSpread":0,
-    "alphaStart":0,
-    "alphaFinish":1,
+    "alphaStart":1,
+    "alphaFinish":0,
     "textures":"http://hifi-content.s3.amazonaws.com/alan/dev/Particles/Particle-Spark.png"
 };
 
@@ -119,7 +119,7 @@ function shootFirework(position, color, options) {
         playRandomSound(popSounds, { position: position, volume: 3.0 });
         Script.setTimeout(function() {
             Entities.editEntity(burstID, { emitRate: 0 });
-        }, 500);
+        }, 250);
         Script.setTimeout(function() {
             Entities.deleteEntity(smokeID);
             Entities.deleteEntity(burstID);
@@ -143,4 +143,5 @@ playFireworkShow = function(position, numberOfFireworks, duration, offsetRange, 
         }(randomPosition), Math.random() * duration);
     }
 };
-playFireworkShow(MyAvatar.position, 10, 1, { x: 0, y: 0, z: 0 }, { red: 255, green: 0, blue: 0 }, { red: 255, green: 0, blue: 0 });
+//var position = Vec3.sum(MyAvatar.position, { x: 30, y: 0, z: 0 });
+//playFireworkShow(position, 10, 2000, { x: 0, y: 0, z: 0 }, { red: 0, green: 0, blue: 200 }, { red: 0, green: 0, blue: 200 });
