@@ -31,8 +31,16 @@
                     position: Entities.getEntityProperties(self.entityID, 'position').position
                 }));
             }, 1000);
+            Entities.deletingEntity.connect(this, this.onDeletingEntity);
+        },
+        onDeletingEntity: function(id) {
+            if (id === this.entityID) {
+                this.unload();
+                Entities.deletingEntity.disconnect(this, this.onDeletingEntity);
+            }
         },
         unload: function() {
+            print(this.entityID, "unloading");
             Script.clearInterval(this.heartbeatTimerID);
         }
     };
