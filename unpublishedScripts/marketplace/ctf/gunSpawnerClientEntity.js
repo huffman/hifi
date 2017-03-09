@@ -29,7 +29,7 @@
             "y": 0.5236133337020874,
             "z": -0.43306630849838257
         },
-        lifetime: 100,
+        //lifetime: 100,
         velocity: {
             x: 0,
             y: 0.1,
@@ -42,7 +42,7 @@
     };
 
     var lightProps = {
-        lifetime: 100,
+        //lifetime: 100,
         "color": {
             "blue": 255,
             "green": 166,
