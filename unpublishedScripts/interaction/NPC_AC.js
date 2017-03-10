@@ -1,13 +1,12 @@
 Script.include("file:///home/delamare/gitclones/hifi/unpublishedScripts/interaction/NPCHelpers.js", function(){print("NPCHelpers included.");main();});
 
-var skeleFST = "http://mpassets.highfidelity.com/72e083ee-194d-4113-9c61-0591d8257493-v1/skeleton_Rigged.fst";
-var walkForwardAnim = "file:///home/delamare/gitclones/hifi/build/interface/resources/avatar/animations/walk_fwd.fbx";
-var idleAnim = "file:///home/delamare/gitclones/hifi/build/interface/resources/avatar/animations/idle.fbx";
+var walkForwardAnim = "https://storage.googleapis.com/limitlessserv-144100.appspot.com/hifi%20assets/walk_fwd.fbx";
+var idleAnim = "https://storage.googleapis.com/limitlessserv-144100.appspot.com/hifi%20assets/idle.fbx";
 
-var lightFST = "http://192.168.1.10:8080/beingOfLight.fst";
-var lightThankful = "http://192.168.1.10:8080/beingOfLightThankful.fbx";
-var lightWave = "http://192.168.1.10:8080/beingOfLightWave.fbx";
-var gameOverURL = "http://192.168.1.10:8080/ArcadeGameover.wav";
+var lightFST = "https://storage.googleapis.com/limitlessserv-144100.appspot.com/hifi%20assets/beingOfLight.fst";
+var lightThankful = "https://storage.googleapis.com/limitlessserv-144100.appspot.com/hifi%20assets/beingOfLightThankful.fbx";
+var lightWave = "https://storage.googleapis.com/limitlessserv-144100.appspot.com/hifi%20assets/beingOfLightWave.fbx";
+var gameOverURL = "https://storage.googleapis.com/limitlessserv-144100.appspot.com/hifi%20assets/ArcadeGameover.wav";
 
 Agent.isAvatar = true;
 Avatar.skeletonModelURL = lightFST;
@@ -50,4 +49,3 @@ function main() {
 	});
 	playAnim(idleAnim, true);
 }
-
