@@ -41,8 +41,12 @@ function callOnNPC(message) {
 }
 
 function isStillFocusedNPC() {
-	var avatarPosition = AvatarList.getAvatar(NPC).position;
-	return Vec3.distance(MyAvatar.position, avatarPosition) <= distance && Math.abs(Quat.dot(Camera.getOrientation(), Quat.lookAtSimple(MyAvatar.position, avatarPosition))) > 0.6;
+	var avatar = AvatarList.getAvatar(NPC);
+	if(avatar) {
+		var avatarPosition = avatar.position;
+		return Vec3.distance(MyAvatar.position, avatarPosition) <= distance && Math.abs(Quat.dot(Camera.getOrientation(), Quat.lookAtSimple(MyAvatar.position, avatarPosition))) > 0.6;
+	}
+	return false; // NPC reference died. Maybe it crashed or we teleported to a new world?
 }
 
 function onWeLostFocus() {

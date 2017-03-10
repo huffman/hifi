@@ -5,7 +5,7 @@ var idleAnim = "file:///home/delamare/gitclones/hifi/build/interface/resources/a
 var lightFST = "http://192.168.1.10:8080/beingOfLight.fst";
 var lightThankful = "http://192.168.1.10:8080/beingOfLightThankful.fbx";
 var lightWave = "http://192.168.1.10:8080/beingOfLightWave.fbx";
-var gameOverURL = "file:///home/delamare/Music/ArcadeGameover.raw";
+var gameOverURL = "http://192.168.1.10:8080/ArcadeGameover.wav";
 
 Agent.isAvatar = true;
 Avatar.skeletonModelURL = lightFST;
@@ -16,19 +16,27 @@ var startingOrientation = Avatar.orientation;
 
 var audioInjector = false;
 
-function callbackOnCondition(conditionFunc, ms, callback) {
+function callbackOnCondition(conditionFunc, ms, callback, count) {
+	var thisCount = 0;
+	if(typeof count !== 'undefined')
+		thisCount = count;
 	print("Checking condition");
-	if(!conditionFunc()) {
+	if(conditionFunc()) {
+		callback();
+	}
+	else if(thisCount < 10) {
 		print("condition is false");
 		Script.setTimeout(function() {
-			callbackOnCondition(conditionFunc, ms, callback);
+			callbackOnCondition(conditionFunc, ms, callback, thisCount + 1);
 		}, ms);
 		return;
 	}
-	callback();
+	else {
+		print("callbackOnCondition timeout");
+	}
 }
 
-function playAnim(animURL, looping, onFinishedLoading) {
+function playAnim(animURL, looping, onFinished) {
 	// Start caching the animation if not already cached.
 	AnimationCache.getAnimation(animURL);
 
@@ -42,39 +50,48 @@ function playAnim(animURL, looping, onFinishedLoading) {
 		print("attempting to play " + animURL);
 		return details.running && details.url == animURL && details.currentFrame > 0;
 	}, 100, function(){
+		var timeOfAnim = ((AnimationCache.getAnimation(animURL).frames.length / 30) * 1000) + 100; // frames to miliseconds plus a small buffer
+		print("animation loaded. Will play for: " + timeOfAnim);
 		// Start the animation again but this time with frame information
 		Avatar.startAnimation(animURL, 30, 1, looping, true, 0, AnimationCache.getAnimation(animURL).frames.length);
-		// Call any other functionality to be executed when the anim is ready
-		print("finished loading anim. checking for more work");
-		if(typeof onFinishedLoading !== 'undefined') {
-			print("onFinishedLoading defined. calling it");
-			onFinishedLoading();
+		if(typeof onFinished !== 'undefined') {
+			print("onFinished found for anim. Setting a timeout");
+			Script.setTimeout(onFinished, timeOfAnim); 
+		}
+	});
+}
+
+function playSound(soundURL, onFinished) {
+	print("Got sound URL: " + soundURL);
+	callbackOnCondition(function() {
+		return SoundCache.getSound(soundURL).downloaded;
+	}, 100, function() {
+		print("sound downloaded. playing now");
+		audioInjector = Audio.playSound(SoundCache.getSound(soundURL), {position: Avatar.position, volume: 1.0});
+		if(typeof onFinished !== 'undefined') {
+			print("onFinished found. connecting to AudioInjector");
+			audioInjector.finished.connect(onFinished);
 		}
 	});
 }
 
 function npcRespond(soundURL, animURL, onFinished) {
 	if(soundURL) {
-		var sound = SoundCache.getSound(soundURL);
-		var options = {position: Avatar.position, volume: 1.0};
-		audioInjector = Audio.playSound(sound, options);
-		audioInjector.finished.connect(function(){
+		playSound(soundURL, function(){
+			print("Sound finished playing");
 			var animDetails = Avatar.getAnimationDetails();
-			if(animDetails.lastFrame != 0 && !animDetails.running)
+			print("lastFrame: " + animDetails.lastFrame);
+			print("currentFrame: " + animDetails.currentFrame);
+			if(animDetails.lastFrame > animDetails.currentFrame + 1)
 				onFinished();
 			audioInjector = false;
 		});
 	}
 	if(animURL) {
 		playAnim(animURL, false, function() {
-			print("animation loaded. Will play for: " + ((AnimationCache.getAnimation(animURL).frames.length / 30) * 1000));
-			Script.setTimeout(function() {
-				print("Animation finished");
-				// this code will run when the animation is finished playing
-				print("audioInjector: " + audioInjector);
-				if(!audioInjector || !audioInjector.isPlaying())
-					onFinished();
-			}, ((AnimationCache.getAnimation(animURL).frames.length / 30) * 1000) + 100); // frames to miliseconds plus a small buffer
+			print("Animation finished playing.");
+			if(!audioInjector || !audioInjector.isPlaying())
+				onFinished();
 		});
 	}
 }
@@ -92,20 +109,20 @@ Messages.messageReceived.connect(function (channel, message, sender) {
 			playAnim(idleAnim, true);
 		}
 		else if (message.search("onNodReceived") != -1) {
-			npcRespond(null, lightThankful, function(){print("finished onNodReceived response");});
+			npcRespond(null, lightThankful, function(){print("finished onNodReceived response");playAnim(idleAnim, true);});
 		}
 		else if (message.search("onShakeReceived") != -1) {
-			npcRespond(null, lightWave, function(){print("finished onShakeReceived response");});
+			npcRespond(null, lightWave, function(){print("finished onShakeReceived response");playAnim(idleAnim, true);});
 		}
 		else if (message.search("voiceData") != -1) {
 			if(message.search("thank") != -1) {
-			npcRespond(null, lightThankful, function(){print("finished thank response");});
+			npcRespond(null, lightThankful, function(){print("finished thank response");playAnim(idleAnim, true);});
 			}
 			else if (message.search("bye") != -1) {
-			npcRespond(gameOverURL, lightWave, function(){print("finished bye response");});
+			npcRespond(gameOverURL, lightWave, function(){print("finished bye response");playAnim(idleAnim, true);});
 			}
 			else if (message.search("test") != -1) {
-				npcRespond(gameOverURL, null, function(){print("finished test");});
+				npcRespond(gameOverURL, null, function(){print("finished test");playAnim(idleAnim, true);});
 			}
 		}
 	}
