@@ -21,28 +21,30 @@ function main() {
 		print(sender + " -> NPC @" + Agent.sessionUUID + ": " + message);
 		if(channel === "interactionComs" && message.search(Agent.sessionUUID) != -1) {
 			if(message.search("onFocused") != -1) {
+				blocked = false;
 				Avatar.orientation = Quat.lookAtSimple(Avatar.position, AvatarList.getAvatar(sender).position);
 				playAnim(idleAnim, true);
 			}
 			else if (message.search("onLostFocused") != -1) {
+				blocked = false;
 				Avatar.orientation = startingOrientation;
 				playAnim(idleAnim, true);
 			}
 			else if (message.search("onNodReceived") != -1) {
-				npcRespond(null, lightThankful, function(){print("finished onNodReceived response");playAnim(idleAnim, true);});
+				npcRespondBlocking(null, lightThankful, function(){print("finished onNodReceived response");playAnim(idleAnim, true);});
 			}
 			else if (message.search("onShakeReceived") != -1) {
-				npcRespond(null, lightWave, function(){print("finished onShakeReceived response");playAnim(idleAnim, true);});
+				npcRespondBlocking(null, lightWave, function(){print("finished onShakeReceived response");playAnim(idleAnim, true);});
 			}
 			else if (message.search("voiceData") != -1) {
 				if(message.search("thank") != -1) {
-				npcRespond(null, lightThankful, function(){print("finished thank response");playAnim(idleAnim, true);});
+				npcRespondBlocking(null, lightThankful, function(){print("finished thank response");playAnim(idleAnim, true);});
 				}
 				else if (message.search("bye") != -1) {
-				npcRespond(gameOverURL, lightWave, function(){print("finished bye response");playAnim(idleAnim, true);});
+				npcRespondBlocking(gameOverURL, lightWave, function(){print("finished bye response");playAnim(idleAnim, true);});
 				}
 				else if (message.search("test") != -1) {
-					npcRespond(gameOverURL, null, function(){print("finished test");playAnim(idleAnim, true);});
+					npcRespondBlocking(gameOverURL, null, function(){print("finished test");playAnim(idleAnim, true);});
 				}
 			}
 		}

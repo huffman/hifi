@@ -82,16 +82,16 @@ function checkFocus() {
 function checkGesture() {
 	var rotation = Quat.safeEulerAngles(Camera.getOrientation());
 
-	deltaX = Math.abs(rotation.x - baselineX);
+	var deltaX = Math.abs(rotation.x - baselineX);
 	if(deltaX > 180)
 		deltaX -= 180;
-	deltaY = Math.abs(rotation.y - baselineY);
+	var deltaY = Math.abs(rotation.y - baselineY);
 	if(deltaY > 180)
 		deltaY -= 180;
 
-	if(deltaX >= nodRange && rotation.y <= nodRange)
+	if(deltaX >= nodRange && deltaY <= shakeRange)
 		callOnNPC("onNodReceived");
-	else if (deltaY >= shakeRange && rotation.x <= shakeRange)
+	else if (deltaY >= shakeRange && deltaX <= nodRange)
 		callOnNPC("onShakeReceived");
 }
 
