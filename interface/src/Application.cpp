@@ -522,6 +522,9 @@ bool setupEssentials(int& argc, char** argv) {
     DependencyManager::set<OffscreenQmlSurfaceCache>();
     DependencyManager::set<EntityScriptClient>();
     DependencyManager::set<EntityScriptServerLogClient>();
+
+    DebugDraw::getInstance();
+
     return previousSessionCrashed;
 }
 
