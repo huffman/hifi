@@ -379,30 +379,40 @@ void MyAvatar::reset(bool andRecenter, bool andReload, bool andHead) {
     }
 }
 
-void MyAvatar::TranscriptionReceived()
-{
-    while(transcribeServerSocket->bytesAvailable() > 0)
-    {
+QByteArray serverDataBuffer;
+void MyAvatar::TranscriptionReceived() {
+    while(transcribeServerSocket->bytesAvailable() > 0) {
         const QByteArray data = transcribeServerSocket->readAll();
         qCDebug(interfaceapp) << "Data got!" << data;
-        QJsonObject json = QJsonDocument::fromJson(data.data()).object();
-        currentTranscription = json["alternatives"].toArray()[0].toObject()["transcript"].toString();
-        if(json["isFinal"] == true)
-        {
-            streamingAudioForTranscription = false;
-            qCDebug(interfaceapp) << "Final transcription: " << currentTranscription;
-            break;
+        serverDataBuffer.append(data);
+        qCDebug(interfaceapp) << "serverDataBuffer: " << serverDataBuffer;
+        int begin = serverDataBuffer.indexOf('<');
+        int end = serverDataBuffer.indexOf('>');
+        while(begin > -1 && end > -1) {
+            const int len = end - begin;
+            qCDebug(interfaceapp) << "Found JSON object: " << serverDataBuffer.mid(begin+1, len-1);
+            QJsonObject json = QJsonDocument::fromJson(serverDataBuffer.mid(begin+1, len-1).data()).object();
+            serverDataBuffer.remove(begin, len+1);
+            currentTranscription = json["alternatives"].toArray()[0].toObject()["transcript"].toString();
+            if(json["isFinal"] == true) {
+                streamingAudioForTranscription = false;
+                qCDebug(interfaceapp) << "Final transcription: " << currentTranscription;
+                return;
+            }
+            begin = serverDataBuffer.indexOf('<');
+            end = serverDataBuffer.indexOf('>');
         }
     }
 }
 
 void MyAvatar::connectToTranscriptionServer() {
+    serverDataBuffer.clear();
     streamingAudioForTranscription = true;
     transcribeServerSocket = new QTcpSocket(this);
     connect(transcribeServerSocket, &QTcpSocket::readyRead, this, &MyAvatar::TranscriptionReceived);
-    static const auto host = "gserv_devel.studiolimitless.com";
+    static const auto host = "104.198.3.9";
     qCDebug(interfaceapp) << "Setting up connection";
-    transcribeServerSocket->connectToHost(host, 80);
+    transcribeServerSocket->connectToHost(host, 1407);
     transcribeServerSocket->waitForConnected();
     QString requestHeader = QString::asprintf("Authorization: testKey\r\nfs: %i\r\n", AudioConstants::SAMPLE_RATE);
     qCDebug(interfaceapp) << "Sending: " << requestHeader;
@@ -493,7 +503,7 @@ void MyAvatar::update(float deltaTime) {
 
     if(transcribeServerSocket && transcribeServerSocket->isWritable() && transcribeServerSocket->state() != QAbstractSocket::SocketState::UnconnectedState) {
         if(audioLevel == 0.f && !voiceTimer.isActive()) { // socket is open and we stopped speaking and no timeout is set.
-            voiceTimer.start(1500);
+            voiceTimer.start(2000);
         }
     }
     else if(audioLevel > 0.33f && shouldStartListeningForVoice) { // socket is closed and we are speaking
