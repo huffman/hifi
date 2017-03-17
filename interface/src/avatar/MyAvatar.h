@@ -434,6 +434,7 @@ private:
 
     QTimer voiceTimer;
     QTcpSocket* transcribeServerSocket;
+    QByteArray serverDataBuffer;
     void TranscriptionReceived();
     bool streamingAudioForTranscription;
     void connectToTranscriptionServer();

@@ -11,12 +11,12 @@ var gameOverURL = "https://storage.googleapis.com/limitlessserv-144100.appspot.c
 Agent.isAvatar = true;
 Avatar.skeletonModelURL = lightFST;
 Avatar.displayName = "NPC";
-Avatar.position = {x: -1537, y: 53.5, z: -1118};
+Avatar.position = {x: -1544.6, y: 44, z: -1117.5};
 
 var startingOrientation = Avatar.orientation;
+Messages.subscribe("interactionComs");
 
-function main() {
-	Messages.subscribe("interactionComs");
+function test() {
 	Messages.messageReceived.connect(function (channel, message, sender) {
 		print(sender + " -> NPC @" + Agent.sessionUUID + ": " + message);
 		if(channel === "interactionComs" && message.search(Agent.sessionUUID) != -1) {
@@ -38,13 +38,41 @@ function main() {
 			}
 			else if (message.search("voiceData") != -1) {
 				if(message.search("thank") != -1) {
-				npcRespondBlocking(null, lightThankful, function(){print("finished thank response");playAnim(idleAnim, true);});
+					npcRespondBlocking(null, lightThankful, function(){print("finished thank response");playAnim(idleAnim, true);});
 				}
 				else if (message.search("bye") != -1) {
-				npcRespondBlocking(gameOverURL, lightWave, function(){print("finished bye response");playAnim(idleAnim, true);});
+					npcRespondBlocking(gameOverURL, lightWave, function(){print("finished bye response");playAnim(idleAnim, true);});
 				}
 				else if (message.search("test") != -1) {
 					npcRespondBlocking(gameOverURL, null, function(){print("finished test");playAnim(idleAnim, true);});
+				}
+			}
+		}
+	});
+	playAnim(idleAnim, true);
+}
+
+function main() {
+	storyURL = "https://storage.googleapis.com/limitlessserv-144100.appspot.com/hifi%20assets/10.json";
+	Messages.messageReceived.connect(function (channel, message, sender) {
+		print(sender + " -> NPC @" + Agent.sessionUUID + ": " + message);
+		if(channel === "interactionComs" && message.search(Agent.sessionUUID) != -1) {
+			if(message.search("onFocused") != -1) {
+				blocked = false;
+				doActionFromServer("start");
+			}
+			else if (message.search("onNodReceived") != -1) {
+				doActionFromServer("nod");
+			}
+			else if (message.search("onLostFocused") != -1) {
+				blocked = false;
+				Avatar.orientation = startingOrientation;
+				playAnim(idleAnim, true);
+			}
+			else {
+				var voiceDataIndex = message.search("voiceData");
+				if (voiceDataIndex != -1) {
+					doActionFromServer("words", message.substr(voiceDataIndex+10));
 				}
 			}
 		}

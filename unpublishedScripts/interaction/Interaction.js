@@ -17,12 +17,12 @@
 	var ticker = false;
 
 	function callOnNPC(message) {
-		Messages.sendMessage("interactionComs", message + ": " + NPC);
+		Messages.sendMessage("interactionComs", NPC + ":" + message);
 	}
 
 	MyAvatar.onFinishedSpeaking.connect(function(speech) {
 		print("Got: " + speech);
-		callOnNPC("voiceData: " + speech);
+		callOnNPC("voiceData:" + speech);
 	});
 
 	function setBaselineRotations(rot) {

@@ -379,7 +379,6 @@ void MyAvatar::reset(bool andRecenter, bool andReload, bool andHead) {
     }
 }
 
-QByteArray serverDataBuffer;
 void MyAvatar::TranscriptionReceived() {
     while(transcribeServerSocket->bytesAvailable() > 0) {
         const QByteArray data = transcribeServerSocket->readAll();
@@ -410,7 +409,7 @@ void MyAvatar::connectToTranscriptionServer() {
     streamingAudioForTranscription = true;
     transcribeServerSocket = new QTcpSocket(this);
     connect(transcribeServerSocket, &QTcpSocket::readyRead, this, &MyAvatar::TranscriptionReceived);
-    static const auto host = "104.198.3.9";
+    static const auto host = "104.199.127.93";
     qCDebug(interfaceapp) << "Setting up connection";
     transcribeServerSocket->connectToHost(host, 1407);
     transcribeServerSocket->waitForConnected();

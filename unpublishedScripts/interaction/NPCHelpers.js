@@ -1,6 +1,8 @@
-// Helper functinons for NPC_AC.js
+// Helper functions for NPC_AC.js
 var audioInjector = false;
 var blocked = false;
+var storyURL = "";
+var _qid = "start";
 
 function callbackOnCondition(conditionFunc, ms, callback, count) {
 	var thisCount = 0;
@@ -60,17 +62,20 @@ function playSound(soundURL, onFinished) {
 }
 
 function npcRespond(soundURL, animURL, onFinished) {
-	if(soundURL) {
+	if(typeof soundURL !== 'undefined' && soundURL != '') {
+		print("npcRespond got soundURL!");
 		playSound(soundURL, function(){
 			print("sound finished");
 			var animDetails = Avatar.getAnimationDetails();
 			print("animDetails.lastFrame: " + animDetails.lastFrame);
-			if(animDetails.lastFrame > animDetails.currentFrame + 1)
+			print("animDetails.currentFrame: " + animDetails.currentFrame);
+			if(animDetails.lastFrame < animDetails.currentFrame + 1)
 				onFinished();
 			audioInjector = false;
 		});
 	}
-	if(animURL) {
+	if(typeof animURL !== 'undefined' && animURL != '') {
+		print("npcRespond got animURL!");
 		playAnim(animURL, false, function() {
 			print("anim finished");
 			print("injector: " + audioInjector);
@@ -86,6 +91,40 @@ function npcRespondBlocking(soundURL, animURL, onFinished) {
 	if(!blocked) {
 		print("not already blocked");
 		blocked = true;
-		npcRespond(soundURL, animURL, function(){ print("blocking response finished");onFinished();blocked = false; });
+		npcRespond(soundURL, animURL, function(){ if(onFinished)onFinished();blocked = false; });
 	}
+}
+
+function npcContinueStory(soundURL, animURL, nextID, onFinished) {
+	if(!nextID)
+		nextID = _qid;
+	npcRespondBlocking(soundURL, animURL, function(){if(onFinished)onFinished();setQid(nextID);});
+}
+
+function setQid(newQid) {
+	print("setting quid");
+	print("_qid: " + _qid);
+	_qid = newQid;
+	print("_qid: " + _qid);
+	doActionFromServer("init");
+}
+
+function doActionFromServer(action, data) {
+	if(action == "start")
+		_qid = "start";
+	var xhr = new XMLHttpRequest();
+	xhr.open("POST", "http://127.0.0.1:8080/story", true);
+	xhr.onreadystatechange = function(){
+		if(xhr.readyState == 4 && xhr.status == 200){
+			print("200!");
+			print("evaluating: " + xhr.responseText);
+			Script.evaluate(xhr.responseText, "");
+		}
+	};
+	xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+	var postData = "url=" + storyURL + "&action=" + action + "&qid=" + _qid;
+	if(typeof data !== 'undefined')
+		postData += "&data=" + data;
+	print("Sending: " + postData);
+	xhr.send(postData);
 }
