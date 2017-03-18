@@ -11,7 +11,7 @@ var gameOverURL = "https://storage.googleapis.com/limitlessserv-144100.appspot.c
 Agent.isAvatar = true;
 Avatar.skeletonModelURL = lightFST;
 Avatar.displayName = "NPC";
-Avatar.position = {x: -1544.6, y: 44, z: -1117.5};
+Avatar.position = {x: -1400.1, y: 48, z: -1280.5};
 
 var startingOrientation = Avatar.orientation;
 Messages.subscribe("interactionComs");
@@ -53,26 +53,28 @@ function test() {
 }
 
 function main() {
-	storyURL = "https://storage.googleapis.com/limitlessserv-144100.appspot.com/hifi%20assets/10.json";
+	storyURL = "https://storage.googleapis.com/limitlessserv-144100.appspot.com/hifi%20assets/7.json";
 	Messages.messageReceived.connect(function (channel, message, sender) {
 		print(sender + " -> NPC @" + Agent.sessionUUID + ": " + message);
-		if(channel === "interactionComs" && message.search(Agent.sessionUUID) != -1) {
-			if(message.search("onFocused") != -1) {
-				blocked = false;
-				doActionFromServer("start");
-			}
-			else if (message.search("onNodReceived") != -1) {
-				doActionFromServer("nod");
-			}
-			else if (message.search("onLostFocused") != -1) {
-				blocked = false;
-				Avatar.orientation = startingOrientation;
-				playAnim(idleAnim, true);
-			}
-			else {
-				var voiceDataIndex = message.search("voiceData");
-				if (voiceDataIndex != -1) {
-					doActionFromServer("words", message.substr(voiceDataIndex+10));
+		if(channel === "interactionComs") {
+			if(message.search(Agent.sessionUUID) != -1) {
+				if(message.search("onFocused") != -1) {
+					blocked = false;
+					doActionFromServer("start");
+				}
+				else if (message.search("onNodReceived") != -1) {
+					doActionFromServer("nod");
+				}
+				else if (message.search("onLostFocused") != -1) {
+					blocked = false;
+					Avatar.orientation = startingOrientation;
+					playAnim(idleAnim, true);
+				}
+				else {
+					var voiceDataIndex = message.search("voiceData");
+					if (voiceDataIndex != -1) {
+						doActionFromServer("words", message.substr(voiceDataIndex+10));
+					}
 				}
 			}
 		}

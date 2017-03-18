@@ -1,6 +1,7 @@
 // Helper functions for NPC_AC.js
 var audioInjector = false;
 var blocked = false;
+var playingResponseAnim = false;
 var storyURL = "";
 var _qid = "start";
 
@@ -69,15 +70,17 @@ function npcRespond(soundURL, animURL, onFinished) {
 			var animDetails = Avatar.getAnimationDetails();
 			print("animDetails.lastFrame: " + animDetails.lastFrame);
 			print("animDetails.currentFrame: " + animDetails.currentFrame);
-			if(animDetails.lastFrame < animDetails.currentFrame + 1)
+			if(animDetails.lastFrame < animDetails.currentFrame + 1 || !playingResponseAnim)
 				onFinished();
 			audioInjector = false;
 		});
 	}
 	if(typeof animURL !== 'undefined' && animURL != '') {
 		print("npcRespond got animURL!");
+		playingResponseAnim = true;
 		playAnim(animURL, false, function() {
 			print("anim finished");
+			playingResponseAnim = false;
 			print("injector: " + audioInjector);
 			// print("audioInjector.isPlaying(): " + audioInjector.isPlaying());
 			if(!audioInjector || !audioInjector.isPlaying())
@@ -109,22 +112,32 @@ function setQid(newQid) {
 	doActionFromServer("init");
 }
 
-function doActionFromServer(action, data) {
+function doActionFromServer(action, data, useServerCache) {
 	if(action == "start")
 		_qid = "start";
 	var xhr = new XMLHttpRequest();
-	xhr.open("POST", "http://127.0.0.1:8080/story", true);
+	xhr.open("POST", "http://gserv_devel.studiolimitless.com/story", true);
 	xhr.onreadystatechange = function(){
-		if(xhr.readyState == 4 && xhr.status == 200){
-			print("200!");
-			print("evaluating: " + xhr.responseText);
-			Script.evaluate(xhr.responseText, "");
+		if(xhr.readyState == 4){
+			if(xhr.status == 200) {
+				print("200!");
+				print("evaluating: " + xhr.responseText);
+				Script.evaluate(xhr.responseText, "");
+			}
+			else if(xhr.status == 444) {
+				print("Limitless Serv 444: API error: " + xhr.responseText);
+			}
+			else {
+				print("HTTP Code: " + xhr.status + ": " + xhr.responseText);
+			}
 		}
 	};
 	xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
 	var postData = "url=" + storyURL + "&action=" + action + "&qid=" + _qid;
-	if(typeof data !== 'undefined')
+	if(typeof data !== 'undefined' && data != '')
 		postData += "&data=" + data;
+	if(typeof useServerCache !== 'undefined' && !useServerCache)
+		postData += "&nocache=true"
 	print("Sending: " + postData);
 	xhr.send(postData);
 }

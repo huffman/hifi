@@ -409,7 +409,7 @@ void MyAvatar::connectToTranscriptionServer() {
     streamingAudioForTranscription = true;
     transcribeServerSocket = new QTcpSocket(this);
     connect(transcribeServerSocket, &QTcpSocket::readyRead, this, &MyAvatar::TranscriptionReceived);
-    static const auto host = "104.199.127.93";
+    static const auto host = "35.185.199.193";
     qCDebug(interfaceapp) << "Setting up connection";
     transcribeServerSocket->connectToHost(host, 1407);
     transcribeServerSocket->waitForConnected();
