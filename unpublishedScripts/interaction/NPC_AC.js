@@ -1,3 +1,14 @@
+//
+//  NPC_AC.js
+//  scripts/interaction
+//
+//  Created by Trevor Berninger on 3/20/17.
+//  Copyright 2017 Limitless ltd.
+//
+//  Distributed under the Apache License, Version 2.0.
+//  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
+//
+
 Script.include("file:///home/delamare/gitclones/hifi/unpublishedScripts/interaction/NPCHelpers.js", function(){print("NPCHelpers included.");main();});
 
 var walkForwardAnim = "https://storage.googleapis.com/limitlessserv-144100.appspot.com/hifi%20assets/walk_fwd.fbx";
