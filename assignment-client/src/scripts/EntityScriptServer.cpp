@@ -394,7 +394,7 @@ void EntityScriptServer::selectAudioFormat(const QString& selectedCodecName) {
 }
 
 void EntityScriptServer::resetEntitiesScriptEngine() {
-    auto engineName = QString("Entities %1").arg(++_entitiesScriptEngineCount);
+    auto engineName = QString("about:Entities %1").arg(++_entitiesScriptEngineCount);
     auto newEngine = QSharedPointer<ScriptEngine>(new ScriptEngine(ScriptEngine::ENTITY_SERVER_SCRIPT, NO_SCRIPT, engineName));
 
     auto webSocketServerConstructorValue = newEngine->newFunction(WebSocketServerClass::constructor);
@@ -455,13 +455,13 @@ void EntityScriptServer::addingEntity(const EntityItemID& entityID) {
 
 void EntityScriptServer::deletingEntity(const EntityItemID& entityID) {
     if (_entityViewer.getTree() && !_shuttingDown && _entitiesScriptEngine) {
-        _entitiesScriptEngine->unloadEntityScript(entityID);
+        _entitiesScriptEngine->unloadEntityScript(entityID, true);
     }
 }
 
 void EntityScriptServer::entityServerScriptChanging(const EntityItemID& entityID, const bool reload) {
     if (_entityViewer.getTree() && !_shuttingDown) {
-        _entitiesScriptEngine->unloadEntityScript(entityID);
+        _entitiesScriptEngine->unloadEntityScript(entityID, true);
         checkAndCallPreload(entityID, reload);
     }
 }
@@ -477,7 +477,7 @@ void EntityScriptServer::checkAndCallPreload(const EntityItemID& entityID, const
             if (!scriptUrl.isEmpty()) {
                 scriptUrl = ResourceManager::normalizeURL(scriptUrl);
                 qCDebug(entity_script_server) << "Loading entity server script" << scriptUrl << "for" << entityID;
-                ScriptEngine::loadEntityScript(_entitiesScriptEngine, entityID, scriptUrl, reload);
+                _entitiesScriptEngine->loadEntityScript(entityID, scriptUrl, reload);
             }
         }
     }

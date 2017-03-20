@@ -74,9 +74,6 @@ Menu::Menu() {
     // File > Help
     addActionToQMenuAndActionHash(fileMenu, MenuOption::Help, 0, qApp, SLOT(showHelp()));
 
-    // File > About
-    addActionToQMenuAndActionHash(fileMenu, MenuOption::AboutApp, 0, qApp, SLOT(aboutApp()), QAction::AboutRole);
-
     // File > Quit
     addActionToQMenuAndActionHash(fileMenu, MenuOption::Quit, Qt::CTRL | Qt::Key_Q, qApp, SLOT(quit()), QAction::QuitRole);
 
@@ -249,9 +246,6 @@ Menu::Menu() {
 
     viewMenu->addSeparator();
 
-    // View > Mini Mirror
-    addCheckableActionToQMenuAndActionHash(viewMenu, MenuOption::MiniMirror, 0, false);
-
     // View > Center Player In View
     addCheckableActionToQMenuAndActionHash(viewMenu, MenuOption::CenterPlayerInView,
         0, true, qApp, SLOT(rotationModeChanged()),
@@ -417,6 +411,9 @@ Menu::Menu() {
     }
 
     // Developer > Assets >>>
+    // Menu item is not currently needed but code should be kept in case it proves useful again at some stage.
+//#define WANT_ASSET_MIGRATION
+#ifdef WANT_ASSET_MIGRATION
     MenuWrapper* assetDeveloperMenu = developerMenu->addMenu("Assets");
     auto& atpMigrator = ATPAssetMigrator::getInstance();
     atpMigrator.setDialogParent(this);
@@ -424,6 +421,7 @@ Menu::Menu() {
     addActionToQMenuAndActionHash(assetDeveloperMenu, MenuOption::AssetMigration,
         0, &atpMigrator,
         SLOT(loadEntityServerFile()));
+#endif
 
     // Developer > Avatar >>>
     MenuWrapper* avatarDebugMenu = developerMenu->addMenu("Avatar");
@@ -554,20 +552,16 @@ Menu::Menu() {
                                                       "NetworkingPreferencesDialog");
     });
     addActionToQMenuAndActionHash(networkMenu, MenuOption::ReloadContent, 0, qApp, SLOT(reloadResourceCaches()));
+    addActionToQMenuAndActionHash(networkMenu, MenuOption::ClearDiskCache, 0,
+        DependencyManager::get<AssetClient>().data(), SLOT(clearCache()));
     addCheckableActionToQMenuAndActionHash(networkMenu,
         MenuOption::DisableActivityLogger,
         0,
         false,
         &UserActivityLogger::getInstance(),
         SLOT(disable(bool)));
-    addActionToQMenuAndActionHash(networkMenu, MenuOption::CachesSize, 0,
-        dialogsManager.data(), SLOT(cachesSizeDialog()));
-    addActionToQMenuAndActionHash(networkMenu, MenuOption::DiskCacheEditor, 0,
-        dialogsManager.data(), SLOT(toggleDiskCacheEditor()));
     addActionToQMenuAndActionHash(networkMenu, MenuOption::ShowDSConnectTable, 0,
         dialogsManager.data(), SLOT(showDomainConnectionDialog()));
-    addActionToQMenuAndActionHash(networkMenu, MenuOption::BandwidthDetails, 0,
-        dialogsManager.data(), SLOT(bandwidthDetails()));
 
     #if (PR_BUILD || DEV_BUILD)
     addCheckableActionToQMenuAndActionHash(networkMenu, MenuOption::SendWrongProtocolVersion, 0, false,
@@ -577,7 +571,7 @@ Menu::Menu() {
                                            nodeList.data(), SLOT(toggleSendNewerDSConnectVersion(bool)));
     #endif
 
-    
+
     // Developer >> Tests >>>
     MenuWrapper* testMenu = developerMenu->addMenu("Tests");
     addActionToQMenuAndActionHash(testMenu, MenuOption::RunClientScriptTests, 0, dialogsManager.data(), SLOT(showTestingResults()));
@@ -628,9 +622,9 @@ Menu::Menu() {
 
     auto scope = DependencyManager::get<AudioScope>();
     MenuWrapper* audioScopeMenu = audioDebugMenu->addMenu("Audio Scope");
-    addCheckableActionToQMenuAndActionHash(audioScopeMenu, MenuOption::AudioScope, Qt::CTRL | Qt::Key_P, false,
+    addCheckableActionToQMenuAndActionHash(audioScopeMenu, MenuOption::AudioScope, Qt::CTRL | Qt::Key_F2, false,
         scope.data(), SLOT(toggle()));
-    addCheckableActionToQMenuAndActionHash(audioScopeMenu, MenuOption::AudioScopePause, Qt::CTRL | Qt::SHIFT | Qt::Key_P, false,
+    addCheckableActionToQMenuAndActionHash(audioScopeMenu, MenuOption::AudioScopePause, Qt::CTRL | Qt::SHIFT | Qt::Key_F2, false,
         scope.data(), SLOT(togglePause()));
 
     addDisabledActionAndSeparator(audioScopeMenu, "Display Frames");
