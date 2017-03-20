@@ -41,7 +41,6 @@
 #include <recording/Clip.h>
 #include <recording/Frame.h>
 #include <RecordingScriptingInterface.h>
-#include <src/ui/AvatarInputs.h>
 
 #include "Application.h"
 #include "devices/Faceshift.h"
@@ -65,8 +64,8 @@ const float MAX_BOOST_SPEED = 0.5f * MAX_WALKING_SPEED; // action motor gets add
 const float MIN_AVATAR_SPEED = 0.05f;
 const float MIN_AVATAR_SPEED_SQUARED = MIN_AVATAR_SPEED * MIN_AVATAR_SPEED; // speed is set to zero below this
 
-const float YAW_SPEED_DEFAULT = 15.0f;   // degrees/sec
-const float PITCH_SPEED_DEFAULT = 15.0f; // degrees/sec
+const float YAW_SPEED_DEFAULT = 120.0f;   // degrees/sec
+const float PITCH_SPEED_DEFAULT = 90.0f; // degrees/sec
 
 // TODO: normalize avatar speed for standard avatar size, then scale all motion logic
 // to properly follow avatar size.
@@ -84,38 +83,38 @@ const float MyAvatar::ZOOM_MAX = 25.0f;
 const float MyAvatar::ZOOM_DEFAULT = 1.5f;
 
 MyAvatar::MyAvatar(RigPointer rig) :
-    Avatar(rig),
-    _wasPushing(false),
-    _isPushing(false),
-    _isBeingPushed(false),
-    _isBraking(false),
-    _isAway(false),
-    _boomLength(ZOOM_DEFAULT),
-    _yawSpeed(YAW_SPEED_DEFAULT),
-    _pitchSpeed(PITCH_SPEED_DEFAULT),
-    _thrust(0.0f),
-    _actionMotorVelocity(0.0f),
-    _scriptedMotorVelocity(0.0f),
-    _scriptedMotorTimescale(DEFAULT_SCRIPTED_MOTOR_TIMESCALE),
-    _scriptedMotorFrame(SCRIPTED_MOTOR_CAMERA_FRAME),
-    _motionBehaviors(AVATAR_MOTION_DEFAULTS),
-    _characterController(this),
-    _lookAtTargetAvatar(),
-    _shouldRender(true),
-    _eyeContactTarget(LEFT_EYE),
-    _realWorldFieldOfView("realWorldFieldOfView",
-                          DEFAULT_REAL_WORLD_FIELD_OF_VIEW_DEGREES),
-    _hmdSensorMatrix(),
-    _hmdSensorOrientation(),
-    _hmdSensorPosition(),
-    _bodySensorMatrix(),
-    _goToPending(false),
-    _goToPosition(),
-    _goToOrientation(),
-    _rig(rig),
-    _prevShouldDrawHead(true),
-    _audioListenerMode(FROM_HEAD),
-    _hmdAtRestDetector(glm::vec3(0), glm::quat())
+        Avatar(rig),
+        _wasPushing(false),
+        _isPushing(false),
+        _isBeingPushed(false),
+        _isBraking(false),
+        _isAway(false),
+        _boomLength(ZOOM_DEFAULT),
+        _yawSpeed(YAW_SPEED_DEFAULT),
+        _pitchSpeed(PITCH_SPEED_DEFAULT),
+        _thrust(0.0f),
+        _actionMotorVelocity(0.0f),
+        _scriptedMotorVelocity(0.0f),
+        _scriptedMotorTimescale(DEFAULT_SCRIPTED_MOTOR_TIMESCALE),
+        _scriptedMotorFrame(SCRIPTED_MOTOR_CAMERA_FRAME),
+        _motionBehaviors(AVATAR_MOTION_DEFAULTS),
+        _characterController(this),
+        _lookAtTargetAvatar(),
+        _shouldRender(true),
+        _eyeContactTarget(LEFT_EYE),
+        _realWorldFieldOfView("realWorldFieldOfView",
+                              DEFAULT_REAL_WORLD_FIELD_OF_VIEW_DEGREES),
+        _hmdSensorMatrix(),
+        _hmdSensorOrientation(),
+        _hmdSensorPosition(),
+        _bodySensorMatrix(),
+        _goToPending(false),
+        _goToPosition(),
+        _goToOrientation(),
+        _rig(rig),
+        _prevShouldDrawHead(true),
+        _audioListenerMode(FROM_HEAD),
+        _hmdAtRestDetector(glm::vec3(0), glm::quat())
 {
     using namespace recording;
     _skeletonModel->flagAsCauterized();
@@ -222,37 +221,10 @@ MyAvatar::MyAvatar(RigPointer rig) :
     });
 
     connect(rig.get(), SIGNAL(onLoadComplete()), this, SIGNAL(onLoadComplete()));
-
-    audioClient = DependencyManager::get<AudioClient>().data();
-    connect(audioClient, &AudioClient::inputReceived, this, &MyAvatar::audioInputReceived);
-    connect(&voiceTimer, &QTimer::timeout, this, &MyAvatar::voiceTimeout);
-    transcribeServerSocket = nullptr;
-    streamingAudioForTranscription = false;
-    shouldStartListeningForVoice = false;
-    currentTranscription = "";
 }
 
 MyAvatar::~MyAvatar() {
     _lookAtTargetAvatar.reset();
-}
-
-void MyAvatar::audioInputReceived(const QByteArray& inputSamples)
-{
-    if(transcribeServerSocket && transcribeServerSocket->isWritable() && transcribeServerSocket->state() != QAbstractSocket::SocketState::UnconnectedState) {
-        if(streamingAudioForTranscription) {
-            qCDebug(interfaceapp) << "Sending Data!";
-            transcribeServerSocket->write(inputSamples.data(), inputSamples.size());
-            transcribeServerSocket->waitForBytesWritten();
-        }
-        else {
-            qCDebug(interfaceapp) << "Closing socket with data: " << currentTranscription;
-            onFinishedSpeaking(currentTranscription);
-            currentTranscription = "";
-            transcribeServerSocket->close();
-            delete transcribeServerSocket;
-            transcribeServerSocket = nullptr;
-        }
-    }
 }
 
 void MyAvatar::setOrientationVar(const QVariant& newOrientationVar) {
@@ -379,56 +351,6 @@ void MyAvatar::reset(bool andRecenter, bool andReload, bool andHead) {
     }
 }
 
-void MyAvatar::TranscriptionReceived() {
-    while(transcribeServerSocket->bytesAvailable() > 0) {
-        const QByteArray data = transcribeServerSocket->readAll();
-        qCDebug(interfaceapp) << "Data got!" << data;
-        serverDataBuffer.append(data);
-        qCDebug(interfaceapp) << "serverDataBuffer: " << serverDataBuffer;
-        int begin = serverDataBuffer.indexOf('<');
-        int end = serverDataBuffer.indexOf('>');
-        while(begin > -1 && end > -1) {
-            const int len = end - begin;
-            qCDebug(interfaceapp) << "Found JSON object: " << serverDataBuffer.mid(begin+1, len-1);
-            QJsonObject json = QJsonDocument::fromJson(serverDataBuffer.mid(begin+1, len-1).data()).object();
-            serverDataBuffer.remove(begin, len+1);
-            currentTranscription = json["alternatives"].toArray()[0].toObject()["transcript"].toString();
-            if(json["isFinal"] == true) {
-                streamingAudioForTranscription = false;
-                qCDebug(interfaceapp) << "Final transcription: " << currentTranscription;
-                return;
-            }
-            begin = serverDataBuffer.indexOf('<');
-            end = serverDataBuffer.indexOf('>');
-        }
-    }
-}
-
-void MyAvatar::connectToTranscriptionServer() {
-    serverDataBuffer.clear();
-    streamingAudioForTranscription = true;
-    transcribeServerSocket = new QTcpSocket(this);
-    connect(transcribeServerSocket, &QTcpSocket::readyRead, this, &MyAvatar::TranscriptionReceived);
-    static const auto host = "35.185.199.193";
-    qCDebug(interfaceapp) << "Setting up connection";
-    transcribeServerSocket->connectToHost(host, 1407);
-    transcribeServerSocket->waitForConnected();
-    QString requestHeader = QString::asprintf("Authorization: testKey\r\nfs: %i\r\n", AudioConstants::SAMPLE_RATE);
-    qCDebug(interfaceapp) << "Sending: " << requestHeader;
-    transcribeServerSocket->write(requestHeader.toLocal8Bit());
-    transcribeServerSocket->waitForBytesWritten();
-    qCDebug(interfaceapp) << "Completed send";
-}
-
-void MyAvatar::voiceTimeout() {
-    qCDebug(interfaceapp) << "Timeout timer called";
-    if(transcribeServerSocket && transcribeServerSocket->isWritable() && transcribeServerSocket->state() != QAbstractSocket::SocketState::UnconnectedState) {
-        streamingAudioForTranscription = false;
-        qCDebug(interfaceapp) << "Timeout!";
-    }
-    voiceTimer.stop();
-}
-
 void MyAvatar::update(float deltaTime) {
 
     // update moving average of HMD facing in xz plane.
@@ -470,8 +392,8 @@ void MyAvatar::update(float deltaTime) {
     glm::vec3 halfBoundingBoxDimensions(_characterController.getCapsuleRadius(), _characterController.getCapsuleHalfHeight(), _characterController.getCapsuleRadius());
     halfBoundingBoxDimensions += _characterController.getCapsuleLocalOffset();
     QMetaObject::invokeMethod(audio.data(), "setAvatarBoundingBoxParameters",
-        Q_ARG(glm::vec3, (getPosition() - halfBoundingBoxDimensions)),
-        Q_ARG(glm::vec3, (halfBoundingBoxDimensions*2.0f)));
+                              Q_ARG(glm::vec3, (getPosition() - halfBoundingBoxDimensions)),
+                              Q_ARG(glm::vec3, (halfBoundingBoxDimensions*2.0f)));
 
     uint64_t now = usecTimestampNow();
     if (now > _identityPacketExpiry || _avatarEntityDataLocallyEdited) {
@@ -492,22 +414,6 @@ void MyAvatar::update(float deltaTime) {
     emit energyChanged(currentEnergy);
 
     updateEyeContactTarget(deltaTime);
-
-    const float audioLevel = AvatarInputs::getInstance()->loudnessToAudioLevel(audioClient->getAudioAverageInputLoudness());
-
-//    qCDebug(interfaceapp) << "inputVol: " << AvatarInputs::getInstance()->loudnessToAudioLevel(audioClient->getLastInputLoudness()) << '\n'
-//                          << "averageInputLoudness: " << AvatarInputs::getInstance()->loudnessToAudioLevel(audioClient->getAudioAverageInputLoudness()) << '\n'
-//                          << "streamingData: " << streamingAudioForTranscription << '\n'
-//                          << "socketOpen: " << (transcribeServerSocket && transcribeServerSocket->isWritable() && transcribeServerSocket->state() != QAbstractSocket::SocketState::UnconnectedState);
-
-    if(transcribeServerSocket && transcribeServerSocket->isWritable() && transcribeServerSocket->state() != QAbstractSocket::SocketState::UnconnectedState) {
-        if(audioLevel == 0.f && !voiceTimer.isActive()) { // socket is open and we stopped speaking and no timeout is set.
-            voiceTimer.start(2000);
-        }
-    }
-    else if(audioLevel > 0.33f && shouldStartListeningForVoice) { // socket is closed and we are speaking
-        connectToTranscriptionServer();
-    }
 }
 
 void MyAvatar::updateEyeContactTarget(float deltaTime) {
@@ -822,11 +728,6 @@ controller::Pose MyAvatar::getRightHandTipPose() const {
     return pose;
 }
 
-void MyAvatar::setListeningToVoice(bool listening) {
-    // delay so that the enter key doesn't start the listening process when debugging.
-    QTimer::singleShot(100, [=]{shouldStartListeningForVoice = listening;});
-}
-
 // virtual
 void MyAvatar::render(RenderArgs* renderArgs, const glm::vec3& cameraPosition) {
     // don't render if we've been asked to disable local rendering
@@ -1138,7 +1039,7 @@ AttachmentData MyAvatar::loadAttachmentData(const QUrl& modelURL, const QString&
 
 int MyAvatar::parseDataFromBuffer(const QByteArray& buffer) {
     qCDebug(interfaceapp) << "Error: ignoring update packet for MyAvatar"
-        << " packetLength = " << buffer.size();
+                          << " packetLength = " << buffer.size();
     // this packet is just bad, so we pretend that we unpacked it ALL
     return buffer.size();
 }
@@ -1159,69 +1060,69 @@ void MyAvatar::updateLookAtTargetAvatar() {
 
     AvatarHash hash = DependencyManager::get<AvatarManager>()->getHashCopy();
 
-    foreach (const AvatarSharedPointer& avatarPointer, hash) {
-        auto avatar = static_pointer_cast<Avatar>(avatarPointer);
-        bool isCurrentTarget = avatar->getIsLookAtTarget();
-        float distanceTo = glm::length(avatar->getHead()->getEyePosition() - cameraPosition);
-        avatar->setIsLookAtTarget(false);
-        if (!avatar->isMyAvatar() && avatar->isInitialized() &&
-            (distanceTo < GREATEST_LOOKING_AT_DISTANCE * getUniformScale())) {
-            float radius = glm::length(avatar->getHead()->getEyePosition() - avatar->getHead()->getRightEyePosition());
-            float angleTo = coneSphereAngle(getHead()->getEyePosition(), lookForward, avatar->getHead()->getEyePosition(), radius);
-            if (angleTo < (smallestAngleTo * (isCurrentTarget ? KEEP_LOOKING_AT_CURRENT_ANGLE_FACTOR : 1.0f))) {
-                _lookAtTargetAvatar = avatarPointer;
-                _targetAvatarPosition = avatarPointer->getPosition();
-                smallestAngleTo = angleTo;
-            }
-            if (isLookingAtMe(avatar)) {
-
-                // Alter their gaze to look directly at my camera; this looks more natural than looking at my avatar's face.
-                glm::vec3 lookAtPosition = avatar->getHead()->getLookAtPosition(); // A position, in world space, on my avatar.
-
-                // The camera isn't at the point midway between the avatar eyes. (Even without an HMD, the head can be offset a bit.)
-                // Let's get everything to world space:
-                glm::vec3 avatarLeftEye = getHead()->getLeftEyePosition();
-                glm::vec3 avatarRightEye = getHead()->getRightEyePosition();
-
-                // First find out where (in world space) the person is looking relative to that bridge-of-the-avatar point.
-                // (We will be adding that offset to the camera position, after making some other adjustments.)
-                glm::vec3 gazeOffset = lookAtPosition - getHead()->getEyePosition();
-
-                 ViewFrustum viewFrustum;
-                 qApp->copyViewFrustum(viewFrustum);
-
-                // scale gazeOffset by IPD, if wearing an HMD.
-                if (qApp->isHMDMode()) {
-                    glm::mat4 leftEye = qApp->getEyeOffset(Eye::Left);
-                    glm::mat4 rightEye = qApp->getEyeOffset(Eye::Right);
-                    glm::vec3 leftEyeHeadLocal = glm::vec3(leftEye[3]);
-                    glm::vec3 rightEyeHeadLocal = glm::vec3(rightEye[3]);
-                    glm::vec3 humanLeftEye = viewFrustum.getPosition() + (viewFrustum.getOrientation() * leftEyeHeadLocal);
-                    glm::vec3 humanRightEye = viewFrustum.getPosition() + (viewFrustum.getOrientation() * rightEyeHeadLocal);
-
-                    auto hmdInterface = DependencyManager::get<HMDScriptingInterface>();
-                    float ipdScale = hmdInterface->getIPDScale();
-
-                    // Scale by proportional differences between avatar and human.
-                    float humanEyeSeparationInModelSpace = glm::length(humanLeftEye - humanRightEye) * ipdScale;
-                    float avatarEyeSeparation = glm::length(avatarLeftEye - avatarRightEye);
-                    if (avatarEyeSeparation > 0.0f) {
-                        gazeOffset = gazeOffset * humanEyeSeparationInModelSpace / avatarEyeSeparation;
-                    }
+            foreach (const AvatarSharedPointer& avatarPointer, hash) {
+            auto avatar = static_pointer_cast<Avatar>(avatarPointer);
+            bool isCurrentTarget = avatar->getIsLookAtTarget();
+            float distanceTo = glm::length(avatar->getHead()->getEyePosition() - cameraPosition);
+            avatar->setIsLookAtTarget(false);
+            if (!avatar->isMyAvatar() && avatar->isInitialized() &&
+                (distanceTo < GREATEST_LOOKING_AT_DISTANCE * getUniformScale())) {
+                float radius = glm::length(avatar->getHead()->getEyePosition() - avatar->getHead()->getRightEyePosition());
+                float angleTo = coneSphereAngle(getHead()->getEyePosition(), lookForward, avatar->getHead()->getEyePosition(), radius);
+                if (angleTo < (smallestAngleTo * (isCurrentTarget ? KEEP_LOOKING_AT_CURRENT_ANGLE_FACTOR : 1.0f))) {
+                    _lookAtTargetAvatar = avatarPointer;
+                    _targetAvatarPosition = avatarPointer->getPosition();
+                    smallestAngleTo = angleTo;
                 }
+                if (isLookingAtMe(avatar)) {
 
-                // And now we can finally add that offset to the camera.
-                glm::vec3 corrected = viewFrustum.getPosition() + gazeOffset;
+                    // Alter their gaze to look directly at my camera; this looks more natural than looking at my avatar's face.
+                    glm::vec3 lookAtPosition = avatar->getHead()->getLookAtPosition(); // A position, in world space, on my avatar.
 
-                avatar->getHead()->setCorrectedLookAtPosition(corrected);
+                    // The camera isn't at the point midway between the avatar eyes. (Even without an HMD, the head can be offset a bit.)
+                    // Let's get everything to world space:
+                    glm::vec3 avatarLeftEye = getHead()->getLeftEyePosition();
+                    glm::vec3 avatarRightEye = getHead()->getRightEyePosition();
 
+                    // First find out where (in world space) the person is looking relative to that bridge-of-the-avatar point.
+                    // (We will be adding that offset to the camera position, after making some other adjustments.)
+                    glm::vec3 gazeOffset = lookAtPosition - getHead()->getEyePosition();
+
+                    ViewFrustum viewFrustum;
+                    qApp->copyViewFrustum(viewFrustum);
+
+                    // scale gazeOffset by IPD, if wearing an HMD.
+                    if (qApp->isHMDMode()) {
+                        glm::mat4 leftEye = qApp->getEyeOffset(Eye::Left);
+                        glm::mat4 rightEye = qApp->getEyeOffset(Eye::Right);
+                        glm::vec3 leftEyeHeadLocal = glm::vec3(leftEye[3]);
+                        glm::vec3 rightEyeHeadLocal = glm::vec3(rightEye[3]);
+                        glm::vec3 humanLeftEye = viewFrustum.getPosition() + (viewFrustum.getOrientation() * leftEyeHeadLocal);
+                        glm::vec3 humanRightEye = viewFrustum.getPosition() + (viewFrustum.getOrientation() * rightEyeHeadLocal);
+
+                        auto hmdInterface = DependencyManager::get<HMDScriptingInterface>();
+                        float ipdScale = hmdInterface->getIPDScale();
+
+                        // Scale by proportional differences between avatar and human.
+                        float humanEyeSeparationInModelSpace = glm::length(humanLeftEye - humanRightEye) * ipdScale;
+                        float avatarEyeSeparation = glm::length(avatarLeftEye - avatarRightEye);
+                        if (avatarEyeSeparation > 0.0f) {
+                            gazeOffset = gazeOffset * humanEyeSeparationInModelSpace / avatarEyeSeparation;
+                        }
+                    }
+
+                    // And now we can finally add that offset to the camera.
+                    glm::vec3 corrected = viewFrustum.getPosition() + gazeOffset;
+
+                    avatar->getHead()->setCorrectedLookAtPosition(corrected);
+
+                } else {
+                    avatar->getHead()->clearCorrectedLookAtPosition();
+                }
             } else {
                 avatar->getHead()->clearCorrectedLookAtPosition();
             }
-        } else {
-            avatar->getHead()->clearCorrectedLookAtPosition();
         }
-    }
     auto avatarPointer = _lookAtTargetAvatar.lock();
     if (avatarPointer) {
         static_pointer_cast<Avatar>(avatarPointer)->setIsLookAtTarget(true);
@@ -1254,7 +1155,7 @@ void MyAvatar::setJointRotations(QVector<glm::quat> jointRotations) {
 void MyAvatar::setJointData(int index, const glm::quat& rotation, const glm::vec3& translation) {
     if (QThread::currentThread() != thread()) {
         QMetaObject::invokeMethod(this, "setJointData", Q_ARG(int, index), Q_ARG(const glm::quat&, rotation),
-            Q_ARG(const glm::vec3&, translation));
+                                  Q_ARG(const glm::vec3&, translation));
         return;
     }
     // HACK: ATM only JS scripts call setJointData() on MyAvatar so we hardcode the priority
@@ -1519,7 +1420,7 @@ void MyAvatar::setScriptedMotorTimescale(float timescale) {
     // we clamp the timescale on the large side (instead of just the low side) to prevent
     // obnoxiously large values from introducing NaN into avatar's velocity
     _scriptedMotorTimescale = glm::clamp(timescale, MIN_SCRIPTED_MOTOR_TIMESCALE,
-            DEFAULT_SCRIPTED_MOTOR_TIMESCALE);
+                                         DEFAULT_SCRIPTED_MOTOR_TIMESCALE);
 }
 
 void MyAvatar::setScriptedMotorFrame(QString frame) {
@@ -1839,7 +1740,7 @@ void MyAvatar::updateOrientation(float deltaTime) {
 void MyAvatar::updateActionMotor(float deltaTime) {
     bool thrustIsPushing = (glm::length2(_thrust) > EPSILON);
     bool scriptedMotorIsPushing = (_motionBehaviors & AVATAR_MOTION_SCRIPTED_MOTOR_ENABLED)
-        && _scriptedMotorTimescale < MAX_CHARACTER_MOTOR_TIMESCALE;
+                                  && _scriptedMotorTimescale < MAX_CHARACTER_MOTOR_TIMESCALE;
     _isBeingPushed = thrustIsPushing || scriptedMotorIsPushing;
     if (_isPushing || _isBeingPushed) {
         // we don't want the motor to brake if a script is pushing the avatar around
@@ -1943,7 +1844,7 @@ void MyAvatar::updateCollisionSound(const glm::vec3 &penetration, float deltaTim
 }
 
 bool findAvatarAvatarPenetration(const glm::vec3 positionA, float radiusA, float heightA,
-        const glm::vec3 positionB, float radiusB, float heightB, glm::vec3& penetration) {
+                                 const glm::vec3 positionB, float radiusB, float heightB, glm::vec3& penetration) {
     glm::vec3 positionBA = positionB - positionA;
     float xzDistance = sqrt(positionBA.x * positionBA.x + positionBA.z * positionBA.z);
     if (xzDistance < (radiusA + radiusB)) {
@@ -2118,7 +2019,7 @@ void MyAvatar::goToLocation(const glm::vec3& newPosition,
                             bool shouldFaceLocation) {
 
     qCDebug(interfaceapp).nospace() << "MyAvatar goToLocation - moving to " << newPosition.x << ", "
-        << newPosition.y << ", " << newPosition.z;
+                                    << newPosition.y << ", " << newPosition.z;
 
     _goToPending = true;
     _goToPosition = newPosition;

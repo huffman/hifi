@@ -25,7 +25,6 @@
 #include "AtRestDetector.h"
 #include "MyCharacterController.h"
 #include <ThreadSafeValueCache.h>
-#include "AudioClient.h"
 
 class AvatarActionHold;
 class ModelItemID;
@@ -58,7 +57,7 @@ enum AudioListenerMode {
 Q_DECLARE_METATYPE(AudioListenerMode);
 
 class MyAvatar : public Avatar {
-    Q_OBJECT
+Q_OBJECT
     Q_PROPERTY(bool shouldRenderLocally READ getShouldRenderLocally WRITE setShouldRenderLocally)
     Q_PROPERTY(glm::vec3 motorVelocity READ getScriptedMotorVelocity WRITE setScriptedMotorVelocity)
     Q_PROPERTY(float motorTimescale READ getScriptedMotorTimescale WRITE setScriptedMotorTimescale)
@@ -207,9 +206,6 @@ public:
     Q_INVOKABLE controller::Pose getLeftHandTipPose() const;
     Q_INVOKABLE controller::Pose getRightHandTipPose() const;
 
-    bool shouldStartListeningForVoice;
-    Q_INVOKABLE void setListeningToVoice(bool listening);
-
     AvatarWeakPointer getLookAtTargetAvatar() const { return _lookAtTargetAvatar; }
     void updateLookAtTargetAvatar();
     void clearLookAtTargetAvatar();
@@ -331,15 +327,11 @@ public slots:
     glm::vec3 getPositionForAudio();
     glm::quat getOrientationForAudio();
 
-    void audioInputReceived(const QByteArray& inputSamples);
-    void voiceTimeout();
-
 signals:
     void audioListenerModeChanged();
     void transformChanged();
     void newCollisionSoundURL(const QUrl& url);
     void collisionWithEntity(const Collision& collision);
-    void onFinishedSpeaking(QString speech);
     void energyChanged(float newEnergy);
     void positionGoneTo();
     void onLoadComplete();
@@ -431,13 +423,6 @@ private:
     glm::vec3 _trackedHeadPosition;
 
     Setting::Handle<float> _realWorldFieldOfView;
-
-    QTimer voiceTimer;
-    QTcpSocket* transcribeServerSocket;
-    QByteArray serverDataBuffer;
-    void TranscriptionReceived();
-    bool streamingAudioForTranscription;
-    void connectToTranscriptionServer();
 
     // private methods
     void updateOrientation(float deltaTime);
@@ -546,10 +531,6 @@ private:
     float getEnergy();
     void setEnergy(float value);
     bool didTeleport();
-
-    AudioClient* audioClient;
-    QString currentTranscription;
-
     bool getIsAway() const { return _isAway; }
     void setAway(bool value);
 

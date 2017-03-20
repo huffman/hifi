@@ -177,6 +177,7 @@
 #include "FrameTimingsScriptingInterface.h"
 #include <GPUIdent.h>
 #include <gl/GLHelpers.h>
+#include <src/scripting/SpeechRecognitionScriptingInterface.h>
 
 // On Windows PC, NVidia Optimus laptop, we want to enable NVIDIA GPU
 // FIXME seems to be broken.
@@ -4557,6 +4558,8 @@ void Application::update(float deltaTime) {
     }
 
     AnimDebugDraw::getInstance().update();
+
+    SpeechRecognitionScriptingInterface::getInstance()->update();
 }
 
 void Application::sendAvatarViewFrustum() {
@@ -5547,6 +5550,8 @@ void Application::registerScriptEngineWithApplicationServices(ScriptEngine* scri
 
     scriptEngine->registerGlobalObject("UserActivityLogger", DependencyManager::get<UserActivityLoggerScriptingInterface>().data());
     scriptEngine->registerGlobalObject("Users", DependencyManager::get<UsersScriptingInterface>().data());
+
+    scriptEngine->registerGlobalObject("SpeechRecognition", SpeechRecognitionScriptingInterface::getInstance());
 
     if (auto steamClient = PluginManager::getInstance()->getSteamClientPlugin()) {
         scriptEngine->registerGlobalObject("Steam", new SteamScriptingInterface(scriptEngine, steamClient.get()));

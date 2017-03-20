@@ -20,7 +20,7 @@
 		Messages.sendMessage("interactionComs", NPC + ":" + message);
 	}
 
-	MyAvatar.onFinishedSpeaking.connect(function(speech) {
+	SpeechRecognition.onFinishedSpeaking.connect(function(speech) {
 		print("Got: " + speech);
 		callOnNPC("voiceData:" + speech);
 	});
@@ -57,7 +57,7 @@
 		callOnNPC("onLostFocused");
 		var baselineX = 0;
 		var baselineY = 0;
-		MyAvatar.setListeningToVoice(false);
+		SpeechRecognition.setListeningToVoice(false);
 	}
 
 	function onWeGainedFocus() {
@@ -66,7 +66,7 @@
 		var rotation = Quat.safeEulerAngles(Camera.getOrientation());
 		baselineX = rotation.x;
 		baselineY = rotation.y;
-		MyAvatar.setListeningToVoice(true);
+		SpeechRecognition.setListeningToVoice(true);
 	}
 
 	function checkFocus() {
