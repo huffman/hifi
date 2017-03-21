@@ -6,7 +6,7 @@
 //  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
 //
 
-var shortbowEntities = Script.require("./shortbow.json");
+var shortbowEntities = require("./shortbow.json");
 
 // Add LocalPosition to entity data if parent properties are available
 var entities = shortbowEntities.Entities;

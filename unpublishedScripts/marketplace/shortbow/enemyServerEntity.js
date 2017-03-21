@@ -7,7 +7,7 @@
 //
 
 (function() {
-    const utils = Script.require('./utils.js');
+    const utils = require('./utils.js');
 
     function Enemy() {
     }
