@@ -36,7 +36,7 @@ if (!Function.prototype.bind) {
     };
 }
 
-utils = {
+module.exports = {
     parseJSON: function(json) {
         try {
             return JSON.parse(json);

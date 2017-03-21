@@ -7,10 +7,10 @@
 //
 /* globals utils, SHORTBOW_ENTITIES, TEMPLATES:true */
 
-Script.include('utils.js');
-Script.include('shortbow.js');
-Script.include('shortbowGameManager.js');
-TEMPLATES = SHORTBOW_ENTITIES.Entities;
+const utils = Script.require('./utils.js');
+const shortbowEntities = Script.require('./shortbow.js');
+
+var TEMPLATES = shortbowEntities.Entities;
 
 // Merge two objects into a new object. If a key name appears in both a and b,
 // the value in a will be used.
