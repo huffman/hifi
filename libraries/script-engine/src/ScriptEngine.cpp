@@ -649,6 +649,9 @@ void ScriptEngine::init() {
         auto resolve = Script.property("_requireResolve");
         require.setProperty("resolve", resolve, READONLY_PROP_FLAGS);
         resetModuleCache();
+
+        // Make require globally available
+        globalObject().setProperty("require", require, READONLY_PROP_FLAGS);
     }
 
     registerGlobalObject("Audio", DependencyManager::get<AudioScriptingInterface>().data());
