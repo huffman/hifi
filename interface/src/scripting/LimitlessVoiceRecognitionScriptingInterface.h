@@ -15,10 +15,11 @@
 #include <AudioClient.h>
 #include <QObject>
 
-class SpeechRecognitionScriptingInterface : public QObject {
+class LimitlessVoiceRecognitionScriptingInterface : public QObject, public Dependency {
     Q_OBJECT
 public:
-    static SpeechRecognitionScriptingInterface* getInstance();
+    LimitlessVoiceRecognitionScriptingInterface();
+
     void update();
 
 public slots:
@@ -28,18 +29,16 @@ signals:
     void onFinishedSpeaking(QString speech);
 
 private:
-    SpeechRecognitionScriptingInterface();
 
-    bool shouldStartListeningForVoice;
-    bool streamingAudioForTranscription;
+    bool _shouldStartListeningForVoice;
+    bool _streamingAudioForTranscription;
 
-    QTimer voiceTimer;
-    QTcpSocket* transcribeServerSocket;
-    QByteArray serverDataBuffer;
-    AudioClient* audioClient;
-    QString currentTranscription;
+    QTimer _voiceTimer;
+    std::unique_ptr<QTcpSocket> _transcribeServerSocket;
+    QByteArray _serverDataBuffer;
+    QString _currentTranscription;
 
-    void TranscriptionReceived();
+    void transcriptionReceived();
     void connectToTranscriptionServer();
     void audioInputReceived(const QByteArray& inputSamples);
     void voiceTimeout();
