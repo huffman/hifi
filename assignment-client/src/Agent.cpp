@@ -63,6 +63,7 @@ Agent::Agent(ReceivedMessage& message) :
     DependencyManager::set<ResourceCacheSharedItems>();
     DependencyManager::set<SoundCache>();
     DependencyManager::set<AudioInjectorManager>();
+    DependencyManager::set<AudioScriptingInterface>();
     DependencyManager::set<recording::Deck>();
     DependencyManager::set<recording::Recorder>();
     DependencyManager::set<RecordingScriptingInterface>();
