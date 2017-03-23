@@ -115,6 +115,7 @@
 
 	this.enterEntity = function(id) {
 		print("Something entered me: " + id);
+		SpeechRecognition.setAuthKey("testKey");
 		if(!ticker) {
 			ticker = Script.setInterval(tick, 333);
 		}

@@ -14,6 +14,7 @@
 
 #include <AudioClient.h>
 #include <QObject>
+#include <QFuture>
 
 class LimitlessVoiceRecognitionScriptingInterface : public QObject, public Dependency {
     Q_OBJECT
@@ -24,6 +25,7 @@ public:
 
 public slots:
     void setListeningToVoice(bool listening);
+    void setAuthKey(QString key);
 
 signals:
     void onFinishedSpeaking(QString speech);
@@ -32,14 +34,18 @@ private:
 
     bool _shouldStartListeningForVoice;
     bool _streamingAudioForTranscription;
+    bool _authenticated;
 
     QTimer _voiceTimer;
+    QFuture<void> _thread;
+    QQueue<QByteArray> _audioDataBuffer;
     std::unique_ptr<QTcpSocket> _transcribeServerSocket;
     QByteArray _serverDataBuffer;
     QString _currentTranscription;
+    QString _speechAuthCode;
 
+    void talkToServer();
     void transcriptionReceived();
-    void connectToTranscriptionServer();
     void audioInputReceived(const QByteArray& inputSamples);
     void voiceTimeout();
 };

@@ -1006,7 +1006,7 @@ void AudioClient::handleAudioInput(QByteArray& audioBuffer) {
             _timeSinceLastClip += (float)numSamples / (float)AudioConstants::SAMPLE_RATE;
         }
 
-        emit inputReceived({ audioBuffer.data(), numSamples });
+        emit inputReceived({ audioBuffer.data(), audioBuffer.size() });
 
         if (_noiseGate.openedInLastBlock()) {
             emit noiseGateOpened();
