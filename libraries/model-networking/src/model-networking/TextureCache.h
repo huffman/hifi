@@ -96,6 +96,7 @@ private:
     Type _type;
     TextureLoaderFunc _textureLoader { [](const QImage&, const std::string&){ return nullptr; } };
     KTXFilePointer _file;
+    bool _sourceIsKTX { false };
     int _originalWidth { 0 };
     int _originalHeight { 0 };
     int _width { 0 };
