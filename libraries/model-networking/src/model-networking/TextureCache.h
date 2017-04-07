@@ -93,8 +93,15 @@ private:
     friend class KTXReader;
     friend class ImageReader;
 
+    enum KTXLoadState {
+        LOADING_HEADER,
+        LOADING_LOWEST_SIX,
+        DONE_LOADING 
+    };
+
     Type _type;
     TextureLoaderFunc _textureLoader { [](const QImage&, const std::string&){ return nullptr; } };
+    KTXLoadState _ktxLoadState { LOADING_HEADER };
     KTXFilePointer _file;
     bool _sourceIsKTX { false };
     int _originalWidth { 0 };
