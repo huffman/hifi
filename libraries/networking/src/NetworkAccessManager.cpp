@@ -25,7 +25,7 @@ QNetworkAccessManager& NetworkAccessManager::getInstance() {
         proxy.setType(QNetworkProxy::HttpProxy);
         proxy.setHostName("127.0.0.1");
         proxy.setPort(8888);
-        //nm->setProxy(proxy);
+        nm->setProxy(proxy);
         
     }
     
