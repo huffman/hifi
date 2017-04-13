@@ -446,6 +446,9 @@ void GL45VariableAllocationTexture::executeNextTransfer(const TexturePointer& cu
 using GL45ResourceTexture = GL45Backend::GL45ResourceTexture;
 
 GL45ResourceTexture::GL45ResourceTexture(const std::weak_ptr<GLBackend>& backend, const Texture& texture) : GL45VariableAllocationTexture(backend, texture) {
+    if (texture.source().find_first_of("box.ktx") == std::string::npos) {
+        qDebug() << "In box.ktx ctor";
+    }
     auto mipLevels = texture.getNumMips();
     _allocatedMip = mipLevels;
     uvec3 mipDimensions;
@@ -455,8 +458,9 @@ GL45ResourceTexture::GL45ResourceTexture(const std::weak_ptr<GLBackend>& backend
             break;
         }
     }
+    _maxAllocatedMip = _populatedMip = mipLevels;
 
-    uint16_t allocatedMip = _populatedMip - std::min<uint16_t>(_populatedMip, 2);
+    uint16_t allocatedMip = _populatedMip;// -std::min<uint16_t>(_populatedMip, 2);
     allocateStorage(allocatedMip);
     _memoryPressureStateStale = true;
     copyMipsFromTexture();
@@ -574,18 +578,20 @@ void GL45ResourceTexture::populateTransferQueue() {
 
     const uint8_t maxFace = GLTexture::getFaceCount(_target);
     uint16_t sourceMip = _populatedMip;
+    qDebug() << "populateTransferQueue info : " << _populatedMip << " " << _maxAllocatedMip << " " << _allocatedMip;
     do {
         --sourceMip;
         auto targetMip = sourceMip - _allocatedMip;
         auto mipDimensions = _gpuObject.evalMipDimensions(sourceMip);
+        qDebug() << "populateTransferQueue " << QString::fromStdString(_gpuObject.source()) << sourceMip << " " << targetMip;
         for (uint8_t face = 0; face < maxFace; ++face) {
-            qDebug() << "populateTransferQueue " << QString::fromStdString(_gpuObject.source()) << sourceMip << " " << targetMip;
             if (!_gpuObject.isStoredMipFaceAvailable(sourceMip, face)) {
                 continue;
             }
 
             // If the mip is less than the max transfer size, then just do it in one transfer
             if (glm::all(glm::lessThanEqual(mipDimensions, MAX_TRANSFER_DIMENSIONS))) {
+                qDebug() << "mip is less than max transfer size";
                 // Can the mip be transferred in one go
                 _pendingTransfers.emplace(new TransferJob(*this, sourceMip, targetMip, face));
                 continue;
@@ -599,6 +605,7 @@ void GL45ResourceTexture::populateTransferQueue() {
             Q_ASSERT(0 == (mipSize % lines));
             uint32_t linesPerTransfer = (uint32_t)(MAX_TRANSFER_SIZE / bytesPerLine);
             uint32_t lineOffset = 0;
+            qDebug() << "queing up single line transfers " << linesPerTransfer << " " << lineOffset;
             while (lineOffset < lines) {
                 uint32_t linesToCopy = std::min<uint32_t>(lines - lineOffset, linesPerTransfer);
                 _pendingTransfers.emplace(new TransferJob(*this, sourceMip, targetMip, face, linesToCopy, lineOffset));

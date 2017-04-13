@@ -76,11 +76,12 @@ Size KtxStorage::getMipFaceSize(uint16 level, uint8 face) const {
 
 bool KtxStorage::isMipAvailable(uint16 level, uint8 face) const {
     auto numLevels = _ktxDescriptor->header.numberOfMipmapLevels;
-    auto minLevel = 7 > numLevels ? 0 : numLevels - 10;
+    auto MIN = 3;
+    auto minLevel = 2;
     auto avail = level >= minLevel;
     qDebug() << "isMipAvailable: " << QString::fromStdString(_filename) << ": " << level << " " << face << avail << minLevel << " " << _ktxDescriptor->header.numberOfMipmapLevels;
     //return true;
-    return level > _ktxDescriptor->header.numberOfMipmapLevels - 7;
+    return avail;
 }
 
 void KtxStorage::assignMipData(uint16 level, const storage::StoragePointer& storage) {
