@@ -174,7 +174,9 @@ public:
         }
         bool canPromote() const { return _allocatedMip > 0 || _populatedMip > 0; }
         bool canDemote() const { return _allocatedMip < _maxAllocatedMip; }
-        bool hasPendingTransfers() const { return _populatedMip > _allocatedMip; }
+        bool hasPendingTransfers() const {
+            return _transferQueue.size() > 0;
+        }
         void executeNextTransfer(const TexturePointer& currentTexture);
         Size size() const override { return _size; }
         virtual void populateTransferQueue() = 0;
