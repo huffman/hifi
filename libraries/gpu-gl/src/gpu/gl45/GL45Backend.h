@@ -172,7 +172,7 @@ public:
         bool canPromoteAndPopulate() const {
             return canPromote() && _gpuObject.isStoredMipFaceAvailable(_populatedMip-1, 0);
         }
-        bool canPromote() const { return _allocatedMip > 0 || _minRequestedMip > 0; }
+        bool canPromote() const { return _allocatedMip > 0 || _populatedMip > 0; }
         bool canDemote() const { return _allocatedMip < _maxAllocatedMip; }
         bool hasPendingTransfers() const { return _populatedMip > _allocatedMip; }
         void executeNextTransfer(const TexturePointer& currentTexture);
