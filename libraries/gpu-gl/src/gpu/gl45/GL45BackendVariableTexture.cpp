@@ -98,8 +98,8 @@ TransferJob::TransferJob(const GL45VariableAllocationTexture& parent, uint16_t s
     if (0 == lines) {
         _transferSize = mipSize;
         _bufferingLambda = [=] {
-            auto mipData = _parent._gpuObject.accessStoredMipFace(sourceMip, face);
             qDebug() << "Loading mip " << sourceMip << " " << source;
+            auto mipData = _parent._gpuObject.accessStoredMipFace(sourceMip, face);
             if (!mipData) {
                 qWarning() << "Mip not available: " << sourceMip;
             } else {
@@ -333,14 +333,14 @@ void GL45VariableAllocationTexture::updateMemoryPressure() {
     float pressure = (float)totalVariableMemoryAllocation / (float)allowedMemoryAllocation;
 
     auto newState = MemoryPressureState::Idle;
-    if (hasTransfers) {
-        qDebug() << "Transferring";
+    if (hasTransfers) { // && _memoryPressureState != MemoryPressureState::Transfer) {
+        //qDebug() << "Transferring";
         newState = MemoryPressureState::Transfer;
     } else if (pressure > OVERSUBSCRIBED_PRESSURE_VALUE && canDemote) {
-        qDebug() << "Demoting";
+        //qDebug() << "Demoting";
         newState = MemoryPressureState::Oversubscribed;
     } else if (pressure < UNDERSUBSCRIBED_PRESSURE_VALUE && unallocated != 0 && canPromote) {
-        qDebug() << "Promoting";
+        //qDebug() << "Promoting";
         newState = MemoryPressureState::Undersubscribed;
     }
 
