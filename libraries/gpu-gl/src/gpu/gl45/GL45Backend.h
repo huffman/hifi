@@ -169,7 +169,10 @@ public:
         GL45VariableAllocationTexture(const std::weak_ptr<GLBackend>& backend, const Texture& texture);
         ~GL45VariableAllocationTexture();
         //bool canPromoteNoAllocate() const { return _allocatedMip < _populatedMip; }
-        bool canPromote() const { return _allocatedMip > 0; }
+        bool canPromoteAndPopulate() const {
+            return canPromote() && _gpuObject.isStoredMipFaceAvailable(_populatedMip-1, 0);
+        }
+        bool canPromote() const { return _allocatedMip > 0 || _minRequestedMip > 0; }
         bool canDemote() const { return _allocatedMip < _maxAllocatedMip; }
         bool hasPendingTransfers() const { return _populatedMip > _allocatedMip; }
         void executeNextTransfer(const TexturePointer& currentTexture);
@@ -188,6 +191,8 @@ public:
         // The highest (lowest resolution) mip that we will support, relative to the number 
         // of mips in the gpu::Texture object
         uint16 _maxAllocatedMip { 0 };
+
+        uint16 _minRequestedMip { 0 };
         Size _size { 0 };
         // Contains a series of lambdas that when executed will transfer data to the GPU, modify 
         // the _populatedMip and update the sampler in order to fully populate the allocated texture 
