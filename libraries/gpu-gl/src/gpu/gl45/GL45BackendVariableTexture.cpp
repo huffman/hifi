@@ -325,22 +325,23 @@ void GL45VariableAllocationTexture::updateMemoryPressure() {
         // Track how much we're actually using
         totalVariableMemoryAllocation += object->size();
         canDemote |= object->canDemote();
-        canPromote |= object->canPromote();// && object->_gpuObject.minAvailableMipLevel() < _allocatedMip;
+        canPromote |= object->canPromote() || (object->_gpuObject.minAvailableMipLevel() < object->_allocatedMip);
         hasTransfers |= object->hasPendingTransfers();
     }
 
-    size_t unallocated = idealMemoryAllocation - totalVariableMemoryAllocation;
+    //size_t unallocated = idealMemoryAllocation - totalVariableMemoryAllocation;
+    size_t unallocated = 1;
     float pressure = (float)totalVariableMemoryAllocation / (float)allowedMemoryAllocation;
 
     auto newState = MemoryPressureState::Idle;
     if (hasTransfers) { // && _memoryPressureState != MemoryPressureState::Transfer) {
-        //qDebug() << "Transferring";
+        qDebug() << "Transferring";
         newState = MemoryPressureState::Transfer;
     } else if (pressure > OVERSUBSCRIBED_PRESSURE_VALUE && canDemote) {
-        //qDebug() << "Demoting";
+        qDebug() << "Demoting";
         newState = MemoryPressureState::Oversubscribed;
     } else if (pressure < UNDERSUBSCRIBED_PRESSURE_VALUE && unallocated != 0 && canPromote) {
-        //qDebug() << "Promoting";
+        qDebug() << "Promoting";
         newState = MemoryPressureState::Undersubscribed;
     }
 
@@ -513,18 +514,14 @@ void GL45ResourceTexture::copyMipsFromTexture() {
 void GL45ResourceTexture::syncSampler() const {
     Parent::syncSampler();
     qDebug() << "glTextureParameteri " << QString::fromStdString(_source) << _populatedMip << _populatedMip - _allocatedMip;
-    if (_source == "test" && _populatedMip == 0) {
-        qDebug() << "here";
-    }
     glTextureParameteri(_id, GL_TEXTURE_BASE_LEVEL, _populatedMip - _allocatedMip);
 }
 
 void GL45ResourceTexture::promote() {
     PROFILE_RANGE(render_gpu_gl, __FUNCTION__);
     //Q_ASSERT(_allocatedMip > 0);
-    uint16_t sourceMip = _populatedMip;
-    if (!_gpuObject.isStoredMipFaceAvailable(sourceMip, 0)) {
-        const_cast<gpu::Texture&>(_gpuObject).requestInterestInMip(sourceMip);
+    if (!_gpuObject.isStoredMipFaceAvailable(_populatedMip - 1, 0)) {
+        const_cast<gpu::Texture&>(_gpuObject).requestInterestInMip(_populatedMip - 1);
         return;
     }
     GLuint oldId = _id;
