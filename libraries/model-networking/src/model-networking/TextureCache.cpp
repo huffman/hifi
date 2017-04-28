@@ -730,78 +730,99 @@ void ImageReader::read() {
 
     // Maybe load from cache
     auto textureCache = DependencyManager::get<TextureCache>();
+    gpu::TexturePointer existingTexture;
     if (textureCache) {
         // If we already have a live texture with the same hash, use it
-        auto texture = textureCache->getTextureByHash(hash);
+        existingTexture = textureCache->getTextureByHash(hash);
 
         // If there is no live texture, check if there's an existing KTX file
-        if (!texture) {
+        if (!existingTexture) {
             KTXFilePointer ktxFile = textureCache->_ktxCache.getFile(hash);
             if (ktxFile) {
-                texture = gpu::Texture::unserialize(ktxFile->getFilepath());
-                if (texture) {
-                    texture = textureCache->cacheTextureByHash(hash, texture);
+                existingTexture = gpu::Texture::unserialize(ktxFile->getFilepath());
+                if (existingTexture) {
+                    existingTexture = textureCache->cacheTextureByHash(hash, existingTexture);
                 }
             }
         }
 
         // If we found the texture either because it's in use or via KTX deserialization, 
-        // set the image and return immediately.
-        if (texture) {
+        // and it contains all of its mips, set the image and return immediately.
+        if (existingTexture && existingTexture->minAvailableMipLevel() == 0) {
             QMetaObject::invokeMethod(resource.data(), "setImage",
-                                      Q_ARG(gpu::TexturePointer, texture),
-                                      Q_ARG(int, texture->getWidth()),
-                                      Q_ARG(int, texture->getHeight()));
+                Q_ARG(gpu::TexturePointer, existingTexture),
+                Q_ARG(int, existingTexture->getWidth()),
+                Q_ARG(int, existingTexture->getHeight()));
             return;
         }
     }
 
     // Proccess new texture
-    gpu::TexturePointer texture;
+    gpu::TexturePointer fullTexture;
     {
         PROFILE_RANGE_EX(resource_parse_image_raw, __FUNCTION__, 0xffff0000, 0);
-        texture = image::processImage(_content, _url.toString().toStdString(), _maxNumPixels, networkTexture->getTextureType());
+        fullTexture = image::processImage(_content, _url.toString().toStdString(), _maxNumPixels, networkTexture->getTextureType());
 
-        if (!texture) {
+        if (!fullTexture) {
             qCWarning(modelnetworking) << "Could not process:" << _url;
             QMetaObject::invokeMethod(resource.data(), "setImage",
-                                      Q_ARG(gpu::TexturePointer, texture),
+                                      Q_ARG(gpu::TexturePointer, fullTexture),
                                       Q_ARG(int, 0),
                                       Q_ARG(int, 0));
             return;
         }
 
-        texture->setSourceHash(hash);
-        texture->setFallbackTexture(networkTexture->getFallbackTexture());
+        fullTexture->setSourceHash(hash);
+        fullTexture->setFallbackTexture(networkTexture->getFallbackTexture());
     }
 
-    // Save the image into a KTXFile
-    if (texture && textureCache) {
-        auto memKtx = gpu::Texture::serialize(*texture);
+    if (!existingTexture || existingTexture->minAvailableMipLevel() > 0) {
+        // Save the image into a KTXFile
+        auto memKtx = gpu::Texture::serialize(*fullTexture);
 
         // Move the texture into a memory mapped file
         if (memKtx) {
-            const char* data = reinterpret_cast<const char*>(memKtx->_storage->data());
-            size_t length = memKtx->_storage->size();
-            auto& ktxCache = textureCache->_ktxCache;
-            networkTexture->_file = ktxCache.writeFile(data, KTXCache::Metadata(hash, length));
-            if (!networkTexture->_file) {
-                qCWarning(modelnetworking) << _url << "file cache failed";
-            } else {
-                texture->setKtxBacking(networkTexture->_file->getFilepath());
+            if (existingTexture) {
+                qDebug() << "Filling in the remainder of: " << _url;
+                auto storage = memKtx->getStorage();
+                auto data = storage->data();
+                auto totalSize = storage->size();
+
+                size_t offset = 0;
+                auto& images = memKtx->_images;
+
+                auto minAvailableMip = existingTexture->minAvailableMipLevel();
+                for (uint16_t mip = 0; mip < minAvailableMip; ++mip) {
+                    auto size = images[mip]._imageSize;
+                    if ((offset + size) > totalSize) {
+                        qWarning(networking) << "Not enough data in source ktx to fill bare ktx";
+                        break;
+                    }
+                    existingTexture->assignStoredMip(mip, size, data + offset);
+                }
+            } else if (textureCache) {
+                const char* data = reinterpret_cast<const char*>(memKtx->_storage->data());
+                size_t length = memKtx->_storage->size();
+                auto& ktxCache = textureCache->_ktxCache;
+                networkTexture->_file = ktxCache.writeFile(data, KTXCache::Metadata(hash, length));
+                if (!networkTexture->_file) {
+                    qCWarning(modelnetworking) << _url << "file cache failed";
+                } else {
+                    fullTexture->setKtxBacking(networkTexture->_file->getFilepath());
+                }
+
+                // We replace the texture with the one stored in the cache.  This deals with the possible race condition of two different 
+                // images with the same hash being loaded concurrently.  Only one of them will make it into the cache by hash first and will
+                // be the winner
+                existingTexture = textureCache->cacheTextureByHash(hash, fullTexture);
             }
         } else {
             qCWarning(modelnetworking) << "Unable to serialize texture to KTX " << _url;
         }
-
-        // We replace the texture with the one stored in the cache.  This deals with the possible race condition of two different 
-        // images with the same hash being loaded concurrently.  Only one of them will make it into the cache by hash first and will
-        // be the winner
-        texture = textureCache->cacheTextureByHash(hash, texture);
     }
 
     QMetaObject::invokeMethod(resource.data(), "setImage",
-                                Q_ARG(gpu::TexturePointer, texture),
-                                Q_ARG(int, texture->getWidth()),
-                                Q_ARG(int, texture->getHeight()));
+                                Q_ARG(gpu::TexturePointer, existingTexture),
+                                Q_ARG(int, existingTexture->getWidth()),
+                                Q_ARG(int, existingTexture->getHeight()));
 }

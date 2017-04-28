@@ -212,7 +212,27 @@ void KtxStorage::assignMipData(uint16 level, const storage::StoragePointer& stor
 }
 
 void KtxStorage::assignMipFaceData(uint16 level, uint8 face, const storage::StoragePointer& storage) {
-    throw std::runtime_error("Invalid call");
+    auto file = maybeOpenFile();
+
+    auto imageData = file->mutableData();
+    imageData += ktx::KTX_HEADER_SIZE + _ktxDescriptor->header.bytesOfKeyValueData + _ktxDescriptor->images[level]._imageOffset;
+    imageData += ktx::IMAGE_SIZE_WIDTH;
+
+    {
+        std::lock_guard<std::mutex> lock { _cacheFileWriteMutex };
+
+        if (level != _minMipLevelAvailable - 1) {
+            qWarning() << "Invalid level to be stored";
+            return;
+        }
+
+        memcpy(imageData, storage->data(), _ktxDescriptor->images[level]._imageSize);
+        _minMipLevelAvailable = level;
+        if (_offsetToMinMipKV > 0) {
+            auto minMipKeyData = file->mutableData() + ktx::KTX_HEADER_SIZE + _offsetToMinMipKV;
+            memcpy(minMipKeyData, (void*)&_minMipLevelAvailable, 1);
+        }
+    }
 }
 
 void Texture::setKtxBacking(const std::string& filename) {
