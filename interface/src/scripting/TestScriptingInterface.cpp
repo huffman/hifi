@@ -74,6 +74,7 @@ bool TestScriptingInterface::loadTestScene(QString scene) {
 }
 
 bool TestScriptingInterface::startTracing(QString logrules) {
+    qDebug() << "Starting trace";
     if (!logrules.isEmpty()) {
         QLoggingCategory::setFilterRules(logrules);
     }
@@ -81,6 +82,7 @@ bool TestScriptingInterface::startTracing(QString logrules) {
     if (!DependencyManager::isSet<tracing::Tracer>()) {
         return false;
     }
+    qDebug() << "Starting trace2";
 
     DependencyManager::get<tracing::Tracer>()->startTracing();
     return true;

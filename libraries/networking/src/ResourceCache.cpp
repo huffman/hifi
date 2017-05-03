@@ -469,7 +469,8 @@ int ResourceCache::getPendingRequestCount() {
 }
 
 int ResourceCache::getLoadingRequestCount() {
-    return DependencyManager::get<ResourceCacheSharedItems>()->getLoadingRequestsCount();
+    return _requestsActive;
+    //return DependencyManager::get<ResourceCacheSharedItems>()->getLoadingRequestsCount();
 }
 
 bool ResourceCache::attemptRequest(QSharedPointer<Resource> resource) {
@@ -477,7 +478,8 @@ bool ResourceCache::attemptRequest(QSharedPointer<Resource> resource) {
 
 
     auto sharedItems = DependencyManager::get<ResourceCacheSharedItems>();
-    if (_requestsActive >= _requestLimit) {
+    auto active = DependencyManager::get<ResourceCacheSharedItems>()->getLoadingRequestsCount();
+    if (active >= _requestLimit) {
         // wait until a slot becomes available
         sharedItems->appendPendingRequest(resource);
         return false;
@@ -485,22 +487,32 @@ bool ResourceCache::attemptRequest(QSharedPointer<Resource> resource) {
     
     ++_requestsActive;
     sharedItems->appendActiveRequest(resource);
+    qDebug() << ">>>> Starting: " << resource->_url;
     resource->makeRequest();
     return true;
 }
 
 void ResourceCache::requestCompleted(QWeakPointer<Resource> resource) {
+    auto res = resource.lock();
+    if (res) {
+        qDebug() << ">>>> Completed: " << res->_url;
+    }
     auto sharedItems = DependencyManager::get<ResourceCacheSharedItems>();
 
     sharedItems->removeRequest(resource);
     --_requestsActive;
 
-    attemptHighestPriorityRequest();
+    while (attemptHighestPriorityRequest()) {
+    }
+
 }
 
 bool ResourceCache::attemptHighestPriorityRequest() {
     auto sharedItems = DependencyManager::get<ResourceCacheSharedItems>();
     auto resource = sharedItems->getHighestPendingRequest();
+    if (!resource) {
+        qDebug() << "Resource invalid";
+    }
     return (resource && attemptRequest(resource));
 }
 
@@ -664,6 +676,8 @@ void Resource::reinsert() {
 
 
 void Resource::makeRequest() {
+    qCDebug(resourceLog).noquote() << "Starting request for:" << _url.toDisplayString();
+
     if (_request) {
         PROFILE_ASYNC_END(resource, "Resource:" + getType(), QString::number(_requestID));
         _request->disconnect();
@@ -684,7 +698,6 @@ void Resource::makeRequest() {
     
     _request->setByteRange(_requestByteRange);
 
-    qCDebug(resourceLog).noquote() << "Starting request for:" << _url.toDisplayString();
     emit loading();
 
     connect(_request, &ResourceRequest::progress, this, &Resource::onProgress);
@@ -704,6 +717,10 @@ void Resource::handleDownloadProgress(uint64_t bytesReceived, uint64_t bytesTota
 
 void Resource::handleReplyFinished() {
     Q_ASSERT_X(_request, "Resource::handleReplyFinished", "Request should not be null while in handleReplyFinished");
+
+    if (!_request) {
+        return;
+    }
 
     PROFILE_ASYNC_END(resource, "Resource:" + getType(), QString::number(_requestID), {
         { "from_cache", _request->loadedFromCache() },

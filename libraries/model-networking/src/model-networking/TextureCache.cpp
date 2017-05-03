@@ -372,6 +372,8 @@ void NetworkTexture::makeRequest() {
             qCDebug(networking).noquote() << "Failed to get request for" << _url.toDisplayString();
 
             PROFILE_ASYNC_END(resource, "Resource:" + getType(), QString::number(_requestID));
+            finishedLoading(false);
+            TextureCache::requestCompleted(_self);
             return;
         }
 
@@ -399,9 +401,13 @@ void NetworkTexture::makeRequest() {
             uint16_t nextMip = _lowestKnownPopulatedMip - 1;
             _url.setFragment(QString::number(nextMip));
             startMipRangeRequest(nextMip, nextMip);
+        } else {
+            qWarning(networking) << "NetworkTexture::makeRequest() called while all mips have been loaded";
+            TextureCache::requestCompleted(_self);
         }
     } else {
         qWarning(networking) << "NetworkTexture::makeRequest() called while not in a valid state: " << _ktxResourceState;
+        TextureCache::requestCompleted(_self);
     }
 
 }
@@ -494,6 +500,8 @@ void NetworkTexture::ktxMipRequestFinished() {
         Q_ASSERT(_ktxMipLevelRangeInFlight.first != NULL_MIP_LEVEL);
         TextureCache::requestCompleted(_self);
 
+        PROFILE_ASYNC_END(resource, "Resource:" + getType(), QString::number(_requestID));
+
         if (_ktxMipRequest->getResult() == ResourceRequest::Success) {
             Q_ASSERT(_ktxMipLevelRangeInFlight.second - _ktxMipLevelRangeInFlight.first == 0);
 
@@ -535,6 +543,7 @@ void NetworkTexture::maybeHandleFinishedInitialLoad() {
     if (_ktxHeaderRequestFinished && _ktxHighMipRequestFinished) {
 
         TextureCache::requestCompleted(_self);
+        PROFILE_ASYNC_END(resource, "Resource:" + getType(), QString::number(_requestID));
 
         if (_ktxHeaderRequest->getResult() != ResourceRequest::Success || _ktxMipRequest->getResult() != ResourceRequest::Success) {
             if (handleFailedRequest(_ktxMipRequest->getResult())) {
@@ -705,7 +714,7 @@ void NetworkTexture::refresh() {
             _ktxMipRequest->deleteLater();
             _ktxMipRequest = nullptr;
         }
-        ResourceCache::requestCompleted(_self);
+        TextureCache::requestCompleted(_self);
     }
 
     Resource::refresh();
