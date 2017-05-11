@@ -7,8 +7,8 @@
 //
 /* globals utils, SHORTBOW_ENTITIES, TEMPLATES:true */
 
-const utils = require('./utils.js');
-const shortbowEntities = require('./shortbow.js');
+var utils = require('./utils.js');
+var shortbowEntities = require('./shortbow.js');
 
 var TEMPLATES = shortbowEntities.Entities;
 
