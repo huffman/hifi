@@ -34,6 +34,8 @@
 #include "FBXReader.h"
 #include "ModelFormatLogging.h"
 
+#include <shared/NsightHelpers.h>
+
 // TOOL: Uncomment the following line to enable the filtering of all the unkwnon fields of a node so we can break point easily while loading a model with problems...
 //#define DEBUG_FBXREADER
 
@@ -288,6 +290,7 @@ void appendModelIDs(const QString& parentID, const QMultiMap<QString, QString>& 
 }
 
 FBXBlendshape extractBlendshape(const FBXNode& object) {
+    PROFILE_RANGE(resource_parse, __FUNCTION__);
     FBXBlendshape blendshape;
     foreach (const FBXNode& data, object.children) {
         if (data.name == "Indexes") {
@@ -330,6 +333,7 @@ QVector<int> getIndices(const QVector<QString> ids, QVector<QString> modelIDs) {
 typedef QPair<int, float> WeightedIndex;
 
 void addBlendshapes(const ExtractedBlendshape& extracted, const QList<WeightedIndex>& indices, ExtractedMesh& extractedMesh) {
+    PROFILE_RANGE(resource_parse, __FUNCTION__);
     foreach (const WeightedIndex& index, indices) {
         extractedMesh.mesh.blendshapes.resize(max(extractedMesh.mesh.blendshapes.size(), index.first + 1));
         extractedMesh.blendshapeIndexMaps.resize(extractedMesh.mesh.blendshapes.size());
@@ -474,6 +478,7 @@ QByteArray fileOnUrl(const QByteArray& filepath, const QString& url) {
 }
 
 FBXGeometry* FBXReader::extractFBXGeometry(const QVariantHash& mapping, const QString& url) {
+    PROFILE_RANGE(resource_parse, __FUNCTION__);
     const FBXNode& node = _fbxNode;
     QMap<QString, ExtractedMesh> meshes;
     QHash<QString, QString> modelIDsToNames;
@@ -531,6 +536,7 @@ FBXGeometry* FBXReader::extractFBXGeometry(const QVariantHash& mapping, const QS
 
     QMultiHash<QByteArray, WeightedIndex> blendshapeIndices;
     for (int i = 0;; i++) {
+        PROFILE_RANGE(resource_parse, "processBlendshape");
         QByteArray blendshapeName = FACESHIFT_BLENDSHAPES[i];
         if (blendshapeName.isEmpty()) {
             break;
@@ -560,6 +566,7 @@ FBXGeometry* FBXReader::extractFBXGeometry(const QVariantHash& mapping, const QS
     QString hifiGlobalNodeID;
     unsigned int meshIndex = 0;
     foreach (const FBXNode& child, node.children) {
+        PROFILE_RANGE(resource_parse, "processChild");
 
         if (child.name == "FBXHeaderExtension") {
             foreach (const FBXNode& object, child.children) {
@@ -1299,6 +1306,7 @@ FBXGeometry* FBXReader::extractFBXGeometry(const QVariantHash& mapping, const QS
 
     // assign the blendshapes to their corresponding meshes
     foreach (const ExtractedBlendshape& extracted, blendshapes) {
+        PROFILE_RANGE(resource_parse, "assignBlendshapes");
         QString blendshapeChannelID = _connectionParentMap.value(extracted.id);
         QString blendshapeID = _connectionParentMap.value(blendshapeChannelID);
         QString meshID = _connectionParentMap.value(blendshapeID);
@@ -1317,6 +1325,7 @@ FBXGeometry* FBXReader::extractFBXGeometry(const QVariantHash& mapping, const QS
     QVector<QString> modelIDs;
     QSet<QString> remainingModels;
     for (QHash<QString, FBXModel>::const_iterator model = models.constBegin(); model != models.constEnd(); model++) {
+        PROFILE_RANGE(resource_parse, "gatherModels");
         // models with clusters must be parented to the cluster top
         foreach (const QString& deformerID, _connectionChildMap.values(model.key())) {
             foreach (const QString& clusterID, _connectionChildMap.values(deformerID)) {
@@ -1365,6 +1374,7 @@ FBXGeometry* FBXReader::extractFBXGeometry(const QVariantHash& mapping, const QS
     QVariantList freeJoints = mapping.values("freeJoint");
     geometry.hasSkeletonJoints = false;
     foreach (const QString& modelID, modelIDs) {
+        PROFILE_RANGE(resource_parse, "convertModelsToJoints");
         const FBXModel& model = models[modelID];
         FBXJoint joint;
         joint.isFree = freeJoints.contains(model.name);
@@ -1521,6 +1531,7 @@ FBXGeometry* FBXReader::extractFBXGeometry(const QVariantHash& mapping, const QS
     bool materialsHaveTextures = checkMaterialsHaveTextures(_fbxMaterials, _textureFilenames, _connectionChildMap);
 
     for (QMap<QString, ExtractedMesh>::iterator it = meshes.begin(); it != meshes.end(); it++) {
+        PROFILE_RANGE(resource_parse, "processExtractedMesh");
         ExtractedMesh& extracted = it.value();
 
         extracted.mesh.meshExtents.reset();
@@ -1783,6 +1794,7 @@ FBXGeometry* FBXReader::extractFBXGeometry(const QVariantHash& mapping, const QS
     // now that all joints have been scanned compute a k-Dop bounding volume of mesh
     glm::vec3 defaultCapsuleAxis(0.0f, 1.0f, 0.0f);
     for (int i = 0; i < geometry.joints.size(); ++i) {
+        PROFILE_RANGE(resource_parse, "processBoundingVolume");
         FBXJoint& joint = geometry.joints[i];
 
         // NOTE: points are in joint-frame
@@ -1818,6 +1830,7 @@ FBXGeometry* FBXReader::extractFBXGeometry(const QVariantHash& mapping, const QS
     // attempt to map any meshes to a named model
     for (QHash<QString, int>::const_iterator m = meshIDsToMeshIndices.constBegin();
             m != meshIDsToMeshIndices.constEnd(); m++) {
+        PROFILE_RANGE(resource_parse, "mapMeshes");
 
         const QString& meshID = m.key();
         int meshIndex = m.value();
@@ -1835,12 +1848,14 @@ FBXGeometry* FBXReader::extractFBXGeometry(const QVariantHash& mapping, const QS
 }
 
 FBXGeometry* readFBX(const QByteArray& model, const QVariantHash& mapping, const QString& url, bool loadLightmaps, float lightmapLevel) {
+    PROFILE_RANGE(resource, __FUNCTION__);
     QBuffer buffer(const_cast<QByteArray*>(&model));
     buffer.open(QIODevice::ReadOnly);
     return readFBX(&buffer, mapping, url, loadLightmaps, lightmapLevel);
 }
 
 FBXGeometry* readFBX(QIODevice* device, const QVariantHash& mapping, const QString& url, bool loadLightmaps, float lightmapLevel) {
+    PROFILE_RANGE(resource, __FUNCTION__);
     FBXReader reader;
     reader._fbxNode = FBXReader::parseFBX(device);
     reader._loadLightmaps = loadLightmaps;

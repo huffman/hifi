@@ -26,6 +26,8 @@
 
 #include <memory>
 
+#include <shared/NsightHelpers.h>
+
 
 class Vertex {
 public:
@@ -166,6 +168,7 @@ void appendIndex(MeshData& data, QVector<int>& indices, int index) {
 }
 
 ExtractedMesh FBXReader::extractMesh(const FBXNode& object, unsigned int& meshIndex) {
+    PROFILE_RANGE(resource_parse, __FUNCTION__);
     MeshData data;
     data.extracted.mesh.meshIndex = meshIndex++;
     QVector<int> materials;
@@ -389,6 +392,7 @@ ExtractedMesh FBXReader::extractMesh(const FBXNode& object, unsigned int& meshIn
 }
 
 void FBXReader::buildModelMesh(FBXMesh& extractedMesh, const QString& url) {
+    PROFILE_RANGE(resource_parse, __FUNCTION__);
     static QString repeatedMessage = LogHandler::getInstance().addRepeatedMessageRegex("buildModelMesh failed -- .*");
 
     unsigned int totalSourceIndices = 0;

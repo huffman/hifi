@@ -101,6 +101,8 @@ template<class T> QVariant readBinaryArray(QDataStream& in, int& position) {
 }
 
 QVariant parseBinaryFBXProperty(QDataStream& in, int& position) {
+    PROFILE_RANGE(resource_parse, __FUNCTION__);
+
     char ch;
     in.device()->getChar(&ch);
     position++;
@@ -169,6 +171,8 @@ QVariant parseBinaryFBXProperty(QDataStream& in, int& position) {
 }
 
 FBXNode parseBinaryFBXNode(QDataStream& in, int& position, bool has64BitPositions = false) {
+    PROFILE_RANGE(resource_parse, __FUNCTION__);
+
     qint64 endOffset;
     quint64 propertyCount;
     quint64 propertyListLength;
@@ -303,6 +307,7 @@ int Tokenizer::nextToken() {
 }
 
 FBXNode parseTextFBXNode(Tokenizer& tokenizer) {
+    PROFILE_RANGE(resource_parse, __FUNCTION__);
     FBXNode node;
 
     if (tokenizer.nextToken() != Tokenizer::DATUM_TOKEN) {
