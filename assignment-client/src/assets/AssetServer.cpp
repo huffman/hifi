@@ -33,6 +33,7 @@
 #include "SendAssetTask.h"
 #include "UploadAssetTask.h"
 #include <ClientServerUtils.h>
+#include <FBXBaker.h>
 
 static const uint8_t MIN_CORES_FOR_MULTICORE = 4;
 static const uint8_t CPU_AFFINITY_COUNT_HIGH = 2;
@@ -42,6 +43,15 @@ static const int INTERFACE_RUNNING_CHECK_FREQUENCY_MS = 1000;
 #endif
 
 const QString ASSET_SERVER_LOGGING_TARGET_NAME = "asset-server";
+
+BakeAssetTask::BakeAssetTask(const QString& assetPath) : _assetPath(assetPath) {
+}
+
+void BakeAssetTask::run() {
+
+    auto baker = std::shared_ptr<FBXBaker>("file:///" + assetPath, [this]() -> QThread* { return thread(); },
+        PathUtils::generateTemporaryDir());
+}
 
 bool interfaceRunning() {
     bool result = false;
@@ -76,13 +86,15 @@ void updateConsumedCores() {
 
 AssetServer::AssetServer(ReceivedMessage& message) :
     ThreadedAssignment(message),
-    _taskPool(this)
+    _transferTaskPool(this),
+    _bakingTaskPool(this)
 {
 
     // Most of the work will be I/O bound, reading from disk and constructing packet objects,
     // so the ideal is greater than the number of cores on the system.
     static const int TASK_POOL_THREAD_COUNT = 50;
-    _taskPool.setMaxThreadCount(TASK_POOL_THREAD_COUNT);
+    _transferTaskPool.setMaxThreadCount(TASK_POOL_THREAD_COUNT);
+    _bakingTaskPool.setMaxThreadCount(1);
 
     auto& packetReceiver = DependencyManager::get<NodeList>()->getPacketReceiver();
     packetReceiver.registerListener(PacketType::AssetGet, this, "handleAssetGet");
@@ -437,7 +449,7 @@ void AssetServer::handleAssetGet(QSharedPointer<ReceivedMessage> message, Shared
 
     // Queue task
     auto task = new SendAssetTask(message, senderNode, _filesDirectory);
-    _taskPool.start(task);
+    _transferTaskPool.start(task);
 }
 
 void AssetServer::handleAssetUpload(QSharedPointer<ReceivedMessage> message, SharedNodePointer senderNode) {
@@ -446,7 +458,7 @@ void AssetServer::handleAssetUpload(QSharedPointer<ReceivedMessage> message, Sha
         qDebug() << "Starting an UploadAssetTask for upload from" << uuidStringWithoutCurlyBraces(senderNode->getUUID());
 
         auto task = new UploadAssetTask(message, senderNode, _filesDirectory);
-        _taskPool.start(task);
+        _transferTaskPool.start(task);
     } else {
         // this is a node the domain told us is not allowed to rez entities
         // for now this also means it isn't allowed to add assets
@@ -836,15 +848,10 @@ bool AssetServer::renameMapping(AssetPath oldPath, AssetPath newPath) {
 
 static const QString HIDDEN_BAKED_CONTENT_FOLDER = "/.baked/";
 
-void AssetServer::handleCompletedBake(AssetHash originalAssetHash, QDir temporaryOutputDir) {
-    // enumerate the baking result files in the temporary directory
-    QDirIterator dirIterator(temporaryOutputDir.absolutePath(), QDir::Files, QDirIterator::Subdirectories);
-
+void AssetServer::handleCompletedBake(AssetHash originalAssetHash, QDir rootOutputDir, std::vector<QString> bakedFilePaths) {
     bool errorCompletingBake { false };
 
-    while (dirIterator.hasNext()) {
-        QString filePath = dirIterator.next();
-
+    for (auto& filePath: bakedFilePaths) {
         // figure out the hash for the contents of this file
         QFile file(filePath);
 
@@ -862,7 +869,7 @@ void AssetServer::handleCompletedBake(AssetHash originalAssetHash, QDir temporar
             }
 
             // first check that we don't already have this bake file in our list
-            auto bakeFileDestination = _filesDirectory.absoluteFilePath(bakedFileHash);
+            auto bakeFileDestination = rootOutputDir.absoluteFilePath(bakedFileHash);
             if (!QFile::exists(bakeFileDestination)) {
                 // copy each to our files folder (with the hash as their filename)
                 if (!file.copy(_filesDirectory.absoluteFilePath(bakedFileHash))) {
@@ -873,7 +880,7 @@ void AssetServer::handleCompletedBake(AssetHash originalAssetHash, QDir temporar
             }
 
             // setup the mapping for this bake file
-            auto relativeFilePath = temporaryOutputDir.relativeFilePath(filePath);
+            auto relativeFilePath = rootOutputDir.relativeFilePath(filePath);
             static const QString BAKED_ASSET_SIMPLE_NAME = "asset.fbx";
 
             if (relativeFilePath.endsWith(".fbx", Qt::CaseInsensitive)) {

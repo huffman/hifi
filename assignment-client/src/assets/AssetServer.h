@@ -20,6 +20,16 @@
 #include "AssetUtils.h"
 #include "ReceivedMessage.h"
 
+class BakeAssetTask : public QRunnable {
+public:
+    BakeAssetTask(const QString& assetPath);
+
+    void run() override;
+
+private:
+    QString _assetPath;
+};
+
 class AssetServer : public ThreadedAssignment {
     Q_OBJECT
 public:
@@ -63,8 +73,10 @@ private:
     /// Delete any unmapped files from the local asset directory
     void cleanupUnmappedFiles();
 
+    void bakeAsset(const QString& assetPath);
+
     /// Move baked content for asset to baked directory and update baked status
-    void handleCompletedBake(AssetHash originalAssetHash, QDir temporaryOutputDir);
+    void handleCompletedBake(AssetHash originalAssetHash, QDir rootOutputDir, std::vector<QString> bakedFilePaths);
 
     /// Create meta file to describe baked content for original asset
     bool createMetaFile(AssetHash originalAssetHash);
@@ -73,7 +85,11 @@ private:
 
     QDir _resourcesDirectory;
     QDir _filesDirectory;
-    QThreadPool _taskPool;
+
+    /// Task pool for handling uploads and downloads of assets
+    QThreadPool _transferTaskPool;
+
+    QThreadPool _bakingTaskPool;
 };
 
 #endif

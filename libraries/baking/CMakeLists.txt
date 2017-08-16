@@ -1,4 +1,4 @@
-set(TARGET_NAME fbx)
+set(TARGET_NAME baking)
 setup_hifi_library()
 
 
