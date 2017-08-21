@@ -1,6 +1,5 @@
 set(TARGET_NAME baking)
-setup_hifi_library()
-
+setup_hifi_library(Concurrent)
 
 find_package(FBX)
 if (FBX_FOUND)
@@ -14,6 +13,5 @@ endif ()
 
 set_target_properties(${TARGET_NAME} PROPERTIES EXCLUDE_FROM_ALL TRUE EXCLUDE_FROM_DEFAULT_BUILD TRUE)
 
-
-link_hifi_libraries(shared model networking image)
-include_hifi_library_headers(gpu image)
+link_hifi_libraries(shared model networking ktx image)
+include_hifi_library_headers(gpu)

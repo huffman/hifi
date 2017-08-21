@@ -24,6 +24,7 @@
 #include <QtCore/QJsonDocument>
 #include <QtCore/QString>
 #include <QtGui/QImageReader>
+#include <QtCore/QVector>
 
 #include <SharedUtil.h>
 #include <PathUtils.h>
@@ -35,6 +36,8 @@
 #include <ClientServerUtils.h>
 #include <FBXBaker.h>
 
+#include <memory>
+
 static const uint8_t MIN_CORES_FOR_MULTICORE = 4;
 static const uint8_t CPU_AFFINITY_COUNT_HIGH = 2;
 static const uint8_t CPU_AFFINITY_COUNT_LOW = 1;
@@ -44,13 +47,82 @@ static const int INTERFACE_RUNNING_CHECK_FREQUENCY_MS = 1000;
 
 const QString ASSET_SERVER_LOGGING_TARGET_NAME = "asset-server";
 
-BakeAssetTask::BakeAssetTask(const QString& assetPath) : _assetPath(assetPath) {
+BakeAssetTask::BakeAssetTask(const QString& assetHash, const QString& assetPath, const QString& filePath)
+    : _assetHash(assetHash), _assetPath(assetPath), _filePath(filePath) {
 }
 
 void BakeAssetTask::run() {
+    qRegisterMetaType<QVector<QString> >("QVector<QString>");
+    TextureBakerThreadGetter fn = []() -> QThread* { return QThread::currentThread();  };
+    auto baker = std::make_shared<FBXBaker>(QUrl("file:///" + _filePath), fn, PathUtils::generateTemporaryDir());
+    QEventLoop loop;
+    connect(baker.get(), &Baker::finished, &loop, &QEventLoop::quit);
+    QMetaObject::invokeMethod(baker.get(), "bake", Qt::QueuedConnection);
+    qDebug() << "Running the bake!";
+    //baker->bake();
+    loop.exec();
 
-    auto baker = std::shared_ptr<FBXBaker>("file:///" + assetPath, [this]() -> QThread* { return thread(); },
-        PathUtils::generateTemporaryDir());
+    qDebug() << "Finsihed bakign: " << _assetHash << _assetPath << baker->getOutputFiles();
+    baker->getOutputFiles();
+
+    emit bakeComplete(_assetHash, _assetPath, QVector<QString>::fromStdVector(baker->getOutputFiles()));
+}
+
+void AssetServer::bakeAsset(const QString& assetHash, const QString& assetPath, const QString& filePath) {
+    qDebug() << "Starting bake for: " << assetPath << assetHash;
+    auto it = _pendingBakes.find(assetHash);
+    if (it == _pendingBakes.end()) {
+        auto task = std::make_shared<BakeAssetTask>(assetHash, assetPath, filePath);
+        task->setAutoDelete(false);
+        _pendingBakes[assetHash] = task;
+
+        connect(task.get(), &BakeAssetTask::bakeComplete, this, [this](QString assetHash, QString assetPath, QVector<QString> outputFiles) {
+            handleCompletedBake(assetHash, outputFiles);
+        });
+
+        _bakingTaskPool.start(task.get());
+    } else {
+        qDebug() << "Already in queue";
+    }
+}
+
+QString AssetServer::getPathToAssetHash(const AssetHash& assetHash) {
+    return _filesDirectory.absoluteFilePath(assetHash);
+}
+
+void AssetServer::bakeAssets() {
+    auto it = _fileMappings.cbegin();
+    for (; it != _fileMappings.cend(); ++it) {
+        auto path = it.key();
+        auto hash = it.value().toString();
+        if (needsToBeBaked(path, hash)) {
+            // Queue bake
+            qDebug() << "Queuing bake of: " << it.key();
+            bakeAsset(hash, path, getPathToAssetHash(hash));
+        }
+    }
+}
+
+bool AssetServer::needsToBeBaked(const AssetPath& path, const AssetHash& assetHash) {
+    if (path.startsWith("/.baked/")) {
+        return false;
+    }
+
+    QStringList bakeableExtensions { "fbx" };// , "png", "tga", "jpg", "jpeg"];
+    auto dotIndex = path.lastIndexOf(".");
+    if (dotIndex == -1) {
+        return false;
+    }
+
+    auto extension = path.mid(dotIndex + 1);
+    bool canBeBaked = bakeableExtensions.contains(extension);
+
+    if (!canBeBaked) {
+        return false;
+    }
+
+    auto bakedPath = "/.baked/" + assetHash + "/asset.fbx";
+    return !_fileMappings.contains(bakedPath);
 }
 
 bool interfaceRunning() {
@@ -208,6 +280,8 @@ void AssetServer::completeSetup() {
         }
 
         nodeList->addSetOfNodeTypesToNodeInterestSet({ NodeType::Agent, NodeType::EntityScriptServer });
+
+        bakeAssets();
     } else {
         qCritical() << "Asset Server assignment will not continue because mapping file could not be loaded.";
         setFinished(true);
@@ -848,8 +922,10 @@ bool AssetServer::renameMapping(AssetPath oldPath, AssetPath newPath) {
 
 static const QString HIDDEN_BAKED_CONTENT_FOLDER = "/.baked/";
 
-void AssetServer::handleCompletedBake(AssetHash originalAssetHash, QDir rootOutputDir, std::vector<QString> bakedFilePaths) {
+void AssetServer::handleCompletedBake(AssetHash originalAssetHash, QVector<QString> bakedFilePaths) {
     bool errorCompletingBake { false };
+
+    qDebug() << "Completing bake for " << originalAssetHash;
 
     for (auto& filePath: bakedFilePaths) {
         // figure out the hash for the contents of this file
@@ -869,7 +945,7 @@ void AssetServer::handleCompletedBake(AssetHash originalAssetHash, QDir rootOutp
             }
 
             // first check that we don't already have this bake file in our list
-            auto bakeFileDestination = rootOutputDir.absoluteFilePath(bakedFileHash);
+            auto bakeFileDestination = _filesDirectory.absoluteFilePath(bakedFileHash);
             if (!QFile::exists(bakeFileDestination)) {
                 // copy each to our files folder (with the hash as their filename)
                 if (!file.copy(_filesDirectory.absoluteFilePath(bakedFileHash))) {
@@ -880,7 +956,7 @@ void AssetServer::handleCompletedBake(AssetHash originalAssetHash, QDir rootOutp
             }
 
             // setup the mapping for this bake file
-            auto relativeFilePath = rootOutputDir.relativeFilePath(filePath);
+            auto relativeFilePath = QFile(filePath).fileName();
             static const QString BAKED_ASSET_SIMPLE_NAME = "asset.fbx";
 
             if (relativeFilePath.endsWith(".fbx", Qt::CaseInsensitive)) {

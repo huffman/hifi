@@ -14,20 +14,27 @@
 
 #include <QtCore/QDir>
 #include <QtCore/QThreadPool>
+#include <QRunnable>
 
 #include <ThreadedAssignment.h>
 
 #include "AssetUtils.h"
 #include "ReceivedMessage.h"
 
-class BakeAssetTask : public QRunnable {
+class BakeAssetTask : public QObject, public QRunnable {
+    Q_OBJECT
 public:
-    BakeAssetTask(const QString& assetPath);
+    BakeAssetTask(const QString& assetHash, const QString& assetPath, const QString& filePath);
 
     void run() override;
 
+signals:
+    void bakeComplete(QString assetHash, QString assetPath, QVector<QString> outputFiles);
+
 private:
+    QString _assetHash;
     QString _assetPath;
+    QString _filePath;
 };
 
 class AssetServer : public ThreadedAssignment {
@@ -73,10 +80,14 @@ private:
     /// Delete any unmapped files from the local asset directory
     void cleanupUnmappedFiles();
 
-    void bakeAsset(const QString& assetPath);
+    QString getPathToAssetHash(const AssetHash& assetHash);
+
+    void bakeAssets();
+    bool needsToBeBaked(const AssetPath& path, const AssetHash& assetHash);
+    void bakeAsset(const QString& assetHash, const QString& assetPath, const QString& filePath);
 
     /// Move baked content for asset to baked directory and update baked status
-    void handleCompletedBake(AssetHash originalAssetHash, QDir rootOutputDir, std::vector<QString> bakedFilePaths);
+    void handleCompletedBake(AssetHash originalAssetHash, QVector<QString> bakedFilePaths);
 
     /// Create meta file to describe baked content for original asset
     bool createMetaFile(AssetHash originalAssetHash);
@@ -89,6 +100,7 @@ private:
     /// Task pool for handling uploads and downloads of assets
     QThreadPool _transferTaskPool;
 
+    QHash<QString, std::shared_ptr<BakeAssetTask>> _pendingBakes;
     QThreadPool _bakingTaskPool;
 };
 

@@ -20,6 +20,8 @@
 #include "Baker.h"
 #include "TextureBaker.h"
 
+#include "ModelBakingLoggingCategory.h"
+
 #include <gpu/Texture.h> 
 
 namespace fbxsdk {

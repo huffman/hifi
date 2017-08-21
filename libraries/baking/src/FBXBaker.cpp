@@ -560,7 +560,7 @@ void FBXBaker::checkIfTexturesFinished() {
 
             return;
         } else {
-            qCDebug(model_baking) << "Finished baking" << _fbxURL;
+            qCDebug(model_baking) << "Finished baking, emitting finsihed" << _fbxURL;
 
             emit finished();
         }
