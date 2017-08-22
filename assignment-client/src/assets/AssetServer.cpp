@@ -931,6 +931,8 @@ void AssetServer::handleCompletedBake(AssetHash originalAssetHash, QVector<QStri
         // figure out the hash for the contents of this file
         QFile file(filePath);
 
+        qDebug() << "File path: " << filePath;
+
         AssetHash bakedFileHash;
 
         if (file.open(QIODevice::ReadOnly)) {
@@ -957,6 +959,7 @@ void AssetServer::handleCompletedBake(AssetHash originalAssetHash, QVector<QStri
 
             // setup the mapping for this bake file
             auto relativeFilePath = QFile(filePath).fileName();
+            qDebug() << "Realtive file path is: " << relativeFilePath;
             static const QString BAKED_ASSET_SIMPLE_NAME = "asset.fbx";
 
             if (relativeFilePath.endsWith(".fbx", Qt::CaseInsensitive)) {
