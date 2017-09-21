@@ -583,10 +583,17 @@ void FBXBaker::rewriteAndBakeSceneTextures() {
                             QString fbxTextureFileName { textureChild.properties.at(0).toByteArray() };
                             QFileInfo textureFileInfo { fbxTextureFileName.replace("\\", "/") };
 
+                            if (textureFileInfo.suffix() == BAKED_TEXTURE_EXT.mid(1)) {
+                                // re-baking an FBX that already references baked textures is a fail
+                                // so we add an error and return from here
+                                handleError("Cannot re-bake a file that references compressed textures");
+
+                                return;
+                            }
+
 
                             // make sure this texture points to something and isn't one we've already re-mapped
                             if (!textureFileInfo.filePath().isEmpty()) {
-
                                 // check if this was an embedded texture we have already have in-memory content for
                                 auto textureContent = _textureContent.value(fbxTextureFileName.toLocal8Bit());
 
@@ -616,14 +623,6 @@ void FBXBaker::rewriteAndBakeSceneTextures() {
                                 textureChild.properties[0] = bakedTextureFileName.toLocal8Bit();
 
                                 if (!_bakingTextures.contains(urlToTexture)) {
-                                    if (textureFileInfo.suffix() == BAKED_TEXTURE_EXT.mid(1)) {
-                                        // re-baking an FBX that already references baked textures is a fail
-                                        // so we add an error and return from here
-                                        handleError("Cannot re-bake a file that references compressed textures");
-
-                                        return;
-                                    }
-
                                     _outputFiles.push_back(bakedTextureFilePath);
 
                                     // grab the ID for this texture so we can figure out the
