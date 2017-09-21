@@ -34,7 +34,7 @@ TextureBaker::TextureBaker(const QUrl& textureURL, image::TextureUsage::Type tex
     _outputDirectory(outputDirectory),
     _bakedTextureFileName(bakedFilename)
 {
-    if (bakedFilename.isEmpty() || bakedFilename.isNull()) {
+    if (bakedFilename.isEmpty()) {
         // figure out the baked texture filename
         auto originalFilename = textureURL.fileName();
         _bakedTextureFileName = originalFilename.left(originalFilename.lastIndexOf('.')) + BAKED_TEXTURE_EXT;
