@@ -1165,10 +1165,11 @@ void AssetServer::handleFailedBake(QString originalAssetHash, QString assetPath,
 
 void AssetServer::handleCompletedBake(QString originalAssetHash, QString originalAssetPath, QVector<QString> bakedFilePaths) {
     bool errorCompletingBake { false };
+    QString errorReason;
 
     qDebug() << "Completing bake for " << originalAssetHash;
 
-    for (auto& filePath: bakedFilePaths) {
+    for (auto& filePath : bakedFilePaths) {
         // figure out the hash for the contents of this file
         QFile file(filePath);
 
@@ -1184,6 +1185,7 @@ void AssetServer::handleCompletedBake(QString originalAssetHash, QString origina
             } else {
                 // stop handling this bake, couldn't hash the contents of the file
                 errorCompletingBake = true;
+                errorReason = "Failed to finalize bake";
                 break;
             }
 
@@ -1194,6 +1196,7 @@ void AssetServer::handleCompletedBake(QString originalAssetHash, QString origina
                 if (!file.copy(_filesDirectory.absoluteFilePath(bakedFileHash))) {
                     // stop handling this bake, couldn't copy the bake file into our files directory
                     errorCompletingBake = true;
+                    errorReason = "Failed to copy baked assets to asset server";
                     break;
                 }
             }
@@ -1220,12 +1223,14 @@ void AssetServer::handleCompletedBake(QString originalAssetHash, QString origina
                 qDebug() << "Failed to set mapping";
                 // stop handling this bake, couldn't add a mapping for this bake file
                 errorCompletingBake = true;
+                errorReason = "Failed to finalize bake";
                 break;
             }
         } else {
             qDebug() << "Failed to open baked file: " << filePath;
             // stop handling this bake, we couldn't open one of the files for reading
             errorCompletingBake = true;
+            errorReason = "Failed to finalize bake";
             break;
         }
     }
@@ -1235,6 +1240,10 @@ void AssetServer::handleCompletedBake(QString originalAssetHash, QString origina
         writeMetaFile(originalAssetHash);
     } else {
         qWarning() << "Could not complete bake for" << originalAssetHash;
+        AssetMeta meta;
+        meta.failedLastBake = true;
+        meta.lastBakeErrors = errorReason;
+        writeMetaFile(originalAssetHash, meta);
     }
 
     _pendingBakes.remove(originalAssetHash);
