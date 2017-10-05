@@ -339,6 +339,7 @@ bool DomainServer::optionallySetupOAuth() {
 
     const QVariantMap& settingsMap = _settingsManager.getSettingsMap();
     _oauthProviderURL = QUrl(settingsMap.value(OAUTH_PROVIDER_URL_OPTION).toString());
+    qDebug() << "OAUTH: " << _oauthProviderURL;
 
     // if we don't have an oauth provider URL then we default to the default node auth url
     if (_oauthProviderURL.isEmpty()) {
@@ -1731,8 +1732,11 @@ QString DomainServer::pathForRedirect(QString path) const {
     return "http://" + _hostname + ":" + QString::number(_httpManager.serverPort()) + path;
 }
 
+
+
 const QString URI_OAUTH = "/oauth";
 bool DomainServer::handleHTTPRequest(HTTPConnection* connection, const QUrl& url, bool skipSubHandler) {
+    qDebug() << "HTTP request received at" << connection->requestOperation() << url.toString();
     const QString JSON_MIME_TYPE = "application/json";
 
     const QString URI_ASSIGNMENT = "/assignment";
@@ -1899,6 +1903,26 @@ bool DomainServer::handleHTTPRequest(HTTPConnection* connection, const QUrl& url
             connection->respond(HTTPConnection::StatusCode200);
             restart();
             return true;
+        } else if (url.path() == "/api/domains") {
+            QUrl url { "https://metaverse.highfidelity.com/api/v1/domains" };
+            auto accessTokenVariant = valueForKeyPath(_settingsManager.getSettingsMap(), ACCESS_TOKEN_KEY_PATH)->toString();
+            qDebug() << "token: " << accessTokenVariant;
+            url.setQuery("access_token=" + accessTokenVariant);
+            QNetworkRequest req(url);
+            req.setHeader(QNetworkRequest::UserAgentHeader, HIGH_FIDELITY_USER_AGENT);
+            QNetworkReply* reply = NetworkAccessManager::getInstance().get(req);
+
+            connect(reply, &QNetworkReply::finished, this, [reply, connection]() {
+                if (reply->error() != QNetworkReply::NoError) {
+                    connection->respond(HTTPConnection::StatusCode500);
+                    return;
+                }
+
+                static const char* CONTENT_TYPE_JSON { "application/json" };
+                connection->respond(HTTPConnection::StatusCode200, reply->readAll());
+            });
+            return true;
+
         } else {
             // check if this is for json stats for a node
             const QString NODE_JSON_REGEX_STRING = QString("\\%1\\/(%2).json\\/?$").arg(URI_NODES).arg(UUID_REGEX_STRING);
@@ -1991,6 +2015,74 @@ bool DomainServer::handleHTTPRequest(HTTPConnection* connection, const QUrl& url
                 // respond with a 400 for failure
                 connection->respond(HTTPConnection::StatusCode400);
             }
+
+            return true;
+
+        } else if (url.path() == "/createDomainID") {
+            auto accessTokenVariant = valueForKeyPath(_settingsManager.getSettingsMap(), ACCESS_TOKEN_KEY_PATH);
+            if (!accessTokenVariant) {
+                connection->respond(HTTPConnection::StatusCode400);
+                return true;
+            }
+
+            auto params = connection->parseUrlEncodedForm();
+
+            auto it = params.find("private_description");
+            if (it == params.end()) {
+                connection->respond(HTTPConnection::StatusCode400);
+                return true;
+            }
+
+            QJsonObject reqRoot2 {
+                {"access_token", accessTokenVariant->toString()},
+                {"domain", { { "private_description", it.value() } } }
+            };
+
+            // TODO replace with initializer list
+            QJsonObject reqDomain;
+            reqDomain["private_description"] = it.value();
+
+            QJsonObject reqRoot;
+            reqRoot["domain"] = reqDomain;
+            reqRoot["access_token"] = accessTokenVariant->toString();
+
+            QJsonDocument reqData;
+            reqData.setObject(reqRoot2);
+
+            QUrl url { "https://metaverse.highfidelity.com/api/v1/domains" };
+            QNetworkRequest req(url);
+            req.setHeader(QNetworkRequest::UserAgentHeader, HIGH_FIDELITY_USER_AGENT);
+            req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+            QNetworkReply* reply = NetworkAccessManager::getInstance().post(req, reqData.toJson());
+            connect(reply, &QNetworkReply::finished, this, [reply, connection]() {
+                auto responseData = reply->readAll();
+                qDebug() << "Got response: " << reply->error() << responseData;
+                if (reply->error() != QNetworkReply::NoError) {
+                    connection->respond(HTTPConnection::StatusCode500);
+                    return;
+                }
+
+                QJsonParseError error;
+                QJsonDocument response { QJsonDocument::fromJson(responseData, &error) };
+                if (error.error != QJsonParseError::NoError) {
+                    qWarning() << "Error parsing create domain id response:" << error.errorString();
+                    connection->respond(HTTPConnection::StatusCode500);
+                    return;
+                }
+
+                if (!response.isObject()) {
+                    connection->respond(HTTPConnection::StatusCode500);
+                    return;
+                }
+
+                QJsonObject root {
+                    { "domain_id", response.object()["domain"].toObject()["id"] },
+                };
+
+                static const char* CONTENT_TYPE_JSON { "application/json" };
+                connection->respond(HTTPConnection::StatusCode200, QJsonDocument(root).toJson(), CONTENT_TYPE_JSON);
+            });
 
             return true;
         }
@@ -2098,6 +2190,8 @@ HTTPSConnection* DomainServer::connectionFromReplyWithState(QNetworkReply* reply
 void DomainServer::tokenGrantFinished() {
     auto tokenReply = qobject_cast<QNetworkReply*>(sender());
 
+    qDebug() << "Token grant finsihed";
+
     if (tokenReply) {
         if (tokenReply->error() == QNetworkReply::NoError) {
             // now that we have a token for this profile, send off a profile request
@@ -2129,6 +2223,7 @@ void DomainServer::profileRequestFinished() {
 
         if (connection) {
             if (profileReply->error() == QNetworkReply::NoError) {
+                qDebug() << "Reply: " << profileReply->readAll();
                 // call helper method to get cookieHeaders
                 Headers cookieHeaders = setupCookieHeadersFromProfileReply(profileReply);
 
@@ -2297,6 +2392,8 @@ QNetworkReply* DomainServer::profileRequestGivenTokenReply(QNetworkReply* tokenR
     QUrl profileURL = _oauthProviderURL;
     profileURL.setPath("/api/v1/user/profile");
     profileURL.setQuery(QString("%1=%2").arg(OAUTH_JSON_ACCESS_TOKEN_KEY, accessToken));
+
+    qDebug() << "Sending profile request to: " << profileURL;
 
     QNetworkRequest profileRequest(profileURL);
     profileRequest.setAttribute(QNetworkRequest::FollowRedirectsAttribute, true);

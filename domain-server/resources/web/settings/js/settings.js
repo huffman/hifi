@@ -469,13 +469,14 @@ function setupHFAccountButton() {
     // without an access token niether of them can do anything
     $("[data-keypath='metaverse.id']").hide();
     $("[data-keypath='metaverse.automatic_networking']").hide();
+
+    // use the existing getFormGroup helper to ask for a button
+    var buttonGroup = viewHelpers.getFormGroup('', buttonSetting, Settings.data.values);
+
+    // add the button group to the top of the metaverse panel
+    $('#metaverse .panel-body').prepend(buttonGroup);
   }
 
-  // use the existing getFormGroup helper to ask for a button
-  var buttonGroup = viewHelpers.getFormGroup('', buttonSetting, Settings.data.values);
-
-  // add the button group to the top of the metaverse panel
-  $('#metaverse .panel-body').prepend(buttonGroup);
 }
 
 function disonnectHighFidelityAccount() {
@@ -515,6 +516,8 @@ function prepareAccessTokenPrompt() {
 
     // we have an input value - set the access token input with this and save settings
     $(Settings.ACCESS_TOKEN_SELECTOR).val(inputValue).change();
+
+    console.log("Prepping access token prompt");
 
     // if the user doesn't have a domain ID set, give them the option to create one now
     if (!Settings.data.values.metaverse.id) {
@@ -589,16 +592,15 @@ function showDomainCreationAlert(justConnected) {
 function createNewDomainID(description, justConnected) {
   // get the JSON object ready that we'll use to create a new domain
   var domainJSON = {
-    "domain": {
-       "private_description": description
-    },
-    "access_token": $(Settings.ACCESS_TOKEN_SELECTOR).val()
+   "private_description": description
+    //"access_token": $(Settings.ACCESS_TOKEN_SELECTOR).val()
   }
 
-  $.post(Settings.METAVERSE_URL + "/api/v1/domains", domainJSON, function(data){
-    if (data.status == "success") {
+  //$.post(Settings.METAVERSE_URL + "/api/v1/domains", domainJSON, function(data){
+  $.post("/createDomainID", domainJSON, function(data){
       // we successfully created a domain ID, set it on that field
-      var domainID = data.domain.id;
+      var domainID = data.domain_id;
+      console.log("Setting domain id to ", data, domainID);
       $(Settings.DOMAIN_ID_SELECTOR).val(domainID).change();
 
       if (justConnected) {
@@ -619,8 +621,7 @@ function createNewDomainID(description, justConnected) {
       }, function(){
         saveSettings();
       });
-    }
-  }).fail(function(){
+  }, 'json').fail(function(){
 
     var errorText = "There was a problem creating your new domain ID. Do you want to try again or";
 
@@ -762,12 +763,14 @@ function chooseFromHighFidelityDomains(clickedButton) {
   if (Settings.initialValues.metaverse.access_token) {
 
     // add a spinner to the choose button
-    clickedButton.html("Loading domains...")
-    clickedButton.attr('disabled', 'disabled')
+    clickedButton.html("Loading domains...");
+    clickedButton.attr('disabled', 'disabled');
 
     // get a list of user domains from data-web
-    data_web_domains_url = Settings.METAVERSE_URL + "/api/v1/domains?access_token="
-    $.getJSON(data_web_domains_url + Settings.initialValues.metaverse.access_token, function(data){
+    data_web_domains_url = Settings.METAVERSE_URL + "/api/v1/domains?access_token=";
+    data_web_domains_url += Settings.initialValues.metaverse.access_token;
+    data_web_domains_url = "/api/domains";
+    $.getJSON(data_web_domains_url, function(data){
 
       modal_buttons = {
         cancel: {
@@ -778,8 +781,8 @@ function chooseFromHighFidelityDomains(clickedButton) {
 
       if (data.data.domains.length) {
         // setup a select box for the returned domains
-        modal_body = "<p>Choose the High Fidelity domain you want this domain-server to represent.<br/>This will set your domain ID on the settings page.</p>"
-        domain_select = $("<select id='domain-name-select' class='form-control'></select>")
+        modal_body = "<p>Choose the High Fidelity domain you want this domain-server to represent.<br/>This will set your domain ID on the settings page.</p>";
+        domain_select = $("<select id='domain-name-select' class='form-control'></select>");
         _.each(data.data.domains, function(domain){
           var domainString = "";
 
