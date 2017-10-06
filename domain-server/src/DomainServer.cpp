@@ -1923,6 +1923,26 @@ bool DomainServer::handleHTTPRequest(HTTPConnection* connection, const QUrl& url
             });
             return true;
 
+        } else if (url.path() == "/api/places") {
+            QUrl url { "https://metaverse.highfidelity.com/api/v1/places" };
+            auto accessTokenVariant = valueForKeyPath(_settingsManager.getSettingsMap(), ACCESS_TOKEN_KEY_PATH)->toString();
+            qDebug() << "token: " << accessTokenVariant;
+            url.setQuery("access_token=" + accessTokenVariant);
+            QNetworkRequest req(url);
+            req.setHeader(QNetworkRequest::UserAgentHeader, HIGH_FIDELITY_USER_AGENT);
+            QNetworkReply* reply = NetworkAccessManager::getInstance().get(req);
+
+            connect(reply, &QNetworkReply::finished, this, [reply, connection]() {
+                if (reply->error() != QNetworkReply::NoError) {
+                    connection->respond(HTTPConnection::StatusCode500);
+                    return;
+                }
+
+                static const char* CONTENT_TYPE_JSON { "application/json" };
+                connection->respond(HTTPConnection::StatusCode200, reply->readAll());
+            });
+            return true;
+
         } else {
             // check if this is for json stats for a node
             const QString NODE_JSON_REGEX_STRING = QString("\\%1\\/(%2).json\\/?$").arg(URI_NODES).arg(UUID_REGEX_STRING);
@@ -2033,21 +2053,16 @@ bool DomainServer::handleHTTPRequest(HTTPConnection* connection, const QUrl& url
                 return true;
             }
 
-            QJsonObject reqRoot2 {
+            QJsonObject reqRoot {
                 {"access_token", accessTokenVariant->toString()},
-                {"domain", { { "private_description", it.value() } } }
+                {"domain",
+                    QJsonObject({ { "private_description", it.value() } })
+                }
             };
 
-            // TODO replace with initializer list
-            QJsonObject reqDomain;
-            reqDomain["private_description"] = it.value();
+            QJsonDocument reqData { reqRoot };
 
-            QJsonObject reqRoot;
-            reqRoot["domain"] = reqDomain;
-            reqRoot["access_token"] = accessTokenVariant->toString();
-
-            QJsonDocument reqData;
-            reqData.setObject(reqRoot2);
+            qDebug() << "Data: " << reqData.toJson();
 
             QUrl url { "https://metaverse.highfidelity.com/api/v1/domains" };
             QNetworkRequest req(url);

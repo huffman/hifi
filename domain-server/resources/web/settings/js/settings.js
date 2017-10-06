@@ -38,6 +38,7 @@ var Settings = {
   DOMAIN_ID_SELECTOR: '[name="metaverse.id"]',
   ACCESS_TOKEN_SELECTOR: '[name="metaverse.access_token"]',
   PLACES_TABLE_ID: 'places-table',
+  ADD_PLACE_BTN_ID: 'add-place-btn',
   FORM_ID: 'settings-form',
   INVALID_ROW_CLASS: 'invalid-input',
   DATA_ROW_INDEX: 'data-row-index'
@@ -307,6 +308,11 @@ $(document).ready(function(){
   $('#' + Settings.FORM_ID).on('click', '#' + Settings.CHOOSE_DOMAIN_ID_BTN_ID, function(){
     $(this).blur();
     chooseFromHighFidelityDomains($(this))
+  });
+
+  $('#' + Settings.FORM_ID).on('click', '#' + Settings.ADD_PLACE_BTN_ID, function(){
+    $(this).blur();
+    chooseFromHighFidelityPlaces($(this))
   });
 
   $('#' + Settings.FORM_ID).on('click', '#' + Settings.GET_TEMPORARY_NAME_BTN_ID, function(){
@@ -666,6 +672,7 @@ function setupPlacesTable() {
       + " go to the <a href='" + Settings.METAVERSE_URL + "/user/places'>My Places</a> "
       + "page in your High Fidelity Metaverse account.",
     read_only: true,
+    can_add_new_rows: false,
     columns: [
       {
         "name": "name",
@@ -688,6 +695,10 @@ function setupPlacesTable() {
 
   // append the places table in the right place
   $('#places_paths .panel-body').prepend(placesTableGroup);
+
+
+  var addPlaceButton = dynamicButton(Settings.ADD_PLACE_BTN_ID, 'Add a place name');
+  $('#' + Settings.PLACES_TABLE_ID).after(addPlaceButton);
 
   // do we have a domain ID?
   if (Settings.data.values.metaverse.id.length > 0) {
@@ -758,6 +769,96 @@ function appendDomainIDButtons() {
   domainIDInput.after(createButton);
 }
 
+function chooseFromHighFidelityPlaces(clickedButton) {
+  if (Settings.initialValues.metaverse.access_token) {
+
+    // add a spinner to the choose button
+    clickedButton.html("Loading places...");
+    clickedButton.attr('disabled', 'disabled');
+
+    // get a list of user places from data-web
+    data_web_places_url = "/api/places";
+
+    $.ajax(data_web_places_url, {
+        dataType: 'json',
+        jsonp: false,
+        success: function(data){
+            var modal_buttons = {
+                cancel: {
+                    label: 'Cancel',
+                    className: 'btn-default'
+                }
+            };
+
+            data.data.places = [
+                {
+                    id: 0,
+                    name: "Test123",
+                },
+                {
+                    id: 1,
+                    name: "Another123",
+                }
+            ];
+
+
+            if (data.data.places.length) {
+                // setup a select box for the returned places
+                modal_body = "<p>Choose the High Fidelity place to point at this place server.</p>";
+                place_select = $("<select id='place-name-select' class='form-control'></select>");
+                _.each(data.data.places, function(place) {
+                    place_select.append("<option value='" + place.id + "'>" + place.name + "</option>");
+                })
+                modal_body += "<label for='place-name-select'>Places</label>" + place_select[0].outerHTML
+
+                modal_body += "<div class='form-group'>";
+                modal_body += "<label for='place-path-input' class='control-label'>Path</label>";
+                modal_body += "<input type='text' id='place-path-input class='form-control' value='/'>";
+                modal_body += "</div>";
+
+                modal_buttons["success"] = {
+                    label: 'Choose place',
+                    callback: function() {
+                        placeID = $('#place-name-select').val()
+                        // set the place ID on the form
+                        $(Settings.place_ID_SELECTOR).val(placeID).change();
+                    }
+                }
+            } else {
+                modal_buttons["success"] = {
+                    label: 'Create new place',
+                    callback: function() {
+                        window.open(Settings.METAVERSE_URL + "/user/places", '_blank');
+                    }
+                }
+                modal_body = "<p>You do not have any places in your High Fidelity account." +
+                    "<br/><br/>Go to your places page to create a new one. Once your place is created re-open this dialog to select it.</p>"
+            }
+
+            bootbox.dialog({
+                title: "Choose matching place",
+                message: modal_body,
+                buttons: modal_buttons
+            })
+
+            // remove the spinner from the choose button
+            clickedButton.html("Choose from my places")
+            clickedButton.removeAttr('disabled')
+        },
+        fail: function() {
+            console.log("FAILURE TO GET JSON");
+        }
+    });
+
+  } else {
+    bootbox.alert({
+      message: "You must have an access token to query your High Fidelity places.<br><br>" +
+        "Please follow the instructions on the settings page to add an access token.",
+      title: "Access token required"
+    })
+  }
+}
+
 function chooseFromHighFidelityDomains(clickedButton) {
   // setup the modal to help user pick their domain
   if (Settings.initialValues.metaverse.access_token) {
@@ -772,7 +873,7 @@ function chooseFromHighFidelityDomains(clickedButton) {
     data_web_domains_url = "/api/domains";
     $.getJSON(data_web_domains_url, function(data){
 
-      modal_buttons = {
+      var modal_buttons = {
         cancel: {
           label: 'Cancel',
           className: 'btn-default'
@@ -1359,6 +1460,7 @@ function getDescriptionForKey(key) {
 var SAVE_BUTTON_LABEL_SAVE = "Save";
 var SAVE_BUTTON_LABEL_RESTART = "Save and restart";
 var reasonsForRestart = [];
+var numChangesBySection = {};
 
 function badgeSidebarForDifferences(changedElement) {
   // figure out which group this input is in
@@ -1408,6 +1510,20 @@ function badgeSidebarForDifferences(changedElement) {
     badgeValue = ""
   }
 
+  numChangesBySection[panelParentID] = badgeValue;
+
+  var hasChanges = badgeValue > 0;
+
+  if (!hasChanges) {
+      for (var key in numChangesBySection) {
+          if (numChangesBySection[key] > 0) {
+              hasChanges = true;
+              break;
+          }
+      }
+  }
+
+  $(".save-button").prop("disabled", !hasChanges);
   $(".save-button").html(reasonsForRestart.length > 0 ? SAVE_BUTTON_LABEL_RESTART : SAVE_BUTTON_LABEL_SAVE);
   $("a[href='#" + panelParentID + "'] .badge").html(badgeValue);
 }
