@@ -31,8 +31,6 @@ var Settings = {
   NEW_ROW_CLASS: 'new-row',
   CONNECT_ACCOUNT_BTN_ID: 'connect-account-btn',
   DISCONNECT_ACCOUNT_BTN_ID: 'disconnect-account-btn',
-  CREATE_DOMAIN_ID_BTN_ID: 'create-domain-btn',
-  CHOOSE_DOMAIN_ID_BTN_ID: 'choose-domain-btn',
   GET_TEMPORARY_NAME_BTN_ID: 'get-temp-name-btn',
   DOMAIN_ID_SELECTOR: '[name="metaverse.id"]',
   ACCESS_TOKEN_SELECTOR: '[name="metaverse.access_token"]',
