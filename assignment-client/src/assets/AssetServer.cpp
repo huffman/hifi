@@ -191,8 +191,7 @@ bool AssetServer::needsToBeBaked(const AssetPath& path, const AssetHash& assetHa
     AssetMeta meta;
     std::tie(loaded, meta) = readMetaFile(assetHash);
 
-    // TODO: Allow failed bakes that happened on old versions to be re-baked
-    if (loaded && meta.failedLastBake) {
+    if (loaded && (meta.failedLastBake && meta.bakeVersion >= CURRENT_BAKE_VERSION)) {
         return false;
     }
 
@@ -207,7 +206,8 @@ bool AssetServer::needsToBeBaked(const AssetPath& path, const AssetHash& assetHa
     }
 
     auto bakedPath = HIDDEN_BAKED_CONTENT_FOLDER + assetHash + "/" + bakedFilename;
-    return _fileMappings.find(bakedPath) == _fileMappings.end();
+    bool bakedMappingExists = _fileMappings.find(bakedPath) == _fileMappings.end();
+    return !bakedMappingExists || (meta.bakeVersion < CURRENT_BAKE_VERSION);
 }
 
 bool interfaceRunning() {
@@ -1185,6 +1185,7 @@ void AssetServer::handleFailedBake(QString originalAssetHash, QString assetPath,
 
     meta.failedLastBake = true;
     meta.lastBakeErrors = errors;
+    meta.bakeVersion = CURRENT_BAKE_VERSION;
 
     writeMetaFile(originalAssetHash, meta);
 
@@ -1282,6 +1283,7 @@ void AssetServer::handleCompletedBake(QString originalAssetHash, QString origina
         AssetMeta meta;
         meta.failedLastBake = true;
         meta.lastBakeErrors = errorReason;
+        meta.bakeVersion = CURRENT_BAKE_VERSION;
         writeMetaFile(originalAssetHash, meta);
     }
 
