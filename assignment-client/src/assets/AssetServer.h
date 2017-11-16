@@ -21,6 +21,8 @@
 #include "AssetUtils.h"
 #include "ReceivedMessage.h"
 
+#include <BakingVersion.h>
+
 
 namespace std {
     template <>
@@ -33,7 +35,7 @@ struct AssetMeta {
     AssetMeta() {
     }
 
-    int bakeVersion { 0 };
+    BakeVersion bakeVersion { 0 };
     bool failedLastBake { false };
     QString lastBakeErrors;
 };

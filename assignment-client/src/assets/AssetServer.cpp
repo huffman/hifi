@@ -35,10 +35,19 @@
 #include <SharedUtil.h>
 #include <PathUtils.h>
 
+#include <BakingVersion.h>
+
 #include "AssetServerLogging.h"
 #include "BakeAssetTask.h"
 #include "SendAssetTask.h"
 #include "UploadAssetTask.h"
+
+QString toSlug(BakedAssetType type) {
+    switch (type) {
+        Model: return "model";
+        Texture: return "texture";
+    }
+}
 
 
 static const uint8_t MIN_CORES_FOR_MULTICORE = 4;
