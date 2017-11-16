@@ -31,11 +31,36 @@ namespace std {
     };
 }
 
+using BakeVersion = int;
+
+enum BakedAssetType : int {
+    Model = 0,
+    Texture,
+    Script,
+
+    NUM_ASSET_TYPES,
+    Undefined
+};
+
+enum class ModelBakeVersion : BakeVersion {
+    Initial = 0,
+    BetterModelBaking,
+};
+
+enum class TextureBakeVersion : BakeVersion {
+    Initial = 0,
+};
+
+enum class ScriptBakeVersion : BakeVersion {
+    Initial = 0,
+    FixEmptyScripts = 1
+};
+
 struct AssetMeta {
     AssetMeta() {
     }
 
-    BakeVersion bakeVersion { 0 };
+    BakeVersion bakeVersion;
     bool failedLastBake { false };
     QString lastBakeErrors;
 };
