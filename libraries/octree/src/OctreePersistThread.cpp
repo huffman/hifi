@@ -167,7 +167,6 @@ void OctreePersistThread::possiblyReplaceContent() {
     }
 }
 
-
 bool OctreePersistThread::process() {
 
     if (!_initialLoadComplete) {
@@ -271,7 +270,6 @@ bool OctreePersistThread::process() {
     }
     return isStillRunning();  // keep running till they terminate us
 }
-
 
 void OctreePersistThread::aboutToFinish() {
     qCDebug(octree) << "Persist thread about to finish...";
@@ -452,7 +450,6 @@ void OctreePersistThread::rollOldBackupVersions(const BackupRule& rule) {
         }
     }
 }
-
 
 void OctreePersistThread::backup() {
     qCDebug(octree) << "backup operation wantBackup:" << _wantBackup;

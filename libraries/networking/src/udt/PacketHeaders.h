@@ -126,6 +126,10 @@ public:
         EntityScriptCallMethod,
         ChallengeOwnershipRequest,
         ChallengeOwnershipReply,
+
+        OctreeDataFileRequest,
+        OctreeDataFileReply,
+
         NUM_PACKET_TYPE
     };
 
@@ -165,6 +169,7 @@ public:
             << PacketTypeEnum::Value::DomainConnectionDenied << PacketTypeEnum::Value::DomainServerPathQuery
             << PacketTypeEnum::Value::DomainServerPathResponse << PacketTypeEnum::Value::DomainServerAddedNode
             << PacketTypeEnum::Value::DomainServerConnectionToken << PacketTypeEnum::Value::DomainSettingsRequest
+            << PacketTypeEnum::Value::OctreeDataFileRequest
             << PacketTypeEnum::Value::DomainSettings << PacketTypeEnum::Value::ICEServerPeerInformation
             << PacketTypeEnum::Value::ICEServerQuery << PacketTypeEnum::Value::ICEServerHeartbeat
             << PacketTypeEnum::Value::ICEServerHeartbeatACK << PacketTypeEnum::Value::ICEPing

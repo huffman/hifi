@@ -46,6 +46,8 @@
 #include "DomainServerNodeData.h"
 #include "NodeConnectionData.h"
 
+Q_LOGGING_CATEGORY(domain_server, "hifi.domain_server")
+
 const QString ACCESS_TOKEN_KEY_PATH = "metaverse.access_token";
 
 int const DomainServer::EXIT_CODE_REBOOT = 234923;
@@ -684,6 +686,8 @@ void DomainServer::setupNodeListAndAssignments() {
 
     packetReceiver.registerListener(PacketType::ICEServerHeartbeatDenied, this, "processICEServerHeartbeatDenialPacket");
     packetReceiver.registerListener(PacketType::ICEServerHeartbeatACK, this, "processICEServerHeartbeatACK");
+
+    packetReceiver.registerListener(PacketType::OctreeDataFileRequest, this, "processOctreeDataRequestMessage");
 
     // add whatever static assignments that have been parsed to the queue
     addStaticAssignmentsToQueue();
@@ -1683,7 +1687,21 @@ void DomainServer::sendHeartbeatToIceServer() {
     } else {
         qDebug() << "Not sending ice-server heartbeat since there is no selected ice-server.";
         qDebug() << "Waiting for" << _iceServerAddr << "host lookup response";
+    }
+}
 
+void DomainServer::processOctreeDataRequestMessage(QSharedPointer<ReceivedMessage> message) {
+    bool shouldSendData { true };
+
+    bool hasExistingData { false };
+    QUuid id;
+    int version;
+    message->readPrimitive(&hasExistingData);
+    if (hasExistingData) {
+        auto idData = message->readWithoutCopy(16);
+        id.fromRfc4122(idData);
+        message->readPrimitive(&version);
+        qDebug() << "Got request for octree data " << id << version;
     }
 }
 

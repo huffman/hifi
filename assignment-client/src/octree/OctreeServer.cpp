@@ -33,6 +33,8 @@
 #include <PathUtils.h>
 #include <QtCore/QDir>
 
+Q_LOGGING_CATEGORY(octree_server, "hifi.octree-server")
+
 int OctreeServer::_clientCount = 0;
 const int MOVING_AVERAGE_SAMPLE_COUNTS = 1000;
 
@@ -83,6 +85,8 @@ int OctreeServer::_extraLongProcessWait = 0;
 int OctreeServer::_longProcessWait = 0;
 int OctreeServer::_shortProcessWait = 0;
 int OctreeServer::_noProcessWait = 0;
+
+static const QString PERSIST_FILE_DOWNLOAD_PATH = "/models.json.gz";
 
 
 void OctreeServer::resetSendingStats() {
@@ -202,7 +206,6 @@ void OctreeServer::trackPacketSendingTime(float time) {
     }
 }
 
-
 void OctreeServer::trackProcessWaitTime(float time) {
     const float MAX_SHORT_TIME = 10.0f;
     const float MAX_LONG_TIME = 100.0f;
@@ -282,8 +285,6 @@ void OctreeServer::initHTTPManager(int port) {
     // setup an httpManager with us as the request handler and the parent
     _httpManager = new HTTPManager(QHostAddress::AnyIPv4, port, documentRoot, this, this);
 }
-
-const QString PERSIST_FILE_DOWNLOAD_PATH = "/models.json.gz";
 
 bool OctreeServer::handleHTTPRequest(HTTPConnection* connection, const QUrl& url, bool skipSubHandler) {
 
@@ -1119,7 +1120,19 @@ void OctreeServer::readConfiguration() {
             _persistFilePath = getMyDefaultPersistFilename();
         }
 
+        // If persist filename does not exist, let's see if there is one beside the application binary
+        // If there is, let's copy it over to our target persist directory
+        QDir persistPath { _persistFilePath };
+        _persistAbsoluteFilePath = persistPath.absolutePath();
+
+        if (persistPath.isRelative()) {
+            // if the domain settings passed us a relative path, make an absolute path that is relative to the
+            // default data directory
+            _persistAbsoluteFilePath = QDir(PathUtils::getAppDataFilePath("entities/")).absoluteFilePath(_persistFilePath);
+        }
+
         qDebug() << "persistFilePath=" << _persistFilePath;
+        qDebug() << "persisAbsoluteFilePath=" << _persistAbsoluteFilePath;
 
         _persistAsFileType = "json.gz";
 
@@ -1199,7 +1212,82 @@ void OctreeServer::run() {
     commonInit(getMyLoggingServerTargetName(), getMyNodeType());
 }
 
+bool readOctreeFile(QString path, QJsonDocument* doc) {
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        qCritical() << "Cannot open json file for reading: " << path;
+        return false;
+    }
+
+    QByteArray data = file.readAll();
+    QByteArray jsonData;
+
+    if (path.endsWith(".json.gz")) {
+        if (!gunzip(data, jsonData)) {
+            qCritical() << "json File not in gzip format: " << path;
+            return false;
+        }
+    } else {
+        jsonData = data;
+    }
+
+    *doc = QJsonDocument::fromJson(jsonData);
+    return !doc->isNull();
+}
+
+bool readOctreeDataInfoFromFile(QString path, OctreeDataInfo* info) {
+    QJsonDocument doc;
+    if (!readOctreeFile(path, &doc)) {
+        return false;
+    }
+
+    auto root = doc.object();
+    if (root.contains("id") && root.contains("version")) {
+        info->id = root["id"].toVariant().toUuid();
+        info->version = root["id"].toInt();
+    }
+    return true;
+}
+
 void OctreeServer::domainSettingsRequestComplete() {
+    if (_state != OctreeServerState::WaitingForDomainSettings) {
+        qCWarning(octree_server) << "Received domain settings after they have already been received";
+        return;
+    }
+
+    qDebug(octree_server) << "Received domain settings!!";
+
+    _state = OctreeServerState::WaitingForOctreeDataNegotation;
+
+    auto nodeList = DependencyManager::get<NodeList>();
+    const DomainHandler& domainHandler = nodeList->getDomainHandler();
+
+    auto packet = NLPacket::create(PacketType::OctreeDataFileRequest, -1, true, false);
+
+    OctreeDataInfo info;
+    if (readOctreeDataInfoFromFile(_persistAbsoluteFilePath, &info)) {
+        packet->writePrimitive(true);
+        auto id = info.id.toByteArray();
+        packet->write(id.data(), id.length());
+        packet->writePrimitive(info.version);
+    } else {
+        packet->writePrimitive(false);
+    }
+
+    //auto nodeList = DependencyManager::get<LimitedNodeList>();
+    nodeList->sendPacket(std::move(packet), domainHandler.getSockAddr());
+
+    if (_wantPersist) {
+    } else {
+    }
+    beginRunning();
+} 
+
+void OctreeServer::beginRunning() {
+    if (_state == OctreeServerState::Running) {
+        qCWarning(octree_server) << "Server is already running";
+        return;
+    }
 
     auto nodeList = DependencyManager::get<NodeList>();
 
@@ -1211,6 +1299,8 @@ void OctreeServer::domainSettingsRequestComplete() {
     packetReceiver.registerListener(PacketType::OctreeDataNack, this, "handleOctreeDataNackPacket");
     packetReceiver.registerListener(PacketType::OctreeFileReplacement, this, "handleOctreeFileReplacement");
     packetReceiver.registerListener(PacketType::OctreeFileReplacementFromUrl, this, "handleOctreeFileReplacementFromURL");
+
+    packetReceiver.registerListener(PacketType::OctreeDataFileReply, this, "handle");
 
     readConfiguration();
 
@@ -1233,17 +1323,6 @@ void OctreeServer::domainSettingsRequestComplete() {
 
     // if we want Persistence, set up the local file and persist thread
     if (_wantPersist) {
-        // If persist filename does not exist, let's see if there is one beside the application binary
-        // If there is, let's copy it over to our target persist directory
-        QDir persistPath { _persistFilePath };
-        _persistAbsoluteFilePath = persistPath.absolutePath();
-
-        if (persistPath.isRelative()) {
-            // if the domain settings passed us a relative path, make an absolute path that is relative to the
-            // default data directory
-            _persistAbsoluteFilePath = QDir(PathUtils::getAppDataFilePath("entities/")).absoluteFilePath(_persistFilePath);
-        }
-
         static const QString ENTITY_PERSIST_EXTENSION = ".json.gz";
 
         // force the persist file to end with .json.gz

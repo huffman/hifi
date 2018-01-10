@@ -27,7 +27,22 @@
 #include "OctreeServerConsts.h"
 #include "OctreeInboundPacketProcessor.h"
 
+#include <QLoggingCategory>
+
+Q_DECLARE_LOGGING_CATEGORY(octree_server)
+
 const int DEFAULT_PACKETS_PER_INTERVAL = 2000; // some 120,000 packets per second total
+
+enum class OctreeServerState {
+    WaitingForDomainSettings,
+    WaitingForOctreeDataNegotation,
+    Running
+};
+
+struct OctreeDataInfo {
+    QUuid id { QUuid() };
+    int version { -1 };
+};
 
 /// Handles assignments of type OctreeServer - sending octrees to various clients.
 class OctreeServer : public ThreadedAssignment, public HTTPRequestHandler {
@@ -35,6 +50,8 @@ class OctreeServer : public ThreadedAssignment, public HTTPRequestHandler {
 public:
     OctreeServer(ReceivedMessage& message);
     ~OctreeServer();
+
+    OctreeServerState _state { OctreeServerState::WaitingForDomainSettings };
 
     /// allows setting of run arguments
     void setArguments(int argc, char** argv);
@@ -159,6 +176,8 @@ protected:
     QString getFileLoadTime();
     QString getConfiguration();
     QString getStatusLink();
+
+    void beginRunning();
     
     UniqueSendThread createSendThread(const SharedNodePointer& node);
     virtual UniqueSendThread newSendThread(const SharedNodePointer& node);

@@ -33,6 +33,10 @@
 
 #include "PendingAssignedNodeData.h"
 
+#include <QLoggingCategory>
+
+Q_DECLARE_LOGGING_CATEGORY(domain_server)
+
 typedef QSharedPointer<Assignment> SharedAssignmentPointer;
 typedef QMultiHash<QUuid, WalletTransaction*> TransactionHash;
 
@@ -81,6 +85,8 @@ private slots:
     void processNodeDisconnectRequestPacket(QSharedPointer<ReceivedMessage> message);
     void processICEServerHeartbeatDenialPacket(QSharedPointer<ReceivedMessage> message);
     void processICEServerHeartbeatACK(QSharedPointer<ReceivedMessage> message);
+
+    void processOctreeDataRequestMessage(QSharedPointer<ReceivedMessage> message);
 
     void setupPendingAssignmentCredits();
     void sendPendingTransactionsToServer();

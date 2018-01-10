@@ -22,7 +22,7 @@ setup_memory_debugger()
 symlink_or_copy_directory_beside_target(${_SHOULD_SYMLINK_RESOURCES} "${CMAKE_CURRENT_SOURCE_DIR}/resources" "resources")
 
 # link the shared hifi libraries
-link_hifi_libraries(embedded-webserver networking shared avatars)
+link_hifi_libraries(embedded-webserver networking shared avatars octree)
 
 # find OpenSSL
 find_package(OpenSSL REQUIRED)
