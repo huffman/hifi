@@ -16,7 +16,11 @@
 #include <glm/glm.hpp>
 
 #include <AABox.h>
+#include <Gzip.h>
 
+#include <QJsonObject>
+#include <QJsonDocument>
+#include <QFile>
 
 float calculateRenderAccuracy(const glm::vec3& position,
         const AABox& bounds,
@@ -68,4 +72,72 @@ float getAccuracyAngle(float octreeSizeScale, int boundaryLevelAdjust) {
     const float maxScale = (float)TREE_SCALE;
     float visibleDistanceAtMaxScale = boundaryDistanceForRenderLevel(boundaryLevelAdjust, octreeSizeScale) / OCTREE_TO_MESH_RATIO;
     return atan(maxScale / visibleDistanceAtMaxScale);
+}
+
+bool OctreeUtils::readOctreeFile(QString path, QJsonDocument* doc) {
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        qCritical() << "Cannot open json file for reading: " << path;
+        return false;
+    }
+
+    QByteArray data = file.readAll();
+    QByteArray jsonData;
+
+    if (path.endsWith(".json.gz")) {
+        if (!gunzip(data, jsonData)) {
+            qCritical() << "json File not in gzip format: " << path;
+            return false;
+        }
+    } else {
+        jsonData = data;
+    }
+
+    *doc = QJsonDocument::fromJson(jsonData);
+    return !doc->isNull();
+}
+
+bool readOctreeDataInfoFromJSON(QJsonObject root, OctreeUtils::RawOctreeData* octreeData) {
+    if (root.contains("Id") && root.contains("DataVersion")) {
+        octreeData->id = root["Id"].toVariant().toUuid();
+        octreeData->version = root["DataVersion"].toInt();
+    }
+    if (root.contains("Entities")) {
+        octreeData->octreeData = root["Entities"].toArray();
+    }
+    return true;
+}
+
+bool OctreeUtils::readOctreeDataInfoFromData(QByteArray data, OctreeUtils::RawOctreeData* octreeData) {
+    auto doc = QJsonDocument::fromJson(data);
+    if (doc.isNull()) {
+        return false;
+    }
+
+    auto root = doc.object();
+    return readOctreeDataInfoFromJSON(root, octreeData);
+}
+
+bool OctreeUtils::readOctreeDataInfoFromFile(QString path, OctreeUtils::RawOctreeData* octreeData) {
+    QJsonDocument doc;
+    if (!OctreeUtils::readOctreeFile(path, &doc)) {
+        return false;
+    }
+
+    auto root = doc.object();
+    return readOctreeDataInfoFromJSON(root, octreeData);
+}
+
+QByteArray OctreeUtils::RawOctreeData::toByteArray() {
+    QJsonObject obj {
+        { "dataVersion", QJsonValue(version) },
+        { "id", QJsonValue(id.toString()) },
+        { "Version", QJsonValue(5) },
+        { "Entities", octreeData }
+    };
+
+    QJsonDocument doc;
+    doc.setObject(obj);
+
+    return doc.toJson();
 }
