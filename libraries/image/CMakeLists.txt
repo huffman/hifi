@@ -7,9 +7,9 @@ if (NOT ANDROID)
     add_dependency_external_projects(nvtt)
     find_package(NVTT REQUIRED)
 
-    list(APPEND NVTT_LIBRARIES "/home/ryan/dev/hifi/build/ext/makefiles/nvtt/project/lib/libnvimage.so")
-    list(APPEND NVTT_LIBRARIES "/home/ryan/dev/hifi/build/ext/makefiles/nvtt/project/lib/libnvmath.so")
-    list(APPEND NVTT_LIBRARIES "/home/ryan/dev/hifi/build/ext/makefiles/nvtt/project/lib/libnvcore.so")
+    #list(APPEND NVTT_LIBRARIES "/home/ryan/dev/hifi/build/ext/makefiles/nvtt/project/lib/libnvimage.so")
+    #list(APPEND NVTT_LIBRARIES "/home/ryan/dev/hifi/build/ext/makefiles/nvtt/project/lib/libnvmath.so")
+    #list(APPEND NVTT_LIBRARIES "/home/ryan/dev/hifi/build/ext/makefiles/nvtt/project/lib/libnvcore.so")
 
     message("NVTT Libs: " ${NVTT_LIBRARIES} ${NVTT_BUILD_DIR})
 

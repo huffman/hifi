@@ -1693,15 +1693,18 @@ void DomainServer::sendHeartbeatToIceServer() {
 void DomainServer::processOctreeDataRequestMessage(QSharedPointer<ReceivedMessage> message) {
     bool shouldSendData { true };
 
-    bool hasExistingData { false };
+    bool remoteHasExistingData { false };
     QUuid id;
     int version;
-    message->readPrimitive(&hasExistingData);
-    if (hasExistingData) {
+    message->readPrimitive(&remoteHasExistingData);
+    if (remoteHasExistingData) {
         auto idData = message->readWithoutCopy(16);
         id.fromRfc4122(idData);
         message->readPrimitive(&version);
         qDebug() << "Got request for octree data " << id << version;
+        auto entityFilePath = PathUtils::getAppDataFilePath("entities.json.gz");
+        qDebug() << "Entity file at:" << entityFilePath;
+        
     }
 }
 

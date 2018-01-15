@@ -1283,6 +1283,10 @@ void OctreeServer::domainSettingsRequestComplete() {
     beginRunning();
 } 
 
+void OctreeServer::handleOctreeDataFileReply(QSharedPointer<ReceivedMessage> message) {
+    qDebug() << "Got reply to octree data file request";
+}
+
 void OctreeServer::beginRunning() {
     if (_state == OctreeServerState::Running) {
         qCWarning(octree_server) << "Server is already running";
@@ -1300,7 +1304,7 @@ void OctreeServer::beginRunning() {
     packetReceiver.registerListener(PacketType::OctreeFileReplacement, this, "handleOctreeFileReplacement");
     packetReceiver.registerListener(PacketType::OctreeFileReplacementFromUrl, this, "handleOctreeFileReplacementFromURL");
 
-    packetReceiver.registerListener(PacketType::OctreeDataFileReply, this, "handle");
+    packetReceiver.registerListener(PacketType::OctreeDataFileReply, this, "handleOctreeDataFileReply");
 
     readConfiguration();
 

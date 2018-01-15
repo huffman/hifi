@@ -52,6 +52,7 @@ OctreePersistThread::OctreePersistThread(OctreePointer tree, const QString& file
 {
     parseSettings(settings);
 
+
     // in case the persist filename has an extension that doesn't match the file type
     QString sansExt = fileNameWithoutExtension(_filename, PERSIST_EXTENSIONS);
     _filename = sansExt + "." + _persistAsFileType;
