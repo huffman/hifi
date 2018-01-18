@@ -16,7 +16,11 @@
 #include <glm/glm.hpp>
 
 #include <AABox.h>
+#include <Gzip.h>
 
+#include <QJsonObject>
+#include <QJsonDocument>
+#include <QFile>
 
 float calculateRenderAccuracy(const glm::vec3& position,
         const AABox& bounds,
@@ -68,4 +72,42 @@ float getAccuracyAngle(float octreeSizeScale, int boundaryLevelAdjust) {
     const float maxScale = (float)TREE_SCALE;
     float visibleDistanceAtMaxScale = boundaryDistanceForRenderLevel(boundaryLevelAdjust, octreeSizeScale) / OCTREE_TO_MESH_RATIO;
     return atan(maxScale / visibleDistanceAtMaxScale);
+}
+
+bool readOctreeFile(QString path, QJsonDocument* doc) {
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        qCritical() << "Cannot open json file for reading: " << path;
+        return false;
+    }
+
+    QByteArray data = file.readAll();
+    QByteArray jsonData;
+
+    if (path.endsWith(".json.gz")) {
+        if (!gunzip(data, jsonData)) {
+            qCritical() << "json File not in gzip format: " << path;
+            return false;
+        }
+    } else {
+        jsonData = data;
+    }
+
+    *doc = QJsonDocument::fromJson(jsonData);
+    return !doc->isNull();
+}
+
+
+bool readOctreeDataInfoFromFile(QString path, OctreeDataInfo* info) {
+    QJsonDocument doc;
+    if (!readOctreeFile(path, &doc)) {
+        return false;
+    }
+
+    auto root = doc.object();
+    if (root.contains("id") && root.contains("version")) {
+        info->id = root["id"].toVariant().toUuid();
+        info->version = root["id"].toInt();
+    }
+    return true;
 }

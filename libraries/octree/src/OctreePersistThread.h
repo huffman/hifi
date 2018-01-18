@@ -18,7 +18,6 @@
 #include <GenericThread.h>
 #include "Octree.h"
 
-/// Generalized threaded processor for handling received inbound packets.
 class OctreePersistThread : public GenericThread {
     Q_OBJECT
 public:
@@ -36,7 +35,8 @@ public:
 
     OctreePersistThread(OctreePointer tree, const QString& filename, const QString& backupDirectory,
                         int persistInterval = DEFAULT_PERSIST_INTERVAL, bool wantBackup = false,
-                        const QJsonObject& settings = QJsonObject(), bool debugTimestampNow = false, QString persistAsFileType="json.gz");
+                        const QJsonObject& settings = QJsonObject(), bool debugTimestampNow = false,
+                        QString persistAsFileType="json.gz");
 
     bool isInitialLoadComplete() const { return _initialLoadComplete; }
     quint64 getLoadElapsedTime() const { return _loadTimeUSecs; }
@@ -46,6 +46,8 @@ public:
     QString getPersistFilename() const { return _filename; }
     QString getPersistFileMimeType() const;
     QByteArray getPersistFileContents() const;
+
+    void replaceData(QByteArray data);
 
 signals:
     void loadCompleted();
@@ -62,6 +64,7 @@ protected:
     quint64 getMostRecentBackupTimeInUsecs(const QString& format);
     void parseSettings(const QJsonObject& settings);
     void possiblyReplaceContent();
+    bool backupCurrentFile();
 
 private:
     OctreePointer _tree;

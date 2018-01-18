@@ -39,11 +39,6 @@ enum class OctreeServerState {
     Running
 };
 
-struct OctreeDataInfo {
-    QUuid id { QUuid() };
-    int version { -1 };
-};
-
 /// Handles assignments of type OctreeServer - sending octrees to various clients.
 class OctreeServer : public ThreadedAssignment, public HTTPRequestHandler {
     Q_OBJECT
@@ -178,7 +173,7 @@ protected:
     QString getConfiguration();
     QString getStatusLink();
 
-    void beginRunning();
+    void beginRunning(QByteArray replaceData);
     
     UniqueSendThread createSendThread(const SharedNodePointer& node);
     virtual UniqueSendThread newSendThread(const SharedNodePointer& node);

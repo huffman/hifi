@@ -33,6 +33,8 @@
 #include <PathUtils.h>
 #include <QtCore/QDir>
 
+#include <OctreeUtils.h>
+
 Q_LOGGING_CATEGORY(octree_server, "hifi.octree-server")
 
 int OctreeServer::_clientCount = 0;
@@ -1212,50 +1214,21 @@ void OctreeServer::run() {
     commonInit(getMyLoggingServerTargetName(), getMyNodeType());
 }
 
-bool readOctreeFile(QString path, QJsonDocument* doc) {
-    QFile file(path);
-    if (!file.open(QIODevice::ReadOnly)) {
-        qCritical() << "Cannot open json file for reading: " << path;
-        return false;
-    }
-
-    QByteArray data = file.readAll();
-    QByteArray jsonData;
-
-    if (path.endsWith(".json.gz")) {
-        if (!gunzip(data, jsonData)) {
-            qCritical() << "json File not in gzip format: " << path;
-            return false;
-        }
-    } else {
-        jsonData = data;
-    }
-
-    *doc = QJsonDocument::fromJson(jsonData);
-    return !doc->isNull();
-}
-
-bool readOctreeDataInfoFromFile(QString path, OctreeDataInfo* info) {
-    QJsonDocument doc;
-    if (!readOctreeFile(path, &doc)) {
-        return false;
-    }
-
-    auto root = doc.object();
-    if (root.contains("id") && root.contains("version")) {
-        info->id = root["id"].toVariant().toUuid();
-        info->version = root["id"].toInt();
-    }
-    return true;
-}
-
 void OctreeServer::domainSettingsRequestComplete() {
     if (_state != OctreeServerState::WaitingForDomainSettings) {
         qCWarning(octree_server) << "Received domain settings after they have already been received";
         return;
     }
 
-    qDebug(octree_server) << "Received domain settings!!";
+    auto& packetReceiver = DependencyManager::get<NodeList>()->getPacketReceiver();
+    packetReceiver.registerListener(getMyQueryMessageType(), this, "handleOctreeQueryPacket");
+    packetReceiver.registerListener(PacketType::OctreeDataNack, this, "handleOctreeDataNackPacket");
+    packetReceiver.registerListener(PacketType::OctreeFileReplacement, this, "handleOctreeFileReplacement");
+    packetReceiver.registerListener(PacketType::OctreeFileReplacementFromUrl, this, "handleOctreeFileReplacementFromURL");
+
+    packetReceiver.registerListener(PacketType::OctreeDataFileReply, this, "handleOctreeDataFileReply");
+
+    qDebug(octree_server) << "Received domain settings";
 
     _state = OctreeServerState::WaitingForOctreeDataNegotation;
 
@@ -1274,37 +1247,38 @@ void OctreeServer::domainSettingsRequestComplete() {
         packet->writePrimitive(false);
     }
 
-    //auto nodeList = DependencyManager::get<LimitedNodeList>();
+    qCDebug(octree_server) << "Sending request for octree data to DS";
     nodeList->sendPacket(std::move(packet), domainHandler.getSockAddr());
 
     if (_wantPersist) {
     } else {
     }
-    beginRunning();
 } 
 
 void OctreeServer::handleOctreeDataFileReply(QSharedPointer<ReceivedMessage> message) {
-    qDebug() << "Got reply to octree data file request";
+    bool success;
+    message->readPrimitive(&success);
+    qDebug() << "Got reply to octree data file request" << success;
+    QByteArray replaceData;
+    if (success) {
+        replaceData = message->readAll();
+        qDebug() << "octree data: " << QString::fromUtf8(replaceData);
+    }
+    beginRunning(replaceData);
 }
 
-void OctreeServer::beginRunning() {
+void OctreeServer::beginRunning(QByteArray replaceData) {
     if (_state == OctreeServerState::Running) {
         qCWarning(octree_server) << "Server is already running";
         return;
     }
 
+    _state = OctreeServerState::Running;
+
     auto nodeList = DependencyManager::get<NodeList>();
 
     // we need to ask the DS about agents so we can ping/reply with them
     nodeList->addSetOfNodeTypesToNodeInterestSet({ NodeType::Agent, NodeType::EntityScriptServer });
-
-    auto& packetReceiver = DependencyManager::get<NodeList>()->getPacketReceiver();
-    packetReceiver.registerListener(getMyQueryMessageType(), this, "handleOctreeQueryPacket");
-    packetReceiver.registerListener(PacketType::OctreeDataNack, this, "handleOctreeDataNackPacket");
-    packetReceiver.registerListener(PacketType::OctreeFileReplacement, this, "handleOctreeFileReplacement");
-    packetReceiver.registerListener(PacketType::OctreeFileReplacementFromUrl, this, "handleOctreeFileReplacementFromURL");
-
-    packetReceiver.registerListener(PacketType::OctreeDataFileReply, this, "handleOctreeDataFileReply");
 
     readConfiguration();
 
@@ -1412,6 +1386,9 @@ void OctreeServer::beginRunning() {
         // now set up PersistThread
         _persistThread = new OctreePersistThread(_tree, _persistAbsoluteFilePath, _backupDirectoryPath, _persistInterval,
                                                  _wantBackup, _settings, _debugTimestampNow, _persistAsFileType);
+        if (!replaceData.isNull()) {
+            _persistThread->replaceData(replaceData);
+        }
         _persistThread->initialize(true);
     }
 

@@ -14,7 +14,19 @@
 
 #include "OctreeConstants.h"
 
+#include <QUuid>
+
 class AABox;
+class QJsonDocument;
+
+class OctreeDataInfo {
+public:
+    QUuid id { QUuid() };
+    int version { -1 };
+};
+
+bool readOctreeFile(QString path, QJsonDocument* doc);
+bool readOctreeDataInfoFromFile(QString path, OctreeDataInfo* info);
 
 /// renderAccuracy represents a floating point "visibility" of an object based on it's view from the camera. At a simple
 /// level it returns 0.0f for things that are so small for the current settings that they could not be visible.

@@ -87,6 +87,7 @@ private slots:
     void processICEServerHeartbeatACK(QSharedPointer<ReceivedMessage> message);
 
     void processOctreeDataRequestMessage(QSharedPointer<ReceivedMessage> message);
+    void processOctreeDataPersistMessage(QSharedPointer<ReceivedMessage> message);
 
     void setupPendingAssignmentCredits();
     void sendPendingTransactionsToServer();

@@ -46,6 +46,8 @@
 #include "DomainServerNodeData.h"
 #include "NodeConnectionData.h"
 
+#include <OctreeUtils.h>
+
 Q_LOGGING_CATEGORY(domain_server, "hifi.domain_server")
 
 const QString ACCESS_TOKEN_KEY_PATH = "metaverse.access_token";
@@ -688,6 +690,7 @@ void DomainServer::setupNodeListAndAssignments() {
     packetReceiver.registerListener(PacketType::ICEServerHeartbeatACK, this, "processICEServerHeartbeatACK");
 
     packetReceiver.registerListener(PacketType::OctreeDataFileRequest, this, "processOctreeDataRequestMessage");
+    packetReceiver.registerListener(PacketType::OctreeDataPersist, this, "processOctreeDataPersistMessage");
 
     // add whatever static assignments that have been parsed to the queue
     addStaticAssignmentsToQueue();
@@ -1597,6 +1600,7 @@ void DomainServer::sendHeartbeatToIceServer() {
             qWarning() << "Waiting for keypair generation to complete before sending ICE heartbeat.";
 
             if (!limitedNodeList->getSessionUUID().isNull()) {
+                qDebug() << "generating keypair";
                 accountManager->generateNewDomainKeypair(limitedNodeList->getSessionUUID());
             } else {
                 qWarning() << "Attempting to send ICE server heartbeat with no domain ID. This is not supported";
@@ -1690,8 +1694,12 @@ void DomainServer::sendHeartbeatToIceServer() {
     }
 }
 
+void DomainServer::processOctreeDataPersistMessage(QSharedPointer<ReceivedMessage> message) {
+    qCDebug(domain_server) << "Receive octree data persist message: " << QString::fromUtf8(message->readAll());
+}
+
 void DomainServer::processOctreeDataRequestMessage(QSharedPointer<ReceivedMessage> message) {
-    bool shouldSendData { true };
+    qDebug() << "Got request for octree data from " << message->getSenderSockAddr();
 
     bool remoteHasExistingData { false };
     QUuid id;
@@ -1702,10 +1710,35 @@ void DomainServer::processOctreeDataRequestMessage(QSharedPointer<ReceivedMessag
         id.fromRfc4122(idData);
         message->readPrimitive(&version);
         qDebug() << "Got request for octree data " << id << version;
-        auto entityFilePath = PathUtils::getAppDataFilePath("entities.json.gz");
-        qDebug() << "Entity file at:" << entityFilePath;
-        
     }
+    auto entityFilePath = PathUtils::getAppDataFilePath("entities/models.json.gz");
+    qDebug() << "Entity file at:" << entityFilePath;
+
+    //QFile file(entityFilePath);
+    auto reply = NLPacketList::create(PacketType::OctreeDataFileReply, QByteArray(), true, true);
+    OctreeDataInfo info;
+    if (readOctreeDataInfoFromFile(entityFilePath, &info)) {
+        if (info.id == id && info.version <= version) {
+            qCDebug(domain_server) << "ES has sufficient octree data, not sending data";
+            reply->writePrimitive(false);
+        } else {
+            qCDebug(domain_server) << "Sending newer octree data to ES";
+            QFile file(entityFilePath);
+            if (file.open(QIODevice::ReadOnly)) {
+                reply->writePrimitive(true);
+                reply->write(file.readAll());
+            } else {
+                qCDebug(domain_server) << "Unable to load entity file";
+                reply->writePrimitive(false);
+            }
+        }
+    } else {
+        qCDebug(domain_server) << "Domain server does not have valid octree data";
+        reply->writePrimitive(false);
+    }
+
+    auto nodeList = DependencyManager::get<LimitedNodeList>();
+    nodeList->sendPacketList(std::move(reply), message->getSenderSockAddr());
 }
 
 void DomainServer::processNodeJSONStatsPacket(QSharedPointer<ReceivedMessage> packetList, SharedNodePointer sendingNode) {
