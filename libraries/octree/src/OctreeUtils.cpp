@@ -74,7 +74,7 @@ float getAccuracyAngle(float octreeSizeScale, int boundaryLevelAdjust) {
     return atan(maxScale / visibleDistanceAtMaxScale);
 }
 
-bool readOctreeFile(QString path, QJsonDocument* doc) {
+bool OctreeUtils::readOctreeFile(QString path, QJsonDocument* doc) {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
         qCritical() << "Cannot open json file for reading: " << path;
@@ -97,17 +97,47 @@ bool readOctreeFile(QString path, QJsonDocument* doc) {
     return !doc->isNull();
 }
 
+bool readOctreeDataInfoFromJSON(QJsonObject root, OctreeUtils::RawOctreeData* octreeData) {
+    if (root.contains("Id") && root.contains("DataVersion")) {
+        octreeData->id = root["Id"].toVariant().toUuid();
+        octreeData->version = root["DataVersion"].toInt();
+    }
+    if (root.contains("Entities")) {
+        octreeData->octreeData = root["Entities"].toArray();
+    }
+    return true;
+}
 
-bool readOctreeDataInfoFromFile(QString path, OctreeDataInfo* info) {
-    QJsonDocument doc;
-    if (!readOctreeFile(path, &doc)) {
+bool OctreeUtils::readOctreeDataInfoFromData(QByteArray data, OctreeUtils::RawOctreeData* octreeData) {
+    auto doc = QJsonDocument::fromJson(data);
+    if (doc.isNull()) {
         return false;
     }
 
     auto root = doc.object();
-    if (root.contains("id") && root.contains("version")) {
-        info->id = root["id"].toVariant().toUuid();
-        info->version = root["id"].toInt();
+    return readOctreeDataInfoFromJSON(root, octreeData);
+}
+
+bool OctreeUtils::readOctreeDataInfoFromFile(QString path, OctreeUtils::RawOctreeData* octreeData) {
+    QJsonDocument doc;
+    if (!OctreeUtils::readOctreeFile(path, &doc)) {
+        return false;
     }
-    return true;
+
+    auto root = doc.object();
+    return readOctreeDataInfoFromJSON(root, octreeData);
+}
+
+QByteArray OctreeUtils::RawOctreeData::toByteArray() {
+    QJsonObject obj {
+        { "dataVersion", QJsonValue(version) },
+        { "id", QJsonValue(id.toString()) },
+        { "Version", QJsonValue(5) },
+        { "Entities", octreeData }
+    };
+
+    QJsonDocument doc;
+    doc.setObject(obj);
+
+    return doc.toJson();
 }

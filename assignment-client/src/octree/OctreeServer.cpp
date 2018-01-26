@@ -925,6 +925,7 @@ void OctreeServer::handleOctreeDataNackPacket(QSharedPointer<ReceivedMessage> me
     }
 }
 
+/*
 void OctreeServer::handleOctreeFileReplacement(QSharedPointer<ReceivedMessage> message) {
     if (!_isFinished && !_isShuttingDown) {
         // these messages are only allowed to come from the domain server, so make sure that is the case
@@ -1005,6 +1006,7 @@ void OctreeServer::replaceContentFromMessageData(QByteArray content) {
         qDebug() << "Received replacement octree file that is invalid - refusing to process";
     }
 }
+*/
 
 bool OctreeServer::readOptionBool(const QString& optionName, const QJsonObject& settingsSectionObject, bool& result) {
     result = false; // assume it doesn't exist
@@ -1223,12 +1225,14 @@ void OctreeServer::domainSettingsRequestComplete() {
     auto& packetReceiver = DependencyManager::get<NodeList>()->getPacketReceiver();
     packetReceiver.registerListener(getMyQueryMessageType(), this, "handleOctreeQueryPacket");
     packetReceiver.registerListener(PacketType::OctreeDataNack, this, "handleOctreeDataNackPacket");
-    packetReceiver.registerListener(PacketType::OctreeFileReplacement, this, "handleOctreeFileReplacement");
-    packetReceiver.registerListener(PacketType::OctreeFileReplacementFromUrl, this, "handleOctreeFileReplacementFromURL");
+    //packetReceiver.registerListener(PacketType::OctreeFileReplacement, this, "handleOctreeFileReplacement");
+    //packetReceiver.registerListener(PacketType::OctreeFileReplacementFromUrl, this, "handleOctreeFileReplacementFromURL");
 
     packetReceiver.registerListener(PacketType::OctreeDataFileReply, this, "handleOctreeDataFileReply");
 
     qDebug(octree_server) << "Received domain settings";
+
+    readConfiguration();
 
     _state = OctreeServerState::WaitingForOctreeDataNegotation;
 
@@ -1237,13 +1241,17 @@ void OctreeServer::domainSettingsRequestComplete() {
 
     auto packet = NLPacket::create(PacketType::OctreeDataFileRequest, -1, true, false);
 
-    OctreeDataInfo info;
-    if (readOctreeDataInfoFromFile(_persistAbsoluteFilePath, &info)) {
+    OctreeUtils::RawOctreeData data;
+    qCDebug(octree_server) << "Reading octree data from" << _persistAbsoluteFilePath;
+    if (OctreeUtils::readOctreeDataInfoFromFile(_persistAbsoluteFilePath, &data)) {
+        qCDebug(octree_server) << "Current octree data: ID(" << data.id << ") DataVersion(" << data.version << ")";
         packet->writePrimitive(true);
-        auto id = info.id.toByteArray();
-        packet->write(id.data(), id.length());
-        packet->writePrimitive(info.version);
+        auto id = data.id.toRfc4122();
+        qDebug() << "Writing UUID as " << id.length() << "Bytes";
+        packet->write(id);
+        packet->writePrimitive(data.version);
     } else {
+        qCWarning(octree_server) << "No octree data found";
         packet->writePrimitive(false);
     }
 
@@ -1256,13 +1264,14 @@ void OctreeServer::domainSettingsRequestComplete() {
 } 
 
 void OctreeServer::handleOctreeDataFileReply(QSharedPointer<ReceivedMessage> message) {
-    bool success;
-    message->readPrimitive(&success);
-    qDebug() << "Got reply to octree data file request" << success;
+    bool includesNewData;
+    message->readPrimitive(&includesNewData);
     QByteArray replaceData;
-    if (success) {
+    if (includesNewData) {
         replaceData = message->readAll();
-        qDebug() << "octree data: " << QString::fromUtf8(replaceData);
+        qDebug() << "Got reply to octree data file request, new data sent";
+    } else {
+        qDebug() << "Got reply to octree data file request, current entity data is sufficient";
     }
     beginRunning(replaceData);
 }
@@ -1279,8 +1288,6 @@ void OctreeServer::beginRunning(QByteArray replaceData) {
 
     // we need to ask the DS about agents so we can ping/reply with them
     nodeList->addSetOfNodeTypesToNodeInterestSet({ NodeType::Agent, NodeType::EntityScriptServer });
-
-    readConfiguration();
 
     beforeRun(); // after payload has been processed
 

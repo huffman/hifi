@@ -24,6 +24,7 @@
 #include <QTimer>
 #include <QUrlQuery>
 #include <QCommandLineParser>
+#include <QUuid>
 
 #include <AccountManager.h>
 #include <BuildInfo.h>
@@ -46,11 +47,14 @@
 #include "DomainServerNodeData.h"
 #include "NodeConnectionData.h"
 
+#include <Gzip.h>
+
 #include <OctreeUtils.h>
 
 Q_LOGGING_CATEGORY(domain_server, "hifi.domain_server")
 
 const QString ACCESS_TOKEN_KEY_PATH = "metaverse.access_token";
+const QString DomainServer::REPLACEMENT_FILE_EXTENSION = ".replace";
 
 int const DomainServer::EXIT_CODE_REBOOT = 234923;
 
@@ -691,6 +695,9 @@ void DomainServer::setupNodeListAndAssignments() {
 
     packetReceiver.registerListener(PacketType::OctreeDataFileRequest, this, "processOctreeDataRequestMessage");
     packetReceiver.registerListener(PacketType::OctreeDataPersist, this, "processOctreeDataPersistMessage");
+
+    packetReceiver.registerListener(PacketType::OctreeFileReplacement, this, "handleOctreeFileReplacementRequest");
+    packetReceiver.registerListener(PacketType::OctreeFileReplacementFromUrl, this, "handleOctreeFileReplacementFromURLRequest");
 
     // add whatever static assignments that have been parsed to the queue
     addStaticAssignmentsToQueue();
@@ -1695,7 +1702,27 @@ void DomainServer::sendHeartbeatToIceServer() {
 }
 
 void DomainServer::processOctreeDataPersistMessage(QSharedPointer<ReceivedMessage> message) {
-    qCDebug(domain_server) << "Receive octree data persist message: " << QString::fromUtf8(message->readAll());
+    auto data = message->readAll();
+    auto filePath = getEntitiesFilePath();
+
+    QFile f(filePath);
+    if (f.open(QIODevice::WriteOnly)) {
+        f.write(data);
+        OctreeUtils::RawOctreeData octreeData;
+        if (OctreeUtils::readOctreeDataInfoFromData(data, &octreeData)) {
+            qCDebug(domain_server) << "Wrote new entiteis file" << octreeData.id << octreeData.version;
+        }
+    } else {
+        qCDebug(domain_server) << "Failed to write new entities file";
+    }
+}
+
+QString DomainServer::getEntitiesFilePath() {
+    return PathUtils::getAppDataFilePath("entities/models.json.gz");
+}
+
+QString DomainServer::getEntitiesReplacementFilePath() {
+    return getEntitiesFilePath().append(REPLACEMENT_FILE_EXTENSION);
 }
 
 void DomainServer::processOctreeDataRequestMessage(QSharedPointer<ReceivedMessage> message) {
@@ -1706,19 +1733,20 @@ void DomainServer::processOctreeDataRequestMessage(QSharedPointer<ReceivedMessag
     int version;
     message->readPrimitive(&remoteHasExistingData);
     if (remoteHasExistingData) {
-        auto idData = message->readWithoutCopy(16);
-        id.fromRfc4122(idData);
+        auto idData = message->read(16);
+        id = QUuid::fromRfc4122(idData);
         message->readPrimitive(&version);
-        qDebug() << "Got request for octree data " << id << version;
+        qCDebug(domain_server) << "Entity server does have existing data: ID(" << id << ") DataVersion(" << version << ")";
+    } else {
+        qCDebug(domain_server) << "Entity server does not have existing data";
     }
-    auto entityFilePath = PathUtils::getAppDataFilePath("entities/models.json.gz");
-    qDebug() << "Entity file at:" << entityFilePath;
+    auto entityFilePath = getEntitiesFilePath();
 
     //QFile file(entityFilePath);
     auto reply = NLPacketList::create(PacketType::OctreeDataFileReply, QByteArray(), true, true);
-    OctreeDataInfo info;
-    if (readOctreeDataInfoFromFile(entityFilePath, &info)) {
-        if (info.id == id && info.version <= version) {
+    OctreeUtils::RawOctreeData data;
+    if (OctreeUtils::readOctreeDataInfoFromFile(entityFilePath, &data)) {
+        if (data.id == id && data.version <= version) {
             qCDebug(domain_server) << "ES has sufficient octree data, not sending data";
             reply->writePrimitive(false);
         } else {
@@ -3150,6 +3178,41 @@ void DomainServer::setupGroupCacheRefresh() {
 void DomainServer::handleOctreeFileReplacement(QByteArray octreeFile) {
     // enumerate the nodes and find any octree type servers with active sockets
 
+    //Assume we have compressed data
+    auto compressedOctree = octreeFile;
+    QByteArray jsonOctree;
+
+    bool wasCompressed = gunzip(compressedOctree, jsonOctree);
+    if (!wasCompressed) {
+        // the source was not compressed, assume we were sent regular JSON data
+        jsonOctree = compressedOctree;
+    }
+
+    OctreeUtils::RawOctreeData data;
+    if (OctreeUtils::readOctreeDataInfoFromData(jsonOctree, &data)) {
+        data.id = QUuid::createUuid();
+        data.version = 0;
+
+        gzip(data.toByteArray(), compressedOctree);
+
+        // write the compressed octree data to a special file
+        auto replacementFilePath = getEntitiesReplacementFilePath();
+        QFile replacementFile(replacementFilePath);
+        if (replacementFile.open(QIODevice::WriteOnly) && replacementFile.write(compressedOctree) != -1) {
+            // we've now written our replacement file, time to take the server down so it can
+            // process it when it comes back up
+            qInfo() << "Wrote octree replacement file to" << replacementFilePath << "- stopping server";
+
+            QMetaObject::invokeMethod(this, "restart", Qt::QueuedConnection);
+        } else {
+            qWarning() << "Could not write replacement octree data to file - refusing to process";
+        }
+    } else {
+        qDebug() << "Received replacement octree file that is invalid - refusing to process";
+    }
+
+
+    return;
     auto limitedNodeList = DependencyManager::get<LimitedNodeList>();
     limitedNodeList->eachMatchingNode([](const SharedNodePointer& node) {
         return node->getType() == NodeType::EntityServer && node->getActiveSocket();
@@ -3162,4 +3225,25 @@ void DomainServer::handleOctreeFileReplacement(QByteArray octreeFile) {
 
         limitedNodeList->sendPacketList(std::move(octreeFilePacketList), *octreeNode);
     });
+}
+
+void DomainServer::handleOctreeFileReplacementFromURLRequest(QSharedPointer<ReceivedMessage> message) {
+    qInfo() << "Received request to replace content from a url";
+    auto node = DependencyManager::get<NodeList>()->nodeWithUUID(message->getSourceID());
+    if (node->getCanReplaceContent()) {
+        // Convert message data into our URL
+        QString url(message->getMessage());
+        QUrl modelsURL = QUrl(url, QUrl::StrictMode);
+        QNetworkAccessManager& networkAccessManager = NetworkAccessManager::getInstance();
+        QNetworkRequest request(modelsURL);
+        QNetworkReply* reply = networkAccessManager.get(request);
+        connect(reply, &QNetworkReply::finished, [this, reply, modelsURL]() {
+            QNetworkReply::NetworkError networkError = reply->error();
+            if (networkError == QNetworkReply::NoError) {
+                handleOctreeFileReplacement(reply->readAll());
+            } else {
+                qDebug() << "Error downloading JSON from specified file";
+            }
+        });
+    }
 }

@@ -361,6 +361,9 @@ protected:
 
     OctreeElementPointer _rootElement = nullptr;
 
+    QUuid _persistID { QUuid::createUuid() };
+    int _persistDataVersion { 0 };
+
     bool _isDirty;
     bool _shouldReaverage;
     bool _stopImport;

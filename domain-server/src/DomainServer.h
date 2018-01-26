@@ -67,6 +67,8 @@ public:
     bool handleHTTPRequest(HTTPConnection* connection, const QUrl& url, bool skipSubHandler = false) override;
     bool handleHTTPSRequest(HTTPSConnection* connection, const QUrl& url, bool skipSubHandler = false) override;
 
+    static const QString REPLACEMENT_FILE_EXTENSION;
+
 public slots:
     /// Called by NodeList to inform us a node has been added
     void nodeAdded(SharedNodePointer node);
@@ -85,6 +87,8 @@ private slots:
     void processNodeDisconnectRequestPacket(QSharedPointer<ReceivedMessage> message);
     void processICEServerHeartbeatDenialPacket(QSharedPointer<ReceivedMessage> message);
     void processICEServerHeartbeatACK(QSharedPointer<ReceivedMessage> message);
+
+    void handleOctreeFileReplacementFromURLRequest(QSharedPointer<ReceivedMessage> message);
 
     void processOctreeDataRequestMessage(QSharedPointer<ReceivedMessage> message);
     void processOctreeDataPersistMessage(QSharedPointer<ReceivedMessage> message);
@@ -131,6 +135,9 @@ signals:
 private:
     const QUuid& getID();
     void parseCommandLine();
+
+    QString getEntitiesFilePath();
+    QString getEntitiesReplacementFilePath();
 
     void setupNodeListAndAssignments();
     bool optionallySetupOAuth();

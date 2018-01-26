@@ -33,7 +33,6 @@
 #include "OctreePersistThread.h"
 
 const int OctreePersistThread::DEFAULT_PERSIST_INTERVAL = 1000 * 30; // every 30 seconds
-const QString OctreePersistThread::REPLACEMENT_FILE_EXTENSION = ".replace";
 
 OctreePersistThread::OctreePersistThread(OctreePointer tree, const QString& filename, const QString& backupDirectory, int persistInterval,
                                          bool wantBackup, const QJsonObject& settings, bool debugTimestampNow,
@@ -164,34 +163,34 @@ bool OctreePersistThread::backupCurrentFile() {
     return true;
 }
 
-void OctreePersistThread::possiblyReplaceContent() {
-    // before we load the normal file, check if there's a pending replacement file
-    auto replacementFileName = _filename + REPLACEMENT_FILE_EXTENSION;
-
-    QFile replacementFile { replacementFileName };
-    if (replacementFile.exists()) {
-        // we have a replacement file to process
-        qDebug() << "Replacing models file with" << replacementFileName;
-
-        if (!backupCurrentFile()) {
-            if (!replacementFile.remove()) {
-                qWarning() << "Could not remove replacement models file from" << replacementFileName
-                    << "- replacement will be re-attempted on next server restart";
-                return;
-            }
-        }
-
-        // rename the replacement file to match what the persist thread is just about to read
-        if (!replacementFile.rename(_filename)) {
-            qWarning() << "Could not replace models file with" << replacementFileName << "- starting with empty models file";
-        }
-    }
-}
+//void OctreePersistThread::possiblyReplaceContent() {
+//    // before we load the normal file, check if there's a pending replacement file
+//    auto replacementFileName = _filename + REPLACEMENT_FILE_EXTENSION;
+//
+//    QFile replacementFile { replacementFileName };
+//    if (replacementFile.exists()) {
+//        // we have a replacement file to process
+//        qDebug() << "Replacing models file with" << replacementFileName;
+//
+//        if (!backupCurrentFile()) {
+//            if (!replacementFile.remove()) {
+//                qWarning() << "Could not remove replacement models file from" << replacementFileName
+//                    << "- replacement will be re-attempted on next server restart";
+//                return;
+//            }
+//        }
+//
+//        // rename the replacement file to match what the persist thread is just about to read
+//        if (!replacementFile.rename(_filename)) {
+//            qWarning() << "Could not replace models file with" << replacementFileName << "- starting with empty models file";
+//        }
+//    }
+//}
 
 bool OctreePersistThread::process() {
 
     if (!_initialLoadComplete) {
-        possiblyReplaceContent();
+        //possiblyReplaceContent();
 
         quint64 loadStarted = usecTimestampNow();
         qCDebug(octree) << "loading Octrees from file: " << _filename << "...";
@@ -343,11 +342,11 @@ void OctreePersistThread::persist() {
         const DomainHandler& domainHandler = nodeList->getDomainHandler();
 
         QByteArray data;
-        //if (_tree->toGzippedJSON(&data)) {
-        QJsonDocument doc;
-        if (_tree->toJSON(&doc)) {
+        if (_tree->toGzippedJSON(&data)) {
+        //QJsonDocument doc;
+        //if (_tree->toJSON(&doc)) {
             auto message = NLPacketList::create(PacketType::OctreeDataPersist, QByteArray(), true, true);
-            message->write(doc.toJson());
+            message->write(data);
             nodeList->sendPacketList(std::move(message), domainHandler.getSockAddr());
         } else {
             qCWarning(octree) << "Failed to persist octree";
