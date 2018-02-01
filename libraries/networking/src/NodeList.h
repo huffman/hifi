@@ -95,6 +95,10 @@ public:
 
     void removeFromIgnoreMuteSets(const QUuid& nodeID);
 
+    virtual bool isDomainServer() const override { return false; }
+    virtual QUuid getDomainUUID() const override { return _domainHandler.getUUID(); }
+    virtual HifiSockAddr getDomainSockAddr() const override { return _domainHandler.getSockAddr(); }
+
 public slots:
     void reset();
     void sendDomainServerCheckIn();
