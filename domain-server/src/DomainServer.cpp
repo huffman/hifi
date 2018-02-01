@@ -299,9 +299,12 @@ DomainServer::DomainServer(int argc, char* argv[]) :
 
         if (entitiesFile.open(QIODevice::ReadOnly)) {
             QuaZipFile zipFile { zip };
-            zipFile.open(QIODevice::WriteOnly, QuaZipNewInfo("entities.json"));
+            zipFile.open(QIODevice::WriteOnly, QuaZipNewInfo("models.json.gz", entitiesFilePath));
             zipFile.write(entitiesFile.readAll());
             zipFile.close();
+            if (zipFile.getZipError() != UNZ_OK) {
+                qDebug() << "testCreate(): outFile.close(): " << zipFile.getZipError();
+            }
         }
     });
     _contentManager->initialize(true);

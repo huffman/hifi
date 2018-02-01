@@ -36,7 +36,7 @@ const int DomainContentBackupManager::DEFAULT_PERSIST_INTERVAL = 1000 * 30;  // 
 
 // Backup format looks like: daily_backup-TIMESTAMP.zip
 const static QString DATETIME_FORMAT { "yyyy-MM-dd_HH-mm-ss" };
-const static QString DATETIME_FORMAT_RE("\\n{4}-\\n{2}-\\n{2}_\\n{2}-\\n{2}-\\n{2}");
+const static QString DATETIME_FORMAT_RE("\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}");
 
 void DomainContentBackupManager::addCreateBackupHandler(CreateBackupHandler handler) {
     _backupHandlers.push_back(handler);
@@ -84,9 +84,7 @@ void DomainContentBackupManager::parseSettings(const QJsonObject& settings) {
 
             auto name = obj["Name"].toString();
             auto format = obj["format"].toString();
-            format = name;
-            format.replace(" ", "_");
-            format = format.toLower() + "-";
+            format = name.replace(" ", "_").toLower() + "-";
 
             qCDebug(domain_server) << "    Name:" << name;
             qCDebug(domain_server) << "        format:" << format;
@@ -95,12 +93,12 @@ void DomainContentBackupManager::parseSettings(const QJsonObject& settings) {
 
             BackupRule newRule = { name, interval, format, count, 0 };
 
-            newRule.lastBackupSeconds = getMostRecentBackupTimeInUsecs(format);
+            newRule.lastBackupSeconds = getMostRecentBackupTimeInSecs(format);
 
             if (newRule.lastBackupSeconds > 0) {
-                quint64 now = usecTimestampNow();
-                quint64 sinceLastBackup = now - newRule.lastBackupSeconds;
-                qCDebug(domain_server) << "        lastBackup:" << qPrintable(formatUsecTime(sinceLastBackup)) << "ago";
+                auto now = QDateTime::currentSecsSinceEpoch();
+                auto sinceLastBackup = now - newRule.lastBackupSeconds;
+                qCDebug(domain_server).noquote() << "        lastBackup:" <<  formatSecTime(sinceLastBackup) << "ago";
             } else {
                 qCDebug(domain_server) << "        lastBackup: NEVER";
             }
@@ -112,8 +110,8 @@ void DomainContentBackupManager::parseSettings(const QJsonObject& settings) {
     }
 }
 
-int64_t DomainContentBackupManager::getMostRecentBackupTimeInUsecs(const QString& format) {
-    int64_t mostRecentBackupInUsecs = 0;
+int64_t DomainContentBackupManager::getMostRecentBackupTimeInSecs(const QString& format) {
+    int64_t mostRecentBackupInSecs = 0;
 
     QString mostRecentBackupFileName;
     QDateTime mostRecentBackupTime;
@@ -121,10 +119,10 @@ int64_t DomainContentBackupManager::getMostRecentBackupTimeInUsecs(const QString
     bool recentBackup = getMostRecentBackup(format, mostRecentBackupFileName, mostRecentBackupTime);
 
     if (recentBackup) {
-        mostRecentBackupInUsecs = mostRecentBackupTime.toMSecsSinceEpoch() * USECS_PER_MSEC;
+        mostRecentBackupInSecs = mostRecentBackupTime.toSecsSinceEpoch();
     }
 
-    return mostRecentBackupInUsecs;
+    return mostRecentBackupInSecs;
 }
 
 bool DomainContentBackupManager::process() {
@@ -138,7 +136,6 @@ bool DomainContentBackupManager::process() {
         int64_t intervalToCheck = _persistInterval * MSECS_TO_USECS;
 
         if (sinceLastSave > intervalToCheck) {
-            qCDebug(domain_server) << "processing domain content persist";
             _lastCheck = now;
             persist();
         }
@@ -146,6 +143,7 @@ bool DomainContentBackupManager::process() {
 
     // if we were asked to debugTimestampNow do that now...
     if (_debugTimestampNow) {
+
         quint64 now = usecTimestampNow();
         quint64 sinceLastDebug = now - _lastTimeDebug;
         quint64 DEBUG_TIMESTAMP_INTERVAL = 600000000;  // every 10 minutes
@@ -166,15 +164,11 @@ void DomainContentBackupManager::aboutToFinish() {
 }
 
 void DomainContentBackupManager::persist() {
-    qCDebug(domain_server) << "Maybe backing up domain content";
     // create our "lock" file to indicate we're saving.
     QString lockFileName = _backupDirectory + "/running.lock";
-    qCDebug(domain_server) << "Maybe backing up domain content" << lockFileName;
 
     std::ofstream lockFile(qPrintable(lockFileName), std::ios::out | std::ios::binary);
     if (lockFile.is_open()) {
-        qCDebug(domain_server) << "Backing up domain content";
-
         backup();
 
         lockFile.close();
@@ -185,10 +179,10 @@ void DomainContentBackupManager::persist() {
 bool DomainContentBackupManager::getMostRecentBackup(const QString& format,
                                                      QString& mostRecentBackupFileName,
                                                      QDateTime& mostRecentBackupTime) {
-    QRegExp formatRE { QRegExp::escape(format) + "(" + DATETIME_FORMAT_RE + ")" + "\\.zip" };
+    QRegExp formatRE { "backup-" + QRegExp::escape(format) + "(" + DATETIME_FORMAT_RE + ")" + "\\.zip" };
 
     QStringList filters;
-    filters << format + "*.zip";
+    filters << "backup-" + format + "*.zip";
 
     bool bestBackupFound = false;
     QString bestBackupFile;
@@ -201,7 +195,7 @@ bool DomainContentBackupManager::getMostRecentBackup(const QString& format,
         auto fileName = dirIterator.fileInfo().fileName();
 
         if (formatRE.exactMatch(fileName)) {
-            auto datetime = formatRE.cap();
+            auto datetime = formatRE.cap(1);
             auto createdAt = QDateTime::fromString(datetime, DATETIME_FORMAT);
 
             if (!createdAt.isValid()) {
@@ -258,56 +252,52 @@ void DomainContentBackupManager::removeOldBackupVersions(const BackupRule& rule)
 }
 
 void DomainContentBackupManager::backup() {
-    qCDebug(domain_server) << "Backing up content";
-    if (_backupRules.count() > 0) {
-        //quint64 now = usecTimestampNow();
-        //auto now = std::chrono::system_clock::now();
-        //auto now = QDateTime::currentSecsSinceEpoch();
-        auto nowDateTime = QDateTime::currentDateTime();
-        auto nowSeconds = nowDateTime.toSecsSinceEpoch();
+    auto nowDateTime = QDateTime::currentDateTime();
+    auto nowSeconds = nowDateTime.toSecsSinceEpoch();
 
-        for (BackupRule& rule : _backupRules) {
-            auto secondsSinceLastBackup = nowSeconds - rule.lastBackupSeconds;
+    for (BackupRule& rule : _backupRules) {
+        auto secondsSinceLastBackup = nowSeconds - rule.lastBackupSeconds;
 
-            qCDebug(domain_server) << "Checking [" << rule.name << "] - Time since last backup [" << secondsSinceLastBackup
-                                   << "] "
-                                   << "compared to backup interval [" << rule.intervalSeconds << "]...";
+        qCDebug(domain_server) << "Checking [" << rule.name << "] - Time since last backup [" << secondsSinceLastBackup
+                                << "] "
+                                << "compared to backup interval [" << rule.intervalSeconds << "]...";
 
-            if (secondsSinceLastBackup > rule.intervalSeconds) {
-                qCDebug(domain_server) << "Time since last backup [" << secondsSinceLastBackup << "] for rule [" << rule.name
-                                       << "] exceeds backup interval [" << rule.intervalSeconds << "] doing backup now...";
+        if (secondsSinceLastBackup > rule.intervalSeconds) {
+            qCDebug(domain_server) << "Time since last backup [" << secondsSinceLastBackup << "] for rule [" << rule.name
+                                    << "] exceeds backup interval [" << rule.intervalSeconds << "] doing backup now...";
 
-                auto timestamp = QDateTime::currentDateTime().toString(DATETIME_FORMAT);
-                auto fileName = "backup-" + rule.extensionFormat + timestamp + ".zip";
-                auto zip = new QuaZip(_backupDirectory + "/" + fileName);
-                zip->open(QuaZip::mdAdd);
+            auto timestamp = QDateTime::currentDateTime().toString(DATETIME_FORMAT);
+            auto fileName = "backup-" + rule.extensionFormat + timestamp + ".zip";
+            auto zip = new QuaZip(_backupDirectory + "/" + fileName);
+            zip->open(QuaZip::mdAdd);
 
-                for (auto& handler : _backupHandlers) {
-                    handler(zip);
-                }
+            for (auto& handler : _backupHandlers) {
+                handler(zip);
+            }
 
-                qDebug() << "Created backup: " << fileName;
+            zip->close();
 
-                removeOldBackupVersions(rule);
+            qDebug() << "Created backup: " << fileName;
 
-                if (rule.maxBackupVersions > 0) {
-                    // Execute backup
-                    auto result = true;
-                    if (result) {
-                        qCDebug(domain_server) << "DONE backing up persist file...";
-                        rule.lastBackupSeconds = nowSeconds;
-                    } else {
-                        qCDebug(domain_server) << "ERROR in backing up persist file...";
-                        perror("ERROR in backing up persist file");
-                    }
+            removeOldBackupVersions(rule);
+
+            if (rule.maxBackupVersions > 0) {
+                // Execute backup
+                auto result = true;
+                if (result) {
+                    qCDebug(domain_server) << "DONE backing up persist file...";
+                    rule.lastBackupSeconds = nowSeconds;
                 } else {
-                    qCDebug(domain_server) << "This backup rule" << rule.name << " has Max Rolled Backup Versions less than 1 ["
-                                           << rule.maxBackupVersions << "]."
-                                           << " There are no backups to be done...";
+                    qCDebug(domain_server) << "ERROR in backing up persist file...";
+                    perror("ERROR in backing up persist file");
                 }
             } else {
-                qCDebug(domain_server) << "Backup not needed for this rule [" << rule.name << "]...";
+                qCDebug(domain_server) << "This backup rule" << rule.name << " has Max Rolled Backup Versions less than 1 ["
+                                        << rule.maxBackupVersions << "]."
+                                        << " There are no backups to be done...";
             }
+        } else {
+            qCDebug(domain_server) << "Backup not needed for this rule [" << rule.name << "]...";
         }
     }
 }

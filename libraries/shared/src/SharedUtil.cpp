@@ -733,6 +733,10 @@ QString formatUsecTime(double usecs) {
     return formatUsecTime<double>(usecs);
 }
 
+QString formatSecTime(qint64 secs) {
+    return formatUsecTime(secs * 1000000);
+}
+
 
 QString formatSecondsElapsed(float seconds) {
     QString result;
