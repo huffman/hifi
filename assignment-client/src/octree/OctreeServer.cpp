@@ -33,6 +33,10 @@
 #include <PathUtils.h>
 #include <QtCore/QDir>
 
+#include <OctreeUtils.h>
+
+Q_LOGGING_CATEGORY(octree_server, "hifi.octree-server")
+
 int OctreeServer::_clientCount = 0;
 const int MOVING_AVERAGE_SAMPLE_COUNTS = 1000;
 
@@ -83,6 +87,8 @@ int OctreeServer::_extraLongProcessWait = 0;
 int OctreeServer::_longProcessWait = 0;
 int OctreeServer::_shortProcessWait = 0;
 int OctreeServer::_noProcessWait = 0;
+
+static const QString PERSIST_FILE_DOWNLOAD_PATH = "/models.json.gz";
 
 
 void OctreeServer::resetSendingStats() {
@@ -202,7 +208,6 @@ void OctreeServer::trackPacketSendingTime(float time) {
     }
 }
 
-
 void OctreeServer::trackProcessWaitTime(float time) {
     const float MAX_SHORT_TIME = 10.0f;
     const float MAX_LONG_TIME = 100.0f;
@@ -282,8 +287,6 @@ void OctreeServer::initHTTPManager(int port) {
     // setup an httpManager with us as the request handler and the parent
     _httpManager = new HTTPManager(QHostAddress::AnyIPv4, port, documentRoot, this, this);
 }
-
-const QString PERSIST_FILE_DOWNLOAD_PATH = "/models.json.gz";
 
 bool OctreeServer::handleHTTPRequest(HTTPConnection* connection, const QUrl& url, bool skipSubHandler) {
 
@@ -922,6 +925,7 @@ void OctreeServer::handleOctreeDataNackPacket(QSharedPointer<ReceivedMessage> me
     }
 }
 
+/*
 void OctreeServer::handleOctreeFileReplacement(QSharedPointer<ReceivedMessage> message) {
     if (!_isFinished && !_isShuttingDown) {
         // these messages are only allowed to come from the domain server, so make sure that is the case
@@ -1002,6 +1006,7 @@ void OctreeServer::replaceContentFromMessageData(QByteArray content) {
         qDebug() << "Received replacement octree file that is invalid - refusing to process";
     }
 }
+*/
 
 bool OctreeServer::readOptionBool(const QString& optionName, const QJsonObject& settingsSectionObject, bool& result) {
     result = false; // assume it doesn't exist
@@ -1119,7 +1124,19 @@ void OctreeServer::readConfiguration() {
             _persistFilePath = getMyDefaultPersistFilename();
         }
 
+        // If persist filename does not exist, let's see if there is one beside the application binary
+        // If there is, let's copy it over to our target persist directory
+        QDir persistPath { _persistFilePath };
+        _persistAbsoluteFilePath = persistPath.absolutePath();
+
+        if (persistPath.isRelative()) {
+            // if the domain settings passed us a relative path, make an absolute path that is relative to the
+            // default data directory
+            _persistAbsoluteFilePath = QDir(PathUtils::getAppDataFilePath("entities/")).absoluteFilePath(_persistFilePath);
+        }
+
         qDebug() << "persistFilePath=" << _persistFilePath;
+        qDebug() << "persisAbsoluteFilePath=" << _persistAbsoluteFilePath;
 
         _persistAsFileType = "json.gz";
 
@@ -1200,19 +1217,77 @@ void OctreeServer::run() {
 }
 
 void OctreeServer::domainSettingsRequestComplete() {
+    if (_state != OctreeServerState::WaitingForDomainSettings) {
+        qCWarning(octree_server) << "Received domain settings after they have already been received";
+        return;
+    }
+
+    auto& packetReceiver = DependencyManager::get<NodeList>()->getPacketReceiver();
+    packetReceiver.registerListener(getMyQueryMessageType(), this, "handleOctreeQueryPacket");
+    packetReceiver.registerListener(PacketType::OctreeDataNack, this, "handleOctreeDataNackPacket");
+    //packetReceiver.registerListener(PacketType::OctreeFileReplacement, this, "handleOctreeFileReplacement");
+    //packetReceiver.registerListener(PacketType::OctreeFileReplacementFromUrl, this, "handleOctreeFileReplacementFromURL");
+
+    packetReceiver.registerListener(PacketType::OctreeDataFileReply, this, "handleOctreeDataFileReply");
+
+    qDebug(octree_server) << "Received domain settings";
+
+    readConfiguration();
+
+    _state = OctreeServerState::WaitingForOctreeDataNegotation;
+
+    auto nodeList = DependencyManager::get<NodeList>();
+    const DomainHandler& domainHandler = nodeList->getDomainHandler();
+
+    auto packet = NLPacket::create(PacketType::OctreeDataFileRequest, -1, true, false);
+
+    OctreeUtils::RawOctreeData data;
+    qCDebug(octree_server) << "Reading octree data from" << _persistAbsoluteFilePath;
+    if (OctreeUtils::readOctreeDataInfoFromFile(_persistAbsoluteFilePath, &data)) {
+        qCDebug(octree_server) << "Current octree data: ID(" << data.id << ") DataVersion(" << data.version << ")";
+        packet->writePrimitive(true);
+        auto id = data.id.toRfc4122();
+        qDebug() << "Writing UUID as " << id.length() << "Bytes";
+        packet->write(id);
+        packet->writePrimitive(data.version);
+    } else {
+        qCWarning(octree_server) << "No octree data found";
+        packet->writePrimitive(false);
+    }
+
+    qCDebug(octree_server) << "Sending request for octree data to DS";
+    nodeList->sendPacket(std::move(packet), domainHandler.getSockAddr());
+
+    if (_wantPersist) {
+    } else {
+    }
+} 
+
+void OctreeServer::handleOctreeDataFileReply(QSharedPointer<ReceivedMessage> message) {
+    bool includesNewData;
+    message->readPrimitive(&includesNewData);
+    QByteArray replaceData;
+    if (includesNewData) {
+        replaceData = message->readAll();
+        qDebug() << "Got reply to octree data file request, new data sent";
+    } else {
+        qDebug() << "Got reply to octree data file request, current entity data is sufficient";
+    }
+    beginRunning(replaceData);
+}
+
+void OctreeServer::beginRunning(QByteArray replaceData) {
+    if (_state == OctreeServerState::Running) {
+        qCWarning(octree_server) << "Server is already running";
+        return;
+    }
+
+    _state = OctreeServerState::Running;
 
     auto nodeList = DependencyManager::get<NodeList>();
 
     // we need to ask the DS about agents so we can ping/reply with them
     nodeList->addSetOfNodeTypesToNodeInterestSet({ NodeType::Agent, NodeType::EntityScriptServer });
-
-    auto& packetReceiver = DependencyManager::get<NodeList>()->getPacketReceiver();
-    packetReceiver.registerListener(getMyQueryMessageType(), this, "handleOctreeQueryPacket");
-    packetReceiver.registerListener(PacketType::OctreeDataNack, this, "handleOctreeDataNackPacket");
-    packetReceiver.registerListener(PacketType::OctreeFileReplacement, this, "handleOctreeFileReplacement");
-    packetReceiver.registerListener(PacketType::OctreeFileReplacementFromUrl, this, "handleOctreeFileReplacementFromURL");
-
-    readConfiguration();
 
     beforeRun(); // after payload has been processed
 
@@ -1233,17 +1308,6 @@ void OctreeServer::domainSettingsRequestComplete() {
 
     // if we want Persistence, set up the local file and persist thread
     if (_wantPersist) {
-        // If persist filename does not exist, let's see if there is one beside the application binary
-        // If there is, let's copy it over to our target persist directory
-        QDir persistPath { _persistFilePath };
-        _persistAbsoluteFilePath = persistPath.absolutePath();
-
-        if (persistPath.isRelative()) {
-            // if the domain settings passed us a relative path, make an absolute path that is relative to the
-            // default data directory
-            _persistAbsoluteFilePath = QDir(PathUtils::getAppDataFilePath("entities/")).absoluteFilePath(_persistFilePath);
-        }
-
         static const QString ENTITY_PERSIST_EXTENSION = ".json.gz";
 
         // force the persist file to end with .json.gz
@@ -1329,6 +1393,9 @@ void OctreeServer::domainSettingsRequestComplete() {
         // now set up PersistThread
         _persistThread = new OctreePersistThread(_tree, _persistAbsoluteFilePath, _backupDirectoryPath, _persistInterval,
                                                  _wantBackup, _settings, _debugTimestampNow, _persistAsFileType);
+        if (!replaceData.isNull()) {
+            _persistThread->replaceData(replaceData);
+        }
         _persistThread->initialize(true);
     }
 

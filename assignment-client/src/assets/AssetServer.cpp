@@ -406,6 +406,10 @@ void AssetServer::completeSetup() {
         setFinished(true);
     }
 
+    qCDebug(asset_server) << "Here2";
+    qCInfo(asset_server) << "here";
+    qDebug() << "This is a debug message";
+
     // get file size limit for an asset
     static const QString ASSETS_FILESIZE_LIMIT_OPTION = "assets_filesize_limit";
     auto assetsFilesizeLimitJSONValue = assetServerObject[ASSETS_FILESIZE_LIMIT_OPTION];
@@ -428,6 +432,7 @@ void AssetServer::cleanupUnmappedFiles() {
 
     for (const auto& fileInfo : files) {
         auto filename = fileInfo.fileName();
+            qCInfo(asset_server) << "checking " << filename;
         if (hashFileRegex.exactMatch(filename)) {
             bool matched { false };
             for (auto& pair : _fileMappings) {
