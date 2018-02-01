@@ -67,7 +67,7 @@ void usecTimestampNowForceClockSkew(qint64 clockSkew) {
     ::usecTimestampNowAdjust = clockSkew;
 }
 
-static qint64 TIME_REFERENCE = 0; // in usec
+static std::atomic<qint64> TIME_REFERENCE { 0 }; // in usec
 static std::once_flag usecTimestampNowIsInitialized;
 static QElapsedTimer timestampTimer;
 

@@ -288,6 +288,23 @@ DomainServer::DomainServer(int argc, char* argv[]) :
             qDebug() << "Ignoring subnet in whitelist, invalid ip portion: " << subnet;
         }
     }
+
+    qDebug() << "Starting persist thread";
+    auto entitiesFilePath = getEntitiesFilePath();
+    _contentManager.reset(new DomainContentBackupManager(getContentBackupDir(), _settingsManager.responseObjectForType("6")["entity_server_settings"].toObject()));
+    _contentManager->addCreateBackupHandler([entitiesFilePath](QuaZip* zip) {
+        qDebug() << "Creating a backup from handler";
+
+        QFile entitiesFile { entitiesFilePath };
+
+        if (entitiesFile.open(QIODevice::ReadOnly)) {
+            QuaZipFile zipFile { zip };
+            zipFile.open(QIODevice::WriteOnly, QuaZipNewInfo("entities.json"));
+            zipFile.write(entitiesFile.readAll());
+            zipFile.close();
+        }
+    });
+    _contentManager->initialize(true);
 }
 
 void DomainServer::parseCommandLine() {
@@ -354,6 +371,11 @@ DomainServer::~DomainServer() {
     qInfo() << "Domain Server is shutting down.";
     // destroy the LimitedNodeList before the DomainServer QCoreApplication is down
     DependencyManager::destroy<LimitedNodeList>();
+
+    if (_contentManager) {
+        _contentManager->aboutToFinish();
+        _contentManager->terminating();
+    }
 }
 
 void DomainServer::queuedQuit(QString quitMessage, int exitCode) {
@@ -1715,6 +1737,14 @@ void DomainServer::processOctreeDataPersistMessage(QSharedPointer<ReceivedMessag
     } else {
         qCDebug(domain_server) << "Failed to write new entities file";
     }
+}
+
+QString DomainServer::getContentBackupFilename() {
+    return "content.zip";
+}
+
+QString DomainServer::getContentBackupDir() {
+    return PathUtils::getAppDataFilePath("backup");
 }
 
 QString DomainServer::getEntitiesFilePath() {

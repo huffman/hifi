@@ -30,6 +30,7 @@
 #include "DomainServerSettingsManager.h"
 #include "DomainServerWebSessionData.h"
 #include "WalletTransaction.h"
+#include "DomainContentBackupManager.h"
 
 #include "PendingAssignedNodeData.h"
 
@@ -100,8 +101,7 @@ private slots:
     void sendHeartbeatToMetaverse() { sendHeartbeatToMetaverse(QString()); }
     void sendHeartbeatToIceServer();
 
-    void handleConnectedNode(SharedNodePointer newNode);
-
+    void handleConnectedNode(SharedNodePointer newNode); 
     void handleTempDomainSuccess(QNetworkReply& requestReply);
     void handleTempDomainError(QNetworkReply& requestReply);
 
@@ -136,6 +136,8 @@ private:
     const QUuid& getID();
     void parseCommandLine();
 
+    QString getContentBackupFilename();
+    QString getContentBackupDir();
     QString getEntitiesFilePath();
     QString getEntitiesReplacementFilePath();
 
@@ -263,6 +265,8 @@ private:
 
     bool _sendICEServerAddressToMetaverseAPIInProgress { false };
     bool _sendICEServerAddressToMetaverseAPIRedo { false };
+
+    std::unique_ptr<DomainContentBackupManager> _contentManager { nullptr };
 
     QHash<QUuid, QPointer<HTTPSConnection>> _pendingOAuthConnections;
 };
