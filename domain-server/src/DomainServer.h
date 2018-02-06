@@ -271,9 +271,10 @@ private:
     std::unique_ptr<DomainContentBackupManager> _contentManager { nullptr };
 
     QHash<QUuid, QPointer<HTTPSConnection>> _pendingOAuthConnections;
-    BackupSupervisor _backupSupervisor;
 
     QThread _assetClientThread;
+
+    BackupSupervisor _backupSupervisor;
 };
 
 

@@ -45,6 +45,7 @@
 #include <Trace.h>
 #include <StatTracker.h>
 
+#include "BackupSupervisor.h"
 #include "DomainServerNodeData.h"
 #include "NodeConnectionData.h"
 
@@ -290,23 +291,9 @@ DomainServer::DomainServer(int argc, char* argv[]) :
     }
 
     qDebug() << "Starting persist thread";
-    auto entitiesFilePath = getEntitiesFilePath();
     _contentManager.reset(new DomainContentBackupManager(getContentBackupDir(), _settingsManager.responseObjectForType("6")["entity_server_settings"].toObject()));
-    _contentManager->addCreateBackupHandler([entitiesFilePath](QuaZip* zip) {
-        qDebug() << "Creating a backup from handler";
-
-        QFile entitiesFile { entitiesFilePath };
-
-        if (entitiesFile.open(QIODevice::ReadOnly)) {
-            QuaZipFile zipFile { zip };
-            zipFile.open(QIODevice::WriteOnly, QuaZipNewInfo("models.json.gz", entitiesFilePath));
-            zipFile.write(entitiesFile.readAll());
-            zipFile.close();
-            if (zipFile.getZipError() != UNZ_OK) {
-                qDebug() << "testCreate(): outFile.close(): " << zipFile.getZipError();
-            }
-        }
-    });
+    _contentManager->addBackupHandler(EntitiesBackupHandler(getEntitiesFilePath()));
+    _contentManager->addBackupHandler(AssetsBackupHandler(&_backupSupervisor));
     _contentManager->initialize(true);
 }
 
@@ -727,7 +714,6 @@ void DomainServer::setupNodeListAndAssignments() {
     packetReceiver.registerListener(PacketType::OctreeDataFileRequest, this, "processOctreeDataRequestMessage");
     packetReceiver.registerListener(PacketType::OctreeDataPersist, this, "processOctreeDataPersistMessage");
 
-    packetReceiver.registerListener(PacketType::OctreeFileReplacement, this, "handleOctreeFileReplacementRequest");
     packetReceiver.registerListener(PacketType::OctreeFileReplacementFromUrl, this, "handleOctreeFileReplacementFromURLRequest");
 
     // set a custom packetVersionMatch as the verify packet operator for the udt::Socket
