@@ -23,19 +23,19 @@ public:
     template <typename T>
     BackupHandler(T x) : _self(std::make_shared<Model<T>>(std::move(x))) {}
 
-    void loadBackup(const QuaZip& zip) {
+    void loadBackup(QuaZip& zip) {
         _self->loadBackup(zip);
     }
-    void createBackup(QuaZip& zip) const {
+    void createBackup(QuaZip& zip) {
         _self->createBackup(zip);
     }
-    void recoverBackup(const QuaZip& zip) const {
+    void recoverBackup(QuaZip& zip) {
         _self->recoverBackup(zip);
     }
-    void deleteBackup(const QuaZip& zip) {
+    void deleteBackup(QuaZip& zip) {
         _self->deleteBackup(zip);
     }
-    void consolidateBackup(QuaZip& zip) const {
+    void consolidateBackup(QuaZip& zip) {
         _self->consolidateBackup(zip);
     }
 
@@ -43,30 +43,30 @@ private:
     struct Concept {
         virtual ~Concept() = default;
 
-        virtual void loadBackup(const QuaZip& zip) = 0;
-        virtual void createBackup(QuaZip& zip) const = 0;
-        virtual void recoverBackup(const QuaZip& zip) const = 0;
-        virtual void deleteBackup(const QuaZip& zip) = 0;
-        virtual void consolidateBackup(QuaZip& zip) const = 0;
+        virtual void loadBackup(QuaZip& zip) = 0;
+        virtual void createBackup(QuaZip& zip) = 0;
+        virtual void recoverBackup(QuaZip& zip) = 0;
+        virtual void deleteBackup(QuaZip& zip) = 0;
+        virtual void consolidateBackup(QuaZip& zip) = 0;
     };
 
     template <typename T>
     struct Model : Concept {
         Model(T x) : data(std::move(x)) {}
 
-        void loadBackup(const QuaZip& zip) {
+        void loadBackup(QuaZip& zip) {
             data.loadBackup(zip);
         }
-        void createBackup(QuaZip& zip) const {
+        void createBackup(QuaZip& zip) {
             data.createBackup(zip);
         }
-        void recoverBackup(const QuaZip& zip) const {
+        void recoverBackup(QuaZip& zip) {
             data.recoverBackup(zip);
         }
-        void deleteBackup(const QuaZip& zip) {
+        void deleteBackup(QuaZip& zip) {
             data.deleteBackup(zip);
         }
-        void consolidateBackup(QuaZip& zip) const {
+        void consolidateBackup(QuaZip& zip) {
             data.consolidateBackup(zip);
         }
 
@@ -81,9 +81,11 @@ class EntitiesBackupHandler {
 public:
     EntitiesBackupHandler(QString entitiesFilePath) : _entitiesFilePath(entitiesFilePath) {}
 
-    void loadBackup(const QuaZip& zip) {}
+    void loadBackup(QuaZip& zip) {
+    }
 
-    void createBackup(QuaZip& zip) const {
+    // Create a skeleton backup
+    void createBackup(QuaZip& zip) {
         qDebug() << "Creating a backup from handler";
 
         QFile entitiesFile { _entitiesFilePath };
@@ -99,9 +101,32 @@ public:
         }
     }
 
-    void recoverBackup(const QuaZip& zip) const {}
-    void deleteBackup(const QuaZip& zip) {}
-    void consolidateBackup(QuaZip& zip) const {}
+    // Recover from a full backup
+    void recoverBackup(QuaZip& zip) {
+        if (!zip.setCurrentFile("models.json.gz")) {
+            qWarning() << "Failed to find models.json.gz while recovering backup";
+            return;
+        }
+        QuaZipFile zipFile { &zip };
+        zipFile.open(QIODevice::ReadOnly);
+        auto data = zipFile.readAll();
+
+        QFile entitiesFile { _entitiesFilePath };
+
+        if (entitiesFile.open(QIODevice::WriteOnly)) {
+            entitiesFile.write(data);
+        }
+
+        zipFile.close();
+    }
+
+    // Delete a skeleton backup
+    void deleteBackup(QuaZip& zip) {
+    }
+
+    // Create a full backup
+    void consolidateBackup(QuaZip& zip) {
+    }
 
 private:
     QString _entitiesFilePath;

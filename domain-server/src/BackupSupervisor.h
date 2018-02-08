@@ -106,9 +106,9 @@ class AssetsBackupHandler {
 public:
     AssetsBackupHandler(BackupSupervisor* backupSupervisor) : _backupSupervisor(backupSupervisor) {}
 
-    void loadBackup(const QuaZip& zip) {}
+    void loadBackup(QuaZip& zip) {}
 
-    void createBackup(QuaZip& zip) const {
+    void createBackup(QuaZip& zip) {
         quint64 lastRefreshTimestamp = _backupSupervisor->getLastRefreshTimestamp();
         AssetUtils::Mappings mappings = _backupSupervisor->getCurrentMappings();
 
@@ -139,9 +139,9 @@ public:
         }
     }
 
-    void recoverBackup(const QuaZip& zip) const {}
-    void deleteBackup(const QuaZip& zip) {}
-    void consolidateBackup(QuaZip& zip) const {}
+    void recoverBackup(QuaZip& zip) {}
+    void deleteBackup(QuaZip& zip) {}
+    void consolidateBackup(QuaZip& zip) {}
 
 private:
     BackupSupervisor* _backupSupervisor;

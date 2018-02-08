@@ -47,6 +47,8 @@ public:
 
     void replaceData(QByteArray data);
 
+    bool recoverFromBackup(const QString& backupName);
+
 signals:
     void loadCompleted();
 
