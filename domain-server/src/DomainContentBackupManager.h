@@ -24,7 +24,8 @@
 struct BackupItemInfo {
     QString name;
     QString absolutePath;
-    bool isManualBackup { false };
+    QDateTime createdAt;
+    bool isManualBackup;
 };
 
 class DomainContentBackupManager : public GenericThread {

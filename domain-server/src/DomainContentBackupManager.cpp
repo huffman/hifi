@@ -85,7 +85,7 @@ void DomainContentBackupManager::parseSettings(const QJsonObject& settings) {
 
             auto name = obj["Name"].toString();
             auto format = obj["format"].toString();
-            format = name.replace(" ", "_").toLower() + "-";
+            format = name.replace(" ", "_").toLower();
 
             qCDebug(domain_server) << "    Name:" << name;
             qCDebug(domain_server) << "        format:" << format;
@@ -175,7 +175,7 @@ void DomainContentBackupManager::aboutToFinish() {
 bool DomainContentBackupManager::getMostRecentBackup(const QString& format,
                                                      QString& mostRecentBackupFileName,
                                                      QDateTime& mostRecentBackupTime) {
-    QRegExp formatRE { AUTOMATIC_BACKUP_PREFIX + QRegExp::escape(format) + "(" + DATETIME_FORMAT_RE + ")" + "\\.zip" };
+    QRegExp formatRE { AUTOMATIC_BACKUP_PREFIX + QRegExp::escape(format) + "\\-(" + DATETIME_FORMAT_RE + ")" + "\\.zip" };
 
     QStringList filters;
     filters << AUTOMATIC_BACKUP_PREFIX + format + "*.zip";
@@ -237,7 +237,7 @@ void DomainContentBackupManager::recoverFromBackup(const QString& backupName) {
         if (!zip.open(QuaZip::Mode::mdUnzip)) {
             qWarning() << "Failed to unzip file: " << backupName;
             backupFile.close();
-            return false;
+            //return false;
         }
 
         for (auto& handler : _backupHandlers) {
@@ -261,6 +261,27 @@ std::vector<BackupItemInfo> DomainContentBackupManager::getAllBackups() {
     auto matchingFiles =
             backupDir.entryInfoList({ AUTOMATIC_BACKUP_PREFIX + "*.zip", MANUAL_BACKUP_PREFIX + "*.zip" },
                                     QDir::Files | QDir::NoSymLinks, QDir::Name);
+    QString prefixFormat = "(" + QRegExp::escape(AUTOMATIC_BACKUP_PREFIX) + "|" + QRegExp::escape(MANUAL_BACKUP_PREFIX) + ")";
+    QString nameFormat = "(.+)";
+    QString dateTimeFormat = "(" + DATETIME_FORMAT_RE + ")";
+    QRegExp backupNameFormat { prefixFormat + nameFormat + "-" + dateTimeFormat + "\\.zip" };
+
+    for (const auto& fileInfo : matchingFiles) {
+        auto fileName = fileInfo.fileName();
+        if (backupNameFormat.exactMatch(fileName)) {
+            auto type = backupNameFormat.cap(1);
+            auto name = backupNameFormat.cap(2);
+            auto dateTime = backupNameFormat.cap(3);
+            auto createdAt = QDateTime::fromString(dateTime, DATETIME_FORMAT);
+            if (!createdAt.isValid()) {
+                continue;
+            }
+
+            BackupItemInfo backup { name, fileInfo.absoluteFilePath(), createdAt, type == MANUAL_BACKUP_PREFIX };
+            backups.push_back(backup);
+        }
+    }
+
     return backups;
 }
 
@@ -308,7 +329,7 @@ void DomainContentBackupManager::backup() {
                                     << "] exceeds backup interval [" << rule.intervalSeconds << "] doing backup now...";
 
             auto timestamp = QDateTime::currentDateTime().toString(DATETIME_FORMAT);
-            auto fileName = AUTOMATIC_BACKUP_PREFIX + rule.extensionFormat + timestamp + ".zip";
+            auto fileName = AUTOMATIC_BACKUP_PREFIX + rule.extensionFormat + "-" + timestamp + ".zip";
             auto path = _backupDirectory + "/" + fileName;
             QuaZip zip(path);
             if (!zip.open(QuaZip::mdAdd)) {

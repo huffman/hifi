@@ -296,7 +296,10 @@ DomainServer::DomainServer(int argc, char* argv[]) :
     _contentManager->addBackupHandler(AssetsBackupHandler(&_backupSupervisor));
     _contentManager->initialize(true);
 
-    _contentManager->recoverFromBackup("test.zip");
+    qDebug() << "Existing backups:";
+    for (auto& backup : _contentManager->getAllBackups()) {
+        qDebug() << "  Backup: " << backup.name << backup.createdAt;
+    }
 }
 
 void DomainServer::parseCommandLine() {
