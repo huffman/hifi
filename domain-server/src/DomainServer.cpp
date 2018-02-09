@@ -296,7 +296,7 @@ DomainServer::DomainServer(int argc, char* argv[]) :
     _contentManager->addBackupHandler(AssetsBackupHandler(&_backupSupervisor));
     _contentManager->initialize(true);
 
-    _contentManager->recoverFromBackup("backup-daily_rolling-2018-02-06_15-13-50.zip");
+    _contentManager->recoverFromBackup("test.zip");
 }
 
 void DomainServer::parseCommandLine() {
@@ -1730,6 +1730,12 @@ void DomainServer::processOctreeDataPersistMessage(QSharedPointer<ReceivedMessag
     auto data = message->readAll();
     auto filePath = getEntitiesFilePath();
 
+    QDir dir(getEntitiesDirPath());
+    if (!dir.exists()) {
+        qCDebug(domain_server) << "Creating entities content directory:" << dir.absolutePath();
+        dir.mkpath(".");
+    }
+
     QFile f(filePath);
     if (f.open(QIODevice::WriteOnly)) {
         f.write(data);
@@ -1738,7 +1744,7 @@ void DomainServer::processOctreeDataPersistMessage(QSharedPointer<ReceivedMessag
             qCDebug(domain_server) << "Wrote new entiteis file" << octreeData.id << octreeData.version;
         }
     } else {
-        qCDebug(domain_server) << "Failed to write new entities file";
+        qCDebug(domain_server) << "Failed to write new entities file:" << filePath;
     }
 }
 
@@ -1747,7 +1753,11 @@ QString DomainServer::getContentBackupFilename() {
 }
 
 QString DomainServer::getContentBackupDir() {
-    return PathUtils::getAppDataFilePath("backup");
+    return PathUtils::getAppDataFilePath("backups");
+}
+
+QString DomainServer::getEntitiesDirPath() {
+    return PathUtils::getAppDataFilePath("entities");
 }
 
 QString DomainServer::getEntitiesFilePath() {

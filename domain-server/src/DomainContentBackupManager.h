@@ -21,6 +21,12 @@
 
 #include "BackupHandler.h"
 
+struct BackupItemInfo {
+    QString name;
+    QString absolutePath;
+    bool isManualBackup { false };
+};
+
 class DomainContentBackupManager : public GenericThread {
     Q_OBJECT
 public:
@@ -42,12 +48,14 @@ public:
 
     void addBackupHandler(BackupHandler handler);
     bool isInitialLoadComplete() const { return _initialLoadComplete; }
+    std::vector<BackupItemInfo> getAllBackups();
 
     void aboutToFinish();  /// call this to inform the persist thread that the owner is about to finish to support final persist
 
     void replaceData(QByteArray data);
 
-    bool recoverFromBackup(const QString& backupName);
+public slots:
+    void recoverFromBackup(const QString& backupName);
 
 signals:
     void loadCompleted();
@@ -56,7 +64,6 @@ protected:
     /// Implements generic processing behavior for this thread.
     bool process() override;
 
-    void persist();
     void backup();
     void removeOldBackupVersions(const BackupRule& rule);
     bool getMostRecentBackup(const QString& format, QString& mostRecentBackupFileName, QDateTime& mostRecentBackupTime);
