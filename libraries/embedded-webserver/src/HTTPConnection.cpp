@@ -133,11 +133,32 @@ QList<FormData> HTTPConnection::parseFormData() const {
 }
 
 void HTTPConnection::respond(const char* code, const QByteArray& content, const char* contentType, const Headers& headers) {
+    QByteArray data(content);
+    auto device { std::unique_ptr<QBuffer>(new QBuffer()) };
+    device->setBuffer(new QByteArray(content));
+    if (!device->open(QIODevice::ReadOnly)) {
+    }
+    respond(code, std::move(device), contentType, headers);
+}
+
+void HTTPConnection::respond(const char* code, std::unique_ptr<QIODevice> device, const char* contentType, const Headers& headers) {
+    _responseDevice = std::move(device);
+
+    qDebug() << "Responding to: " << _requestOperation << _requestUrl.toString();
+
     _socket->write("HTTP/1.1 ");
+
+    if (_responseDevice->isSequential()) {
+        qWarning() << "Error responding to HTTPConnection: sequential IO devices not supported";
+        _socket->write(StatusCode500);
+        _socket->write("\r\n");
+        _socket->disconnect(SIGNAL(readyRead()), this);
+        _socket->disconnectFromHost();
+        return;
+    }
+
     _socket->write(code);
     _socket->write("\r\n");
-
-    int csize = content.size();
 
     for (Headers::const_iterator it = headers.constBegin(), end = headers.constEnd();
             it != end; it++) {
@@ -146,6 +167,8 @@ void HTTPConnection::respond(const char* code, const QByteArray& content, const 
         _socket->write(it.value());
         _socket->write("\r\n");
     }
+
+    int csize = _responseDevice->size();
     if (csize > 0) {
         _socket->write("Content-Length: ");
         _socket->write(QByteArray::number(csize));
@@ -157,20 +180,41 @@ void HTTPConnection::respond(const char* code, const QByteArray& content, const 
     }
     _socket->write("Connection: close\r\n\r\n");
 
-    if (csize > 0) {
-        _socket->write(content);
+    qDebug() << "Setting up signals";
+
+    if (_responseDevice->atEnd()) {
+        _socket->disconnectFromHost();
+    } else {
+        constexpr size_t HTTP_RESPONSE_CHUNK_SIZE = 1024 * 10;
+        int totalToBeWritten = csize;
+        connect(_socket, &QTcpSocket::bytesWritten, this, [this, totalToBeWritten](size_t bytes) mutable {
+            qDebug() << "Bytes were written " << _responseDevice.get() << bytes << totalToBeWritten;
+            if (!_responseDevice->atEnd()) {
+                qDebug() << "Writing chunk";
+                totalToBeWritten -= _socket->write(_responseDevice->read(HTTP_RESPONSE_CHUNK_SIZE));
+                if (_responseDevice->atEnd()) {
+                    qDebug() << "At end of device, disconnecting";
+                    _socket->disconnectFromHost();
+                    disconnect(_socket, &QTcpSocket::bytesWritten, this, nullptr);
+                }
+            }
+        });
+
     }
 
     // make sure we receive no further read notifications
-    _socket->disconnect(SIGNAL(readyRead()), this);
-
-    _socket->disconnectFromHost();
+    disconnect(_socket, &QTcpSocket::readyRead, this, nullptr);
 }
 
 void HTTPConnection::readRequest() {
     if (!_socket->canReadLine()) {
         return;
     }
+    if (!_requestUrl.isEmpty()) {
+        qDebug() << "Request URL was already set";
+        return;
+    }
+    qDebug() << "Reading request";
     // parse out the method and resource
     QByteArray line = _socket->readLine().trimmed();
     if (line.startsWith("HEAD")) {
@@ -205,6 +249,7 @@ void HTTPConnection::readRequest() {
 }
 
 void HTTPConnection::readHeaders() {
+    qDebug() << "Reading headers";
     while (_socket->canReadLine()) {
         QByteArray line = _socket->readLine();
         QByteArray trimmed = line.trimmed();
@@ -249,6 +294,7 @@ void HTTPConnection::readContent() {
     if (_socket->bytesAvailable() < size) {
         return;
     }
+    qDebug() << "Reading content";
     _socket->read(_requestContent.data(), size);
     _socket->disconnect(this, SLOT(readContent()));
 

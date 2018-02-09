@@ -140,6 +140,7 @@ private:
 
     QString getContentBackupFilename();
     QString getContentBackupDir();
+    QString getEntitiesDirPath();
     QString getEntitiesFilePath();
     QString getEntitiesReplacementFilePath();
 

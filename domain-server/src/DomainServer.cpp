@@ -296,7 +296,10 @@ DomainServer::DomainServer(int argc, char* argv[]) :
     _contentManager->addBackupHandler(AssetsBackupHandler(&_backupSupervisor));
     _contentManager->initialize(true);
 
-    _contentManager->recoverFromBackup("backup-daily_rolling-2018-02-06_15-13-50.zip");
+    qDebug() << "Existing backups:";
+    for (auto& backup : _contentManager->getAllBackups()) {
+        qDebug() << "  Backup: " << backup.name << backup.createdAt;
+    }
 }
 
 void DomainServer::parseCommandLine() {
@@ -1730,6 +1733,12 @@ void DomainServer::processOctreeDataPersistMessage(QSharedPointer<ReceivedMessag
     auto data = message->readAll();
     auto filePath = getEntitiesFilePath();
 
+    QDir dir(getEntitiesDirPath());
+    if (!dir.exists()) {
+        qCDebug(domain_server) << "Creating entities content directory:" << dir.absolutePath();
+        dir.mkpath(".");
+    }
+
     QFile f(filePath);
     if (f.open(QIODevice::WriteOnly)) {
         f.write(data);
@@ -1738,7 +1747,7 @@ void DomainServer::processOctreeDataPersistMessage(QSharedPointer<ReceivedMessag
             qCDebug(domain_server) << "Wrote new entiteis file" << octreeData.id << octreeData.version;
         }
     } else {
-        qCDebug(domain_server) << "Failed to write new entities file";
+        qCDebug(domain_server) << "Failed to write new entities file:" << filePath;
     }
 }
 
@@ -1747,7 +1756,11 @@ QString DomainServer::getContentBackupFilename() {
 }
 
 QString DomainServer::getContentBackupDir() {
-    return PathUtils::getAppDataFilePath("backup");
+    return PathUtils::getAppDataFilePath("backups");
+}
+
+QString DomainServer::getEntitiesDirPath() {
+    return PathUtils::getAppDataFilePath("entities");
 }
 
 QString DomainServer::getEntitiesFilePath() {
@@ -1916,6 +1929,9 @@ bool DomainServer::handleHTTPRequest(HTTPConnection* connection, const QUrl& url
     const QString URI_API_PLACES = "/api/places";
     const QString URI_API_DOMAINS = "/api/domains";
     const QString URI_API_DOMAINS_ID = "/api/domains/";
+    const QString URI_API_BACKUPS = "/api/backups";
+    const QString URI_API_BACKUPS_RECOVER = "/api/backups/recover/";
+    //const QString URI_API_BACKUPS_CREATE = "/api/backups";
 
     const QString UUID_REGEX_STRING = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
@@ -2101,6 +2117,34 @@ bool DomainServer::handleHTTPRequest(HTTPConnection* connection, const QUrl& url
             connection->respond(HTTPConnection::StatusCode200, nodesDocument.toJson(), qPrintable(JSON_MIME_TYPE));
 
             return true;
+        } else if (url.path().startsWith(URI_API_BACKUPS_RECOVER)) {
+            auto id = url.path().mid(QString(URI_API_BACKUPS_RECOVER).length());
+            _contentManager->recoverFromBackup(id);
+            QJsonObject rootJSON;
+            rootJSON["success"] = true;
+            QJsonDocument docJSON(rootJSON);
+            connection->respond(HTTPConnection::StatusCode200, docJSON.toJson(), JSON_MIME_TYPE.toUtf8());
+            return true;
+        } else if (url.path() == URI_API_BACKUPS) {
+            QJsonObject rootJSON;
+            QJsonArray backupsJSON;
+
+            auto backups = _contentManager->getAllBackups();
+
+            for (const auto& backup : backups) {
+                QJsonObject obj;
+                obj["id"] = backup.id;
+                obj["name"] = backup.name;
+                obj["createdAtMillis"] = backup.createdAt.toMSecsSinceEpoch();
+                obj["isManualBackup"] = backup.isManualBackup;
+                backupsJSON.push_back(obj);
+            }
+
+            rootJSON["backups"] = backupsJSON;
+            QJsonDocument docJSON(rootJSON);
+
+            connection->respond(HTTPConnection::StatusCode200, docJSON.toJson(), JSON_MIME_TYPE.toUtf8());
+            return true;
         } else if (url.path() == URI_RESTART) {
             connection->respond(HTTPConnection::StatusCode200);
             restart();
@@ -2203,6 +2247,20 @@ bool DomainServer::handleHTTPRequest(HTTPConnection* connection, const QUrl& url
                 connection->respond(HTTPConnection::StatusCode400);
             }
 
+            return true;
+
+        } else if (url.path() == URI_API_BACKUPS) {
+            qDebug() << "GOt request to create a backup:";
+            auto params = connection->parseUrlEncodedForm();
+            auto it = params.find("name");
+            if (it == params.end()) {
+                connection->respond(HTTPConnection::StatusCode400, "Bad request, missing `name`");
+                return true;
+            }
+
+            _contentManager->createManualBackup(it.value());
+
+            connection->respond(HTTPConnection::StatusCode200);
             return true;
 
         } else if (url.path() == "/domain_settings") {

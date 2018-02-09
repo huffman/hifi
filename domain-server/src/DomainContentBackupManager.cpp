@@ -28,6 +28,7 @@
 #include <NumericalConstants.h>
 #include <PerfStat.h>
 #include <PathUtils.h>
+#include <shared/QtHelpers.h>
 
 #include "DomainServer.h"
 #include "DomainContentBackupManager.h"
@@ -37,7 +38,8 @@ const int DomainContentBackupManager::DEFAULT_PERSIST_INTERVAL = 1000 * 30;  // 
 // Backup format looks like: daily_backup-TIMESTAMP.zip
 const static QString DATETIME_FORMAT { "yyyy-MM-dd_HH-mm-ss" };
 const static QString DATETIME_FORMAT_RE("\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}");
-
+static const QString AUTOMATIC_BACKUP_PREFIX{ "autobackup-" };
+static const QString MANUAL_BACKUP_PREFIX{ "backup-" };
 void DomainContentBackupManager::addBackupHandler(BackupHandler handler) {
     _backupHandlers.push_back(std::move(handler));
 }
@@ -83,7 +85,7 @@ void DomainContentBackupManager::parseSettings(const QJsonObject& settings) {
 
             auto name = obj["Name"].toString();
             auto format = obj["format"].toString();
-            format = name.replace(" ", "_").toLower() + "-";
+            format = name.replace(" ", "_").toLower();
 
             qCDebug(domain_server) << "    Name:" << name;
             qCDebug(domain_server) << "        format:" << format;
@@ -125,6 +127,14 @@ int64_t DomainContentBackupManager::getMostRecentBackupTimeInSecs(const QString&
 }
 
 bool DomainContentBackupManager::process() {
+    if (!_initialLoadComplete) {
+        QDir backupDir { _backupDirectory };
+        if (!backupDir.exists()) {
+            backupDir.mkpath(".");
+        }
+        _initialLoadComplete = true;
+    }
+
     if (isStillRunning()) {
         constexpr int64_t MSECS_TO_USECS = 1000;
         constexpr int64_t USECS_TO_SLEEP = 10 * MSECS_TO_USECS;  // every 10ms
@@ -136,7 +146,7 @@ bool DomainContentBackupManager::process() {
 
         if (sinceLastSave > intervalToCheck) {
             _lastCheck = now;
-            persist();
+            backup();
         }
     }
 
@@ -157,31 +167,18 @@ bool DomainContentBackupManager::process() {
 
 void DomainContentBackupManager::aboutToFinish() {
     qCDebug(domain_server) << "Persist thread about to finish...";
-    persist();
+    backup();
     qCDebug(domain_server) << "Persist thread done with about to finish...";
     _stopThread = true;
-}
-
-void DomainContentBackupManager::persist() {
-    // create our "lock" file to indicate we're saving.
-    QString lockFileName = _backupDirectory + "/running.lock";
-
-    std::ofstream lockFile(qPrintable(lockFileName), std::ios::out | std::ios::binary);
-    if (lockFile.is_open()) {
-        backup();
-
-        lockFile.close();
-        remove(qPrintable(lockFileName));
-    }
 }
 
 bool DomainContentBackupManager::getMostRecentBackup(const QString& format,
                                                      QString& mostRecentBackupFileName,
                                                      QDateTime& mostRecentBackupTime) {
-    QRegExp formatRE { "backup-" + QRegExp::escape(format) + "(" + DATETIME_FORMAT_RE + ")" + "\\.zip" };
+    QRegExp formatRE { AUTOMATIC_BACKUP_PREFIX + QRegExp::escape(format) + "\\-(" + DATETIME_FORMAT_RE + ")" + "\\.zip" };
 
     QStringList filters;
-    filters << "backup-" + format + "*.zip";
+    filters << AUTOMATIC_BACKUP_PREFIX + format + "*.zip";
 
     bool bestBackupFound = false;
     QString bestBackupFile;
@@ -223,7 +220,14 @@ bool DomainContentBackupManager::getMostRecentBackup(const QString& format,
     return bestBackupFound;
 }
 
-bool DomainContentBackupManager::recoverFromBackup(const QString& backupName) {
+void DomainContentBackupManager::recoverFromBackup(const QString& backupName) {
+    if (QThread::currentThread() != thread()) {
+        bool result{ false };
+        BLOCKING_INVOKE_METHOD(this, "recoverFromBackup",
+                               Q_ARG(const QString&, backupName));
+        return;
+    }
+
     qDebug() << "Recoving from" << backupName;
 
     QDir backupDir { _backupDirectory };
@@ -233,7 +237,6 @@ bool DomainContentBackupManager::recoverFromBackup(const QString& backupName) {
         if (!zip.open(QuaZip::Mode::mdUnzip)) {
             qWarning() << "Failed to unzip file: " << backupName;
             backupFile.close();
-            return false;
         }
 
         for (auto& handler : _backupHandlers) {
@@ -241,11 +244,41 @@ bool DomainContentBackupManager::recoverFromBackup(const QString& backupName) {
         }
         
         backupFile.close();
+        qDebug() << "Successfully recovered from " << backupName;
+    } else {
+        qWarning() << "Invalid id: " << backupName;
+    }
+}
+
+std::vector<BackupItemInfo> DomainContentBackupManager::getAllBackups() {
+    std::vector<BackupItemInfo> backups;
+
+    QDir backupDir { _backupDirectory };
+    auto matchingFiles =
+            backupDir.entryInfoList({ AUTOMATIC_BACKUP_PREFIX + "*.zip", MANUAL_BACKUP_PREFIX + "*.zip" },
+                                    QDir::Files | QDir::NoSymLinks, QDir::Name);
+    QString prefixFormat = "(" + QRegExp::escape(AUTOMATIC_BACKUP_PREFIX) + "|" + QRegExp::escape(MANUAL_BACKUP_PREFIX) + ")";
+    QString nameFormat = "(.+)";
+    QString dateTimeFormat = "(" + DATETIME_FORMAT_RE + ")";
+    QRegExp backupNameFormat { prefixFormat + nameFormat + "-" + dateTimeFormat + "\\.zip" };
+
+    for (const auto& fileInfo : matchingFiles) {
+        auto fileName = fileInfo.fileName();
+        if (backupNameFormat.exactMatch(fileName)) {
+            auto type = backupNameFormat.cap(1);
+            auto name = backupNameFormat.cap(2);
+            auto dateTime = backupNameFormat.cap(3);
+            auto createdAt = QDateTime::fromString(dateTime, DATETIME_FORMAT);
+            if (!createdAt.isValid()) {
+                continue;
+            }
+
+            BackupItemInfo backup { fileInfo.fileName(), name, fileInfo.absoluteFilePath(), createdAt, type == MANUAL_BACKUP_PREFIX };
+            backups.push_back(backup);
+        }
     }
 
-    qDebug() << "Successfully recovered from " << backupName;
-
-    return true;
+    return backups;
 }
 
 void DomainContentBackupManager::removeOldBackupVersions(const BackupRule& rule) {
@@ -254,9 +287,10 @@ void DomainContentBackupManager::removeOldBackupVersions(const BackupRule& rule)
         qCDebug(domain_server) << "Rolling old backup versions for rule" << rule.name;
 
         auto matchingFiles =
-                backupDir.entryInfoList({ rule.extensionFormat + "*.zip" }, QDir::Files | QDir::NoSymLinks, QDir::Name);
+                backupDir.entryInfoList({ AUTOMATIC_BACKUP_PREFIX + rule.extensionFormat + "*.zip" }, QDir::Files | QDir::NoSymLinks, QDir::Name);
 
         int backupsToDelete = matchingFiles.length() - rule.maxBackupVersions;
+        qCDebug(domain_server) << "Found" << matchingFiles.length() << "backups, deleting " << backupsToDelete << "backup(s)";
         for (int i = 0; i < backupsToDelete; ++i) {
             auto fileInfo = matchingFiles[i].absoluteFilePath();
             QFile backupFile(fileInfo);
@@ -290,18 +324,15 @@ void DomainContentBackupManager::backup() {
             qCDebug(domain_server) << "Time since last backup [" << secondsSinceLastBackup << "] for rule [" << rule.name
                                     << "] exceeds backup interval [" << rule.intervalSeconds << "] doing backup now...";
 
-            auto timestamp = QDateTime::currentDateTime().toString(DATETIME_FORMAT);
-            auto fileName = "backup-" + rule.extensionFormat + timestamp + ".zip";
-            QuaZip zip(_backupDirectory + "/" + fileName);
-            zip.open(QuaZip::mdAdd);
-
-            for (auto& handler : _backupHandlers) {
-                handler.createBackup(zip);
+            bool success;
+            QString path;
+            std::tie(success, path) =  createBackup(AUTOMATIC_BACKUP_PREFIX, rule.extensionFormat);
+            if (!success) {
+                qCWarning(domain_server) << "Failed to create backup for" << rule.name << "at" << path;
+                continue;
             }
 
-            zip.close();
-
-            qDebug() << "Created backup: " << fileName;
+            qDebug() << "Created backup: " << path;
 
             removeOldBackupVersions(rule);
 
@@ -324,4 +355,28 @@ void DomainContentBackupManager::backup() {
             qCDebug(domain_server) << "Backup not needed for this rule [" << rule.name << "]...";
         }
     }
+}
+
+
+void DomainContentBackupManager::createManualBackup(const QString& name) {
+    createBackup(MANUAL_BACKUP_PREFIX, name);
+}
+
+std::pair<bool, QString> DomainContentBackupManager::createBackup(const QString& prefix, const QString& name) {
+    auto timestamp = QDateTime::currentDateTime().toString(DATETIME_FORMAT);
+    auto fileName = prefix + name + "-" + timestamp + ".zip";
+    auto path = _backupDirectory + "/" + fileName;
+    QuaZip zip(path);
+    if (!zip.open(QuaZip::mdAdd)) {
+        qCWarning(domain_server) << "Failed to open zip file at " << path;
+        return { false, path };
+    }
+
+    for (auto& handler : _backupHandlers) {
+        handler.createBackup(zip);
+    }
+
+    zip.close();
+
+    return { true, path };
 }
