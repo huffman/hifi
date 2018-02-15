@@ -23,14 +23,6 @@
 
 #include <shared/MiniPromises.h>
 
-struct BackupItemInfo {
-    QString id;
-    QString name;
-    QString absolutePath;
-    QDateTime createdAt;
-    bool isManualBackup;
-};
-
 class DomainContentBackupManager : public GenericThread {
     Q_OBJECT
 public:
@@ -51,13 +43,13 @@ public:
                                bool debugTimestampNow = false);
 
     void addBackupHandler(BackupHandler handler);
-    std::vector<BackupItemInfo> getAllBackups();
 
     void aboutToFinish();  /// call this to inform the persist thread that the owner is about to finish to support final persist
 
     void replaceData(QByteArray data);
 
 public slots:
+    void getAllBackupInformation(MiniPromise::Promise promise);
     void createManualBackup(MiniPromise::Promise promise, const QString& name);
     void recoverFromBackup(MiniPromise::Promise promise, const QString& backupName);
     void deleteBackup(MiniPromise::Promise promise, const QString& backupName);
@@ -65,6 +57,7 @@ public slots:
 
 signals:
     void loadCompleted();
+    void recoveryCompleted();
 
 protected:
     /// Implements generic processing behavior for this thread.
@@ -84,6 +77,9 @@ private:
     const QString _backupDirectory;
     std::vector<BackupHandler> _backupHandlers;
     int _persistInterval { 0 };
+
+    std::atomic<bool> _isRecovering { false };
+    QString _recoveryFilename { };
 
     int64_t _lastCheck { 0 };
     std::vector<BackupRule> _backupRules;
