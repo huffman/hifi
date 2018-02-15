@@ -294,7 +294,7 @@ DomainServer::DomainServer(int argc, char* argv[]) :
     }
     maybeHandleReplacementEntityFile();
     auto entitiesFilePath = getEntitiesFilePath();
-    _contentManager.reset(new DomainContentBackupManager(getContentBackupDir(), _settingsManager.responseObjectForType("6")["entity_server_settings"].toObject()));
+    _contentManager.reset(new DomainContentBackupManager(getContentBackupDir(), _settingsManager.settingsResponseObjectForType("6")["entity_server_settings"].toObject()));
     _contentManager->addCreateBackupHandler([entitiesFilePath](QuaZip* zip) {
         qDebug() << "Creating a backup from handler";
 
