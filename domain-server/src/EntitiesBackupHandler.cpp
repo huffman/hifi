@@ -62,7 +62,7 @@ void EntitiesBackupHandler::recoverBackup(const QString& backupName, QuaZip& zip
 
     zipFile.close();
 
-    OctreeUtils::RawEntityData data;
+    OctreeDataUtils::RawEntityData data;
     if (!data.readOctreeDataInfoFromData(rawData)) {
         qCritical() << "Unable to parse octree data during backup recovery";
         return;

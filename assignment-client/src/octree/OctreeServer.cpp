@@ -1155,7 +1155,7 @@ void OctreeServer::domainSettingsRequestComplete() {
 
     auto packet = NLPacket::create(PacketType::OctreeDataFileRequest, -1, true, false);
 
-    OctreeUtils::RawOctreeData data;
+    OctreeDataUtils::RawOctreeData data;
     qCDebug(octree_server) << "Reading octree data from" << _persistAbsoluteFilePath;
     if (data.readOctreeDataInfoFromFile(_persistAbsoluteFilePath)) {
         qCDebug(octree_server) << "Current octree data: ID(" << data.id << ") DataVersion(" << data.version << ")";
@@ -1187,7 +1187,7 @@ void OctreeServer::handleOctreeDataFileReply(QSharedPointer<ReceivedMessage> mes
     } else {
         qDebug() << "Got reply to octree data file request, current entity data is sufficient";
         
-        OctreeUtils::RawEntityData data;
+        OctreeDataUtils::RawEntityData data;
         qCDebug(octree_server) << "Reading octree data from" << _persistAbsoluteFilePath;
         if (data.readOctreeDataInfoFromFile(_persistAbsoluteFilePath)) {
             if (data.id.isNull()) {

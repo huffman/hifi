@@ -39,7 +39,7 @@ bool readOctreeFile(QString path, QJsonDocument* doc) {
     return !doc->isNull();
 }
 
-bool OctreeUtils::RawOctreeData::readOctreeDataInfoFromJSON(QJsonObject root) {
+bool OctreeDataUtils::RawOctreeData::readOctreeDataInfoFromJSON(QJsonObject root) {
     if (root.contains("Id") && root.contains("DataVersion")) {
         id = root["Id"].toVariant().toUuid();
         version = root["DataVersion"].toInt();
@@ -48,7 +48,7 @@ bool OctreeUtils::RawOctreeData::readOctreeDataInfoFromJSON(QJsonObject root) {
     return true;
 }
 
-bool OctreeUtils::RawOctreeData::readOctreeDataInfoFromData(QByteArray data) {
+bool OctreeDataUtils::RawOctreeData::readOctreeDataInfoFromData(QByteArray data) {
     QByteArray jsonData;
     if (gunzip(data, jsonData)) {
         data = jsonData;
@@ -65,7 +65,7 @@ bool OctreeUtils::RawOctreeData::readOctreeDataInfoFromData(QByteArray data) {
 
 // Reads octree file and parses it into a RawOctreeData object.
 // Returns false if readOctreeFile fails.
-bool OctreeUtils::RawOctreeData::readOctreeDataInfoFromFile(QString path) {
+bool OctreeDataUtils::RawOctreeData::readOctreeDataInfoFromFile(QString path) {
     QJsonDocument doc;
     if (!readOctreeFile(path, &doc)) {
         return false;
@@ -75,7 +75,7 @@ bool OctreeUtils::RawOctreeData::readOctreeDataInfoFromFile(QString path) {
     return readOctreeDataInfoFromJSON(root);
 }
 
-QByteArray OctreeUtils::RawOctreeData::toByteArray() {
+QByteArray OctreeDataUtils::RawOctreeData::toByteArray() {
     const auto protocolVersion = (int)versionForPacketType((PacketTypeEnum::Value)dataPacketType());
     QJsonObject obj {
         { "DataVersion", QJsonValue((qint64)version) },
@@ -91,7 +91,7 @@ QByteArray OctreeUtils::RawOctreeData::toByteArray() {
     return doc.toJson();
 }
 
-QByteArray OctreeUtils::RawOctreeData::toGzippedByteArray() {
+QByteArray OctreeDataUtils::RawOctreeData::toGzippedByteArray() {
     auto data = toByteArray();
     QByteArray gzData;
 
@@ -103,26 +103,26 @@ QByteArray OctreeUtils::RawOctreeData::toGzippedByteArray() {
     return gzData;
 }
 
-PacketType OctreeUtils::RawOctreeData::dataPacketType() const {
+PacketType OctreeDataUtils::RawOctreeData::dataPacketType() const {
     Q_ASSERT(false);
     qCritical() << "Attemping to read packet type for incomplete base type 'RawOctreeData'";
     return (PacketType)0;
 }
 
-void OctreeUtils::RawOctreeData::resetIdAndVersion() {
+void OctreeDataUtils::RawOctreeData::resetIdAndVersion() {
     id = QUuid::createUuid();
-    version = OctreeUtils::INITIAL_VERSION;
+    version = OctreeDataUtils::INITIAL_VERSION;
     qDebug() << "Reset octree data to: " << id << version;
 }
 
-void OctreeUtils::RawEntityData::readSubclassData(const QJsonObject& root) {
+void OctreeDataUtils::RawEntityData::readSubclassData(const QJsonObject& root) {
     if (root.contains("Entities")) {
         entityData = root["Entities"].toArray();
     }
 }
 
-void OctreeUtils::RawEntityData::writeSubclassData(QJsonObject& root) const {
+void OctreeDataUtils::RawEntityData::writeSubclassData(QJsonObject& root) const {
     root["Entities"] = entityData;
 }
 
-PacketType OctreeUtils::RawEntityData::dataPacketType() const { return PacketType::EntityData; }
+PacketType OctreeDataUtils::RawEntityData::dataPacketType() const { return PacketType::EntityData; }

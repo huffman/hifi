@@ -1744,7 +1744,7 @@ void DomainServer::processOctreeDataPersistMessage(QSharedPointer<ReceivedMessag
     QFile f(filePath);
     if (f.open(QIODevice::WriteOnly)) {
         f.write(data);
-        OctreeUtils::RawEntityData entityData;
+        OctreeDataUtils::RawEntityData entityData;
         if (entityData.readOctreeDataInfoFromData(data)) {
             qCDebug(domain_server) << "Wrote new entities file" << entityData.id << entityData.version;
         } else {
@@ -1792,7 +1792,7 @@ void DomainServer::processOctreeDataRequestMessage(QSharedPointer<ReceivedMessag
     auto entityFilePath = getEntitiesFilePath();
 
     auto reply = NLPacketList::create(PacketType::OctreeDataFileReply, QByteArray(), true, true);
-    OctreeUtils::RawEntityData data;
+    OctreeDataUtils::RawEntityData data;
     if (data.readOctreeDataInfoFromFile(entityFilePath)) {
         if (data.id == id && data.version <= version) {
             qCDebug(domain_server) << "ES has sufficient octree data, not sending data";
@@ -3343,7 +3343,7 @@ void DomainServer::setupGroupCacheRefresh() {
 
 void DomainServer::maybeHandleReplacementEntityFile() {
     const auto replacementFilePath = getEntitiesReplacementFilePath();
-    OctreeUtils::RawEntityData data;
+    OctreeDataUtils::RawEntityData data;
     if (!data.readOctreeDataInfoFromFile(replacementFilePath)) {
         qCWarning(domain_server) << "Replacement file could not be read, it either doesn't exist or is invalid.";
     } else {
@@ -3380,7 +3380,7 @@ void DomainServer::handleOctreeFileReplacement(QByteArray octreeFile) {
         jsonOctree = compressedOctree;
     }
 
-    OctreeUtils::RawEntityData data;
+    OctreeDataUtils::RawEntityData data;
     if (data.readOctreeDataInfoFromData(jsonOctree)) {
         data.resetIdAndVersion();
 

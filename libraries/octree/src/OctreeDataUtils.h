@@ -17,7 +17,7 @@
 #include <QUuid>
 #include <QJsonArray>
 
-namespace OctreeUtils {
+namespace OctreeDataUtils {
 
 using Version = int64_t;
 constexpr Version INITIAL_VERSION = 0;

@@ -176,7 +176,7 @@ bool OctreePersistThread::process() {
             replaceData(_replacementData);
         }
 
-        OctreeUtils::RawOctreeData data;
+        OctreeDataUtils::RawOctreeData data;
         if (data.readOctreeDataInfoFromFile(_filename)) {
             qDebug() << "Setting entity version info to: " << data.id << data.version;
             _tree->setOctreeVersionInfo(data.id, data.version);
