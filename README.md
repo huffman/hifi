@@ -1,5 +1,5 @@
 High Fidelity (hifi) is an early-stage technology lab experimenting with Virtual Worlds and VR. 
-
+ 
 In this repository you'll find the source to many of the components in our 
 alpha-stage virtual world. The project embraces distributed development 
 and if you'd like to help, we'll pay you -- find out more at [Worklist.net](https://worklist.net). 
