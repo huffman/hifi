@@ -38,195 +38,9 @@
 Q_LOGGING_CATEGORY(octree_server, "hifi.octree-server")
 
 int OctreeServer::_clientCount = 0;
-const int MOVING_AVERAGE_SAMPLE_COUNTS = 1000;
-
-float OctreeServer::SKIP_TIME = -1.0f; // use this for trackXXXTime() calls for non-times
-
-SimpleMovingAverage OctreeServer::_averageLoopTime(MOVING_AVERAGE_SAMPLE_COUNTS);
-SimpleMovingAverage OctreeServer::_averageInsideTime(MOVING_AVERAGE_SAMPLE_COUNTS);
-
-SimpleMovingAverage OctreeServer::_averageEncodeTime(MOVING_AVERAGE_SAMPLE_COUNTS);
-SimpleMovingAverage OctreeServer::_averageShortEncodeTime(MOVING_AVERAGE_SAMPLE_COUNTS);
-SimpleMovingAverage OctreeServer::_averageLongEncodeTime(MOVING_AVERAGE_SAMPLE_COUNTS);
-SimpleMovingAverage OctreeServer::_averageExtraLongEncodeTime(MOVING_AVERAGE_SAMPLE_COUNTS);
-int OctreeServer::_extraLongEncode = 0;
-int OctreeServer::_longEncode = 0;
-int OctreeServer::_shortEncode = 0;
-int OctreeServer::_noEncode = 0;
-
-SimpleMovingAverage OctreeServer::_averageTreeWaitTime(MOVING_AVERAGE_SAMPLE_COUNTS);
-SimpleMovingAverage OctreeServer::_averageTreeShortWaitTime(MOVING_AVERAGE_SAMPLE_COUNTS);
-SimpleMovingAverage OctreeServer::_averageTreeLongWaitTime(MOVING_AVERAGE_SAMPLE_COUNTS);
-SimpleMovingAverage OctreeServer::_averageTreeExtraLongWaitTime(MOVING_AVERAGE_SAMPLE_COUNTS);
-int OctreeServer::_extraLongTreeWait = 0;
-int OctreeServer::_longTreeWait = 0;
-int OctreeServer::_shortTreeWait = 0;
-int OctreeServer::_noTreeWait = 0;
-
-SimpleMovingAverage OctreeServer::_averageTreeTraverseTime(MOVING_AVERAGE_SAMPLE_COUNTS);
-
-SimpleMovingAverage OctreeServer::_averageNodeWaitTime(MOVING_AVERAGE_SAMPLE_COUNTS);
-
-SimpleMovingAverage OctreeServer::_averageCompressAndWriteTime(MOVING_AVERAGE_SAMPLE_COUNTS);
-SimpleMovingAverage OctreeServer::_averageShortCompressTime(MOVING_AVERAGE_SAMPLE_COUNTS);
-SimpleMovingAverage OctreeServer::_averageLongCompressTime(MOVING_AVERAGE_SAMPLE_COUNTS);
-SimpleMovingAverage OctreeServer::_averageExtraLongCompressTime(MOVING_AVERAGE_SAMPLE_COUNTS);
-int OctreeServer::_extraLongCompress = 0;
-int OctreeServer::_longCompress = 0;
-int OctreeServer::_shortCompress = 0;
-int OctreeServer::_noCompress = 0;
-
-SimpleMovingAverage OctreeServer::_averagePacketSendingTime(MOVING_AVERAGE_SAMPLE_COUNTS);
-int OctreeServer::_noSend = 0;
-
-SimpleMovingAverage OctreeServer::_averageProcessWaitTime(MOVING_AVERAGE_SAMPLE_COUNTS);
-SimpleMovingAverage OctreeServer::_averageProcessShortWaitTime(MOVING_AVERAGE_SAMPLE_COUNTS);
-SimpleMovingAverage OctreeServer::_averageProcessLongWaitTime(MOVING_AVERAGE_SAMPLE_COUNTS);
-SimpleMovingAverage OctreeServer::_averageProcessExtraLongWaitTime(MOVING_AVERAGE_SAMPLE_COUNTS);
-int OctreeServer::_extraLongProcessWait = 0;
-int OctreeServer::_longProcessWait = 0;
-int OctreeServer::_shortProcessWait = 0;
-int OctreeServer::_noProcessWait = 0;
 
 static const QString PERSIST_FILE_DOWNLOAD_PATH = "/models.json.gz";
 
-
-void OctreeServer::resetSendingStats() {
-    _averageLoopTime.reset();
-
-    _averageEncodeTime.reset();
-    _averageShortEncodeTime.reset();
-    _averageLongEncodeTime.reset();
-    _averageExtraLongEncodeTime.reset();
-    _extraLongEncode = 0;
-    _longEncode = 0;
-    _shortEncode = 0;
-    _noEncode = 0;
-
-    _averageInsideTime.reset();
-    _averageTreeWaitTime.reset();
-    _averageTreeShortWaitTime.reset();
-    _averageTreeLongWaitTime.reset();
-    _averageTreeExtraLongWaitTime.reset();
-    _extraLongTreeWait = 0;
-    _longTreeWait = 0;
-    _shortTreeWait = 0;
-    _noTreeWait = 0;
-
-    _averageTreeTraverseTime.reset();
-
-    _averageNodeWaitTime.reset();
-
-    _averageCompressAndWriteTime.reset();
-    _averageShortCompressTime.reset();
-    _averageLongCompressTime.reset();
-    _averageExtraLongCompressTime.reset();
-    _extraLongCompress = 0;
-    _longCompress = 0;
-    _shortCompress = 0;
-    _noCompress = 0;
-
-    _averagePacketSendingTime.reset();
-    _noSend = 0;
-
-    _averageProcessWaitTime.reset();
-    _averageProcessShortWaitTime.reset();
-    _averageProcessLongWaitTime.reset();
-    _averageProcessExtraLongWaitTime.reset();
-    _extraLongProcessWait = 0;
-    _longProcessWait = 0;
-    _shortProcessWait = 0;
-    _noProcessWait = 0;
-}
-
-void OctreeServer::trackEncodeTime(float time) {
-    const float MAX_SHORT_TIME = 10.0f;
-    const float MAX_LONG_TIME = 100.0f;
-
-    if (time == SKIP_TIME) {
-        _noEncode++;
-    } else {
-        if (time <= MAX_SHORT_TIME) {
-            _shortEncode++;
-            _averageShortEncodeTime.updateAverage(time);
-        } else if (time <= MAX_LONG_TIME) {
-            _longEncode++;
-            _averageLongEncodeTime.updateAverage(time);
-        } else {
-            _extraLongEncode++;
-            _averageExtraLongEncodeTime.updateAverage(time);
-        }
-        _averageEncodeTime.updateAverage(time);
-    }
-}
-
-void OctreeServer::trackTreeWaitTime(float time) {
-    const float MAX_SHORT_TIME = 10.0f;
-    const float MAX_LONG_TIME = 100.0f;
-    if (time == SKIP_TIME) {
-        _noTreeWait++;
-    } else {
-        if (time <= MAX_SHORT_TIME) {
-            _shortTreeWait++;
-            _averageTreeShortWaitTime.updateAverage(time);
-        } else if (time <= MAX_LONG_TIME) {
-            _longTreeWait++;
-            _averageTreeLongWaitTime.updateAverage(time);
-        } else {
-            _extraLongTreeWait++;
-            _averageTreeExtraLongWaitTime.updateAverage(time);
-        }
-        _averageTreeWaitTime.updateAverage(time);
-    }
-}
-
-void OctreeServer::trackCompressAndWriteTime(float time) {
-    const float MAX_SHORT_TIME = 10.0f;
-    const float MAX_LONG_TIME = 100.0f;
-    if (time == SKIP_TIME) {
-        _noCompress++;
-    } else {
-        if (time <= MAX_SHORT_TIME) {
-            _shortCompress++;
-            _averageShortCompressTime.updateAverage(time);
-        } else if (time <= MAX_LONG_TIME) {
-            _longCompress++;
-            _averageLongCompressTime.updateAverage(time);
-        } else {
-            _extraLongCompress++;
-            _averageExtraLongCompressTime.updateAverage(time);
-        }
-        _averageCompressAndWriteTime.updateAverage(time);
-    }
-}
-
-void OctreeServer::trackPacketSendingTime(float time) {
-    if (time == SKIP_TIME) {
-        _noSend++;
-    } else {
-        _averagePacketSendingTime.updateAverage(time);
-    }
-}
-
-void OctreeServer::trackProcessWaitTime(float time) {
-    const float MAX_SHORT_TIME = 10.0f;
-    const float MAX_LONG_TIME = 100.0f;
-    if (time == SKIP_TIME) {
-        _noProcessWait++;
-    } else {
-        if (time <= MAX_SHORT_TIME) {
-            _shortProcessWait++;
-            _averageProcessShortWaitTime.updateAverage(time);
-        } else if (time <= MAX_LONG_TIME) {
-            _longProcessWait++;
-            _averageProcessLongWaitTime.updateAverage(time);
-        } else {
-            _extraLongProcessWait++;
-            _averageProcessExtraLongWaitTime.updateAverage(time);
-        }
-        _averageProcessWaitTime.updateAverage(time);
-    }
-}
 
 OctreeServer::OctreeServer(ReceivedMessage& message) :
     ThreadedAssignment(message),
@@ -247,7 +61,7 @@ OctreeServer::OctreeServer(ReceivedMessage& message) :
     _started(time(0)),
     _startedUSecs(usecTimestampNow())
 {
-    _averageLoopTime.updateAverage(0);
+    OctreeServerStats::_averageLoopTime.updateAverage(0);
     qDebug() << "Octree server starting... [" << this << "]";
 }
 
@@ -316,7 +130,7 @@ bool OctreeServer::handleHTTPRequest(HTTPConnection* connection, const QUrl& url
         } else if (url.path() == "/resetStats") {
             _octreeInboundPacketProcessor->resetStats();
             _tree->resetEditStats();
-            resetSendingStats();
+            OctreeServerStats::resetSendingStats();
             showStats = true;
         } else if ((url.path() == PERSIST_FILE_DOWNLOAD_PATH) || (url.path() == PERSIST_FILE_DOWNLOAD_PATH + "/")) {
             if (_persistFileDownload) {
@@ -434,163 +248,167 @@ bool OctreeServer::handleHTTPRequest(HTTPConnection* connection, const QUrl& url
         quint64 oneSecondAgo = usecTimestampNow() - USECS_PER_SECOND;
 
         statsString += QString("            process() last second: %1 clients\r\n")
-            .arg(locale.toString((uint)howManyThreadsDidProcess(oneSecondAgo)).rightJustified(COLUMN_WIDTH, ' '));
+            .arg(locale.toString((uint)OctreeServerStats::howManyThreadsDidProcess(oneSecondAgo)).rightJustified(COLUMN_WIDTH, ' '));
         statsString += QString("  packetDistributor() last second: %1 clients\r\n")
-            .arg(locale.toString((uint)howManyThreadsDidPacketDistributor(oneSecondAgo)).rightJustified(COLUMN_WIDTH, ' '));
+            .arg(locale.toString((uint)OctreeServerStats::howManyThreadsDidPacketDistributor(oneSecondAgo)).rightJustified(COLUMN_WIDTH, ' '));
         statsString += QString("   handlePacketSend() last second: %1 clients\r\n")
-            .arg(locale.toString((uint)howManyThreadsDidHandlePacketSend(oneSecondAgo)).rightJustified(COLUMN_WIDTH, ' '));
+            .arg(locale.toString((uint)OctreeServerStats::howManyThreadsDidHandlePacketSend(oneSecondAgo)).rightJustified(COLUMN_WIDTH, ' '));
         statsString += QString("      writeDatagram() last second: %1 clients\r\n\r\n")
-            .arg(locale.toString((uint)howManyThreadsDidCallWriteDatagram(oneSecondAgo)).rightJustified(COLUMN_WIDTH, ' '));
+            .arg(locale.toString((uint)OctreeServerStats::howManyThreadsDidCallWriteDatagram(oneSecondAgo)).rightJustified(COLUMN_WIDTH, ' '));
 
-        float averageLoopTime = getAverageLoopTime();
+        float averageLoopTime = OctreeServerStats::getAverageLoopTime();
         statsString += QString().sprintf("           Average packetLoop() time:      %7.2f msecs"
                                          "                 samples: %12d \r\n",
-                                         (double)averageLoopTime, _averageLoopTime.getSampleCount());
+                                         (double)averageLoopTime, OctreeServerStats::_averageLoopTime.getSampleCount());
 
-        float averageInsideTime = getAverageInsideTime();
+        float averageInsideTime = OctreeServerStats::getAverageInsideTime();
         statsString += QString().sprintf("               Average 'inside' time:    %9.2f usecs"
                                          "                 samples: %12d \r\n\r\n",
-                                         (double)averageInsideTime, _averageInsideTime.getSampleCount());
+                                         (double)averageInsideTime, OctreeServerStats::_averageInsideTime.getSampleCount());
 
 
         // Process Wait
         {
-            int allWaitTimes = _extraLongProcessWait +_longProcessWait + _shortProcessWait + _noProcessWait;
+            int allWaitTimes = OctreeServerStats::_extraLongProcessWait + OctreeServerStats::_longProcessWait +
+                               OctreeServerStats::_shortProcessWait + OctreeServerStats::_noProcessWait;
 
-            float averageProcessWaitTime = getAverageProcessWaitTime();
+            float averageProcessWaitTime = OctreeServerStats::getAverageProcessWaitTime();
             statsString += QString().sprintf("      Average process lock wait time:"
                                              "    %9.2f usecs                 samples: %12d \r\n",
                                              (double)averageProcessWaitTime, allWaitTimes);
 
-            float zeroVsTotal = (allWaitTimes > 0) ? ((float)_noProcessWait / (float)allWaitTimes) : 0.0f;
+            float zeroVsTotal = (allWaitTimes > 0) ? ((float)OctreeServerStats::_noProcessWait / (float)allWaitTimes) : 0.0f;
             statsString += QString().sprintf("                        No Lock Wait:"
                                              "                          (%6.2f%%) samples: %12d \r\n",
-                                             (double)(zeroVsTotal * AS_PERCENT), _noProcessWait);
+                                             (double)(zeroVsTotal * AS_PERCENT), OctreeServerStats::_noProcessWait);
 
-            float shortVsTotal = (allWaitTimes > 0) ? ((float)_shortProcessWait / (float)allWaitTimes) : 0.0f;
+            float shortVsTotal = (allWaitTimes > 0) ? ((float)OctreeServerStats::_shortProcessWait / (float)allWaitTimes) : 0.0f;
             statsString += QString().sprintf("    Avg process lock short wait time:"
                                              "          %9.2f usecs (%6.2f%%) samples: %12d \r\n",
-                                             (double)_averageProcessShortWaitTime.getAverage(),
-                                             (double)(shortVsTotal * AS_PERCENT), _shortProcessWait);
+                                             (double)OctreeServerStats::_averageProcessShortWaitTime.getAverage(),
+                                             (double)(shortVsTotal * AS_PERCENT), OctreeServerStats::_shortProcessWait);
 
-            float longVsTotal = (allWaitTimes > 0) ? ((float)_longProcessWait / (float)allWaitTimes) : 0.0f;
+            float longVsTotal = (allWaitTimes > 0) ? ((float)OctreeServerStats::_longProcessWait / (float)allWaitTimes) : 0.0f;
             statsString += QString().sprintf("     Avg process lock long wait time:"
                                              "          %9.2f usecs (%6.2f%%) samples: %12d \r\n",
-                                             (double)_averageProcessLongWaitTime.getAverage(),
-                                             (double)(longVsTotal * AS_PERCENT), _longProcessWait);
+                                             (double)OctreeServerStats::_averageProcessLongWaitTime.getAverage(),
+                                             (double)(longVsTotal * AS_PERCENT), OctreeServerStats::_longProcessWait);
 
-            float extraLongVsTotal = (allWaitTimes > 0) ? ((float)_extraLongProcessWait / (float)allWaitTimes) : 0.0f;
+            float extraLongVsTotal = (allWaitTimes > 0) ? ((float)OctreeServerStats::_extraLongProcessWait / (float)allWaitTimes) : 0.0f;
             statsString += QString().sprintf("Avg process lock extralong wait time:"
                                              "          %9.2f usecs (%6.2f%%) samples: %12d \r\n\r\n",
-                                             (double)_averageProcessExtraLongWaitTime.getAverage(),
-                                             (double)(extraLongVsTotal * AS_PERCENT), _extraLongProcessWait);
+                                             (double)OctreeServerStats::_averageProcessExtraLongWaitTime.getAverage(),
+                                             (double)(extraLongVsTotal * AS_PERCENT), OctreeServerStats::_extraLongProcessWait);
         }
 
         // Tree Wait
-        int allWaitTimes = _extraLongTreeWait +_longTreeWait + _shortTreeWait + _noTreeWait;
+        int allWaitTimes = OctreeServerStats::_extraLongTreeWait + OctreeServerStats::_longTreeWait +
+                           OctreeServerStats::_shortTreeWait + OctreeServerStats::_noTreeWait;
 
-        float averageTreeWaitTime = getAverageTreeWaitTime();
+        float averageTreeWaitTime = OctreeServerStats::getAverageTreeWaitTime();
         statsString += QString().sprintf("         Average tree lock wait time:"
                                          "    %9.2f usecs                 samples: %12d \r\n",
                                          (double)averageTreeWaitTime, allWaitTimes);
 
-        float zeroVsTotal = (allWaitTimes > 0) ? ((float)_noTreeWait / (float)allWaitTimes) : 0.0f;
+        float zeroVsTotal = (allWaitTimes > 0) ? ((float)OctreeServerStats::_noTreeWait / (float)allWaitTimes) : 0.0f;
         statsString += QString().sprintf("                        No Lock Wait:"
                                          "                          (%6.2f%%) samples: %12d \r\n",
-                                         (double)(zeroVsTotal * AS_PERCENT), _noTreeWait);
+                                         (double)(zeroVsTotal * AS_PERCENT), OctreeServerStats::_noTreeWait);
 
-        float shortVsTotal = (allWaitTimes > 0) ? ((float)_shortTreeWait / (float)allWaitTimes) : 0.0f;
+        float shortVsTotal = (allWaitTimes > 0) ? ((float)OctreeServerStats::_shortTreeWait / (float)allWaitTimes) : 0.0f;
         statsString += QString().sprintf("       Avg tree lock short wait time:"
                                          "          %9.2f usecs (%6.2f%%) samples: %12d \r\n",
-                                         (double)_averageTreeShortWaitTime.getAverage(),
-                                         (double)(shortVsTotal * AS_PERCENT), _shortTreeWait);
+                                         (double)OctreeServerStats::_averageTreeShortWaitTime.getAverage(),
+                                         (double)(shortVsTotal * AS_PERCENT), OctreeServerStats::_shortTreeWait);
 
-        float longVsTotal = (allWaitTimes > 0) ? ((float)_longTreeWait / (float)allWaitTimes) : 0.0f;
+        float longVsTotal = (allWaitTimes > 0) ? ((float)OctreeServerStats::_longTreeWait / (float)allWaitTimes) : 0.0f;
         statsString += QString().sprintf("        Avg tree lock long wait time:"
                                          "          %9.2f usecs (%6.2f%%) samples: %12d \r\n",
-                                         (double)_averageTreeLongWaitTime.getAverage(),
-                                         (double)(longVsTotal * AS_PERCENT), _longTreeWait);
+                                         (double)OctreeServerStats::_averageTreeLongWaitTime.getAverage(),
+                                         (double)(longVsTotal * AS_PERCENT), OctreeServerStats::_longTreeWait);
 
-        float extraLongVsTotal = (allWaitTimes > 0) ? ((float)_extraLongTreeWait / (float)allWaitTimes) : 0.0f;
+        float extraLongVsTotal = (allWaitTimes > 0) ? ((float)OctreeServerStats::_extraLongTreeWait / (float)allWaitTimes) : 0.0f;
         statsString += QString().sprintf("  Avg tree lock extra long wait time:"
                                          "          %9.2f usecs (%6.2f%%) samples: %12d \r\n\r\n",
-                                         (double)_averageTreeExtraLongWaitTime.getAverage(),
-                                         (double)(extraLongVsTotal * AS_PERCENT), _extraLongTreeWait);
+                                         (double)OctreeServerStats::_averageTreeExtraLongWaitTime.getAverage(),
+                                         (double)(extraLongVsTotal * AS_PERCENT), OctreeServerStats::_extraLongTreeWait);
 
         // traverse
-        float averageTreeTraverseTime = getAverageTreeTraverseTime();
+        float averageTreeTraverseTime = OctreeServerStats::getAverageTreeTraverseTime();
         statsString += QString().sprintf("          Average tree traverse time:    %9.2f usecs\r\n\r\n", (double)averageTreeTraverseTime);
 
         // encode
-        float averageEncodeTime = getAverageEncodeTime();
+        float averageEncodeTime = OctreeServerStats::getAverageEncodeTime();
         statsString += QString().sprintf("                 Average encode time:    %9.2f usecs\r\n", (double)averageEncodeTime);
 
-        int allEncodeTimes = _noEncode + _shortEncode + _longEncode + _extraLongEncode;
+        int allEncodeTimes = OctreeServerStats::_noEncode + OctreeServerStats::_shortEncode + OctreeServerStats::_longEncode +
+                             OctreeServerStats::_extraLongEncode;
 
-        float zeroVsTotalEncode = (allEncodeTimes > 0) ? ((float)_noEncode / (float)allEncodeTimes) : 0.0f;
+        float zeroVsTotalEncode = (allEncodeTimes > 0) ? ((float)OctreeServerStats::_noEncode / (float)allEncodeTimes) : 0.0f;
         statsString += QString().sprintf("                           No Encode:"
                                          "                          (%6.2f%%) samples: %12d \r\n",
-                                         (double)(zeroVsTotalEncode * AS_PERCENT), _noEncode);
+                                         (double)(zeroVsTotalEncode * AS_PERCENT), OctreeServerStats::_noEncode);
 
-        float shortVsTotalEncode = (allEncodeTimes > 0) ? ((float)_shortEncode / (float)allEncodeTimes) : 0.0f;
+        float shortVsTotalEncode = (allEncodeTimes > 0) ? ((float)OctreeServerStats::_shortEncode / (float)allEncodeTimes) : 0.0f;
         statsString += QString().sprintf("               Avg short encode time:"
                                          "          %9.2f usecs (%6.2f%%) samples: %12d \r\n",
-                                         (double)_averageShortEncodeTime.getAverage(),
-                                         (double)(shortVsTotalEncode * AS_PERCENT), _shortEncode);
+                                         (double)OctreeServerStats::_averageShortEncodeTime.getAverage(),
+                                         (double)(shortVsTotalEncode * AS_PERCENT), OctreeServerStats::_shortEncode);
 
-        float longVsTotalEncode = (allEncodeTimes > 0) ? ((float)_longEncode / (float)allEncodeTimes) : 0.0f;
+        float longVsTotalEncode = (allEncodeTimes > 0) ? ((float)OctreeServerStats::_longEncode / (float)allEncodeTimes) : 0.0f;
         statsString += QString().sprintf("                Avg long encode time:"
                                          "          %9.2f usecs (%6.2f%%) samples: %12d \r\n",
-                                         (double)_averageLongEncodeTime.getAverage(),
-                                         (double)(longVsTotalEncode * AS_PERCENT), _longEncode);
+                                         (double)OctreeServerStats::_averageLongEncodeTime.getAverage(),
+                                         (double)(longVsTotalEncode * AS_PERCENT), OctreeServerStats::_longEncode);
 
-        float extraLongVsTotalEncode = (allEncodeTimes > 0) ? ((float)_extraLongEncode / (float)allEncodeTimes) : 0.0f;
+        float extraLongVsTotalEncode = (allEncodeTimes > 0) ? ((float)OctreeServerStats::_extraLongEncode / (float)allEncodeTimes) : 0.0f;
         statsString += QString().sprintf("          Avg extra long encode time:"
                                          "          %9.2f usecs (%6.2f%%) samples: %12d \r\n\r\n",
-                                         (double)_averageExtraLongEncodeTime.getAverage(),
-                                         (double)(extraLongVsTotalEncode * AS_PERCENT), _extraLongEncode);
+                                         (double)OctreeServerStats::_averageExtraLongEncodeTime.getAverage(),
+                                         (double)(extraLongVsTotalEncode * AS_PERCENT), OctreeServerStats::_extraLongEncode);
 
 
-        float averageCompressAndWriteTime = getAverageCompressAndWriteTime();
+        float averageCompressAndWriteTime = OctreeServerStats::getAverageCompressAndWriteTime();
         statsString += QString().sprintf("     Average compress and write time:    %9.2f usecs\r\n",
                                          (double)averageCompressAndWriteTime);
 
-        int allCompressTimes = _noCompress + _shortCompress + _longCompress + _extraLongCompress;
+        int allCompressTimes = OctreeServerStats::_noCompress + OctreeServerStats::_shortCompress +
+                               OctreeServerStats::_longCompress + OctreeServerStats::_extraLongCompress;
 
-        float zeroVsTotalCompress = (allCompressTimes > 0) ? ((float)_noCompress / (float)allCompressTimes) : 0.0f;
+        float zeroVsTotalCompress = (allCompressTimes > 0) ? ((float)OctreeServerStats::_noCompress / (float)allCompressTimes) : 0.0f;
         statsString += QString().sprintf("                      No compression:"
                                          "                          (%6.2f%%) samples: %12d \r\n",
-                                         (double)(zeroVsTotalCompress * AS_PERCENT), _noCompress);
+                                         (double)(zeroVsTotalCompress * AS_PERCENT), OctreeServerStats::_noCompress);
 
-        float shortVsTotalCompress = (allCompressTimes > 0) ? ((float)_shortCompress / (float)allCompressTimes) : 0.0f;
+        float shortVsTotalCompress = (allCompressTimes > 0) ? ((float)OctreeServerStats::_shortCompress / (float)allCompressTimes) : 0.0f;
         statsString += QString().sprintf("             Avg short compress time:"
                                          "          %9.2f usecs (%6.2f%%) samples: %12d \r\n",
-                                         (double)_averageShortCompressTime.getAverage(),
-                                         (double)(shortVsTotalCompress * AS_PERCENT), _shortCompress);
+                                         (double)OctreeServerStats::_averageShortCompressTime.getAverage(),
+                                         (double)(shortVsTotalCompress * AS_PERCENT), OctreeServerStats::_shortCompress);
 
-        float longVsTotalCompress = (allCompressTimes > 0) ? ((float)_longCompress / (float)allCompressTimes) : 0.0f;
+        float longVsTotalCompress = (allCompressTimes > 0) ? ((float)OctreeServerStats::_longCompress / (float)allCompressTimes) : 0.0f;
         statsString += QString().sprintf("              Avg long compress time:"
                                          "          %9.2f usecs (%6.2f%%) samples: %12d \r\n",
-                                         (double)_averageLongCompressTime.getAverage(),
-                                         (double)(longVsTotalCompress * AS_PERCENT), _longCompress);
+                                         (double)OctreeServerStats::_averageLongCompressTime.getAverage(),
+                                         (double)(longVsTotalCompress * AS_PERCENT), OctreeServerStats::_longCompress);
 
-        float extraLongVsTotalCompress = (allCompressTimes > 0) ? ((float)_extraLongCompress / (float)allCompressTimes) : 0.0f;
+        float extraLongVsTotalCompress = (allCompressTimes > 0) ? ((float)OctreeServerStats::_extraLongCompress / (float)allCompressTimes) : 0.0f;
         statsString += QString().sprintf("        Avg extra long compress time:"
                                          "          %9.2f usecs (%6.2f%%) samples: %12d \r\n\r\n",
-                                         (double)_averageExtraLongCompressTime.getAverage(),
-                                         (double)(extraLongVsTotalCompress * AS_PERCENT), _extraLongCompress);
+                                         (double)OctreeServerStats::_averageExtraLongCompressTime.getAverage(),
+                                         (double)(extraLongVsTotalCompress * AS_PERCENT), OctreeServerStats::_extraLongCompress);
 
-        float averagePacketSendingTime = getAveragePacketSendingTime();
+        float averagePacketSendingTime = OctreeServerStats::getAveragePacketSendingTime();
         statsString += QString().sprintf("         Average packet sending time:    %9.2f usecs (includes node lock)\r\n",
                                          (double)averagePacketSendingTime);
 
-        float noVsTotalSend = (_averagePacketSendingTime.getSampleCount() > 0) ?
-                                        ((float)_noSend / (float)_averagePacketSendingTime.getSampleCount()) : 0.0f;
+        float noVsTotalSend = (OctreeServerStats::_averagePacketSendingTime.getSampleCount() > 0) ?
+                                        ((float)OctreeServerStats::_noSend / (float)OctreeServerStats::_averagePacketSendingTime.getSampleCount()) : 0.0f;
         statsString += QString().sprintf("                         Not sending:"
                                          "                          (%6.2f%%) samples: %12d \r\n",
-                                         (double)(noVsTotalSend * AS_PERCENT), _noSend);
+                                         (double)(noVsTotalSend * AS_PERCENT), OctreeServerStats::_noSend);
 
-        float averageNodeWaitTime = getAverageNodeWaitTime();
+        float averageNodeWaitTime = OctreeServerStats::getAverageNodeWaitTime();
         statsString += QString().sprintf("         Average node lock wait time:    %9.2f usecs\r\n",
                                          (double)averageNodeWaitTime);
 
@@ -1518,10 +1336,10 @@ void OctreeServer::sendStatsPacket() {
     // Stats Array 1
     QJsonObject threadsStats;
     quint64 oneSecondAgo = usecTimestampNow() - USECS_PER_SECOND;
-    threadsStats["1. processing"] = (double)howManyThreadsDidProcess(oneSecondAgo);
-    threadsStats["2. packetDistributor"] = (double)howManyThreadsDidPacketDistributor(oneSecondAgo);
-    threadsStats["3. handlePacektSend"] = (double)howManyThreadsDidHandlePacketSend(oneSecondAgo);
-    threadsStats["4. writeDatagram"] = (double)howManyThreadsDidCallWriteDatagram(oneSecondAgo);
+    threadsStats["1. processing"] = (double)OctreeServerStats::howManyThreadsDidProcess(oneSecondAgo);
+    threadsStats["2. packetDistributor"] = (double)OctreeServerStats::howManyThreadsDidPacketDistributor(oneSecondAgo);
+    threadsStats["3. handlePacektSend"] = (double)OctreeServerStats::howManyThreadsDidHandlePacketSend(oneSecondAgo);
+    threadsStats["4. writeDatagram"] = (double)OctreeServerStats::howManyThreadsDidCallWriteDatagram(oneSecondAgo);
 
     QJsonObject statsArray1;
     statsArray1["1. configuration"] = getConfiguration();
@@ -1547,13 +1365,13 @@ void OctreeServer::sendStatsPacket() {
     dataObject1["6. totalBytesBitMasks"] = (double)OctreePacketData::getTotalBytesOfColor();
 
     QJsonObject timingArray1;
-    timingArray1["1. avgLoopTime"] = getAverageLoopTime();
-    timingArray1["2. avgInsideTime"] = getAverageInsideTime();
-    timingArray1["3. avgTreeTraverseTime"] = getAverageTreeTraverseTime();
-    timingArray1["4. avgEncodeTime"] = getAverageEncodeTime();
-    timingArray1["5. avgCompressAndWriteTime"] = getAverageCompressAndWriteTime();
-    timingArray1["6. avgSendTime"] = getAveragePacketSendingTime();
-    timingArray1["7. nodeWaitTime"] = getAverageNodeWaitTime();
+    timingArray1["1. avgLoopTime"] = OctreeServerStats::getAverageLoopTime();
+    timingArray1["2. avgInsideTime"] = OctreeServerStats::getAverageInsideTime();
+    timingArray1["3. avgTreeTraverseTime"] = OctreeServerStats::getAverageTreeTraverseTime();
+    timingArray1["4. avgEncodeTime"] = OctreeServerStats::getAverageEncodeTime();
+    timingArray1["5. avgCompressAndWriteTime"] = OctreeServerStats::getAverageCompressAndWriteTime();
+    timingArray1["6. avgSendTime"] = OctreeServerStats::getAveragePacketSendingTime();
+    timingArray1["7. nodeWaitTime"] = OctreeServerStats::getAverageNodeWaitTime();
 
     QJsonObject statsObject2;
     statsObject2["data"] = dataObject1;
@@ -1591,39 +1409,39 @@ void OctreeServer::sendStatsPacket() {
     addPacketStatsAndSendStatsPacket(statsObject);
 }
 
-QMap<OctreeSendThread*, quint64> OctreeServer::_threadsDidProcess;
-QMap<OctreeSendThread*, quint64> OctreeServer::_threadsDidPacketDistributor;
-QMap<OctreeSendThread*, quint64> OctreeServer::_threadsDidHandlePacketSend;
-QMap<OctreeSendThread*, quint64> OctreeServer::_threadsDidCallWriteDatagram;
+QMap<OctreeSendThread*, quint64> OctreeServerStats::_threadsDidProcess;
+QMap<OctreeSendThread*, quint64> OctreeServerStats::_threadsDidPacketDistributor;
+QMap<OctreeSendThread*, quint64> OctreeServerStats::_threadsDidHandlePacketSend;
+QMap<OctreeSendThread*, quint64> OctreeServerStats::_threadsDidCallWriteDatagram;
 
-QMutex OctreeServer::_threadsDidProcessMutex;
-QMutex OctreeServer::_threadsDidPacketDistributorMutex;
-QMutex OctreeServer::_threadsDidHandlePacketSendMutex;
-QMutex OctreeServer::_threadsDidCallWriteDatagramMutex;
+QMutex OctreeServerStats::_threadsDidProcessMutex;
+QMutex OctreeServerStats::_threadsDidPacketDistributorMutex;
+QMutex OctreeServerStats::_threadsDidHandlePacketSendMutex;
+QMutex OctreeServerStats::_threadsDidCallWriteDatagramMutex;
 
 
-void OctreeServer::didProcess(OctreeSendThread* thread) {
+void OctreeServerStats::didProcess(OctreeSendThread* thread) {
     QMutexLocker locker(&_threadsDidProcessMutex);
     _threadsDidProcess[thread] = usecTimestampNow();
 }
 
-void OctreeServer::didPacketDistributor(OctreeSendThread* thread) {
+void OctreeServerStats::didPacketDistributor(OctreeSendThread* thread) {
     QMutexLocker locker(&_threadsDidPacketDistributorMutex);
     _threadsDidPacketDistributor[thread] = usecTimestampNow();
 }
 
-void OctreeServer::didHandlePacketSend(OctreeSendThread* thread) {
+void OctreeServerStats::didHandlePacketSend(OctreeSendThread* thread) {
     QMutexLocker locker(&_threadsDidHandlePacketSendMutex);
     _threadsDidHandlePacketSend[thread] = usecTimestampNow();
 }
 
-void OctreeServer::didCallWriteDatagram(OctreeSendThread* thread) {
+void OctreeServerStats::didCallWriteDatagram(OctreeSendThread* thread) {
     QMutexLocker locker(&_threadsDidCallWriteDatagramMutex);
     _threadsDidCallWriteDatagram[thread] = usecTimestampNow();
 }
 
 
-void OctreeServer::stopTrackingThread(OctreeSendThread* thread) {
+void OctreeServerStats::stopTrackingThread(OctreeSendThread* thread) {
     {
         QMutexLocker locker(&_threadsDidProcessMutex);
         _threadsDidProcess.remove(thread);
@@ -1662,19 +1480,19 @@ int howManyThreadsDidSomething(QMutex& mutex, QMap<OctreeSendThread*, quint64>& 
 }
 
 
-int OctreeServer::howManyThreadsDidProcess(quint64 since) {
+int OctreeServerStats::howManyThreadsDidProcess(quint64 since) {
     return howManyThreadsDidSomething(_threadsDidProcessMutex, _threadsDidProcess, since);
 }
 
-int OctreeServer::howManyThreadsDidPacketDistributor(quint64 since) {
+int OctreeServerStats::howManyThreadsDidPacketDistributor(quint64 since) {
     return howManyThreadsDidSomething(_threadsDidPacketDistributorMutex, _threadsDidPacketDistributor, since);
 }
 
-int OctreeServer::howManyThreadsDidHandlePacketSend(quint64 since) {
+int OctreeServerStats::howManyThreadsDidHandlePacketSend(quint64 since) {
     return howManyThreadsDidSomething(_threadsDidHandlePacketSendMutex, _threadsDidHandlePacketSend, since);
 }
 
-int OctreeServer::howManyThreadsDidCallWriteDatagram(quint64 since) {
+int OctreeServerStats::howManyThreadsDidCallWriteDatagram(quint64 since) {
     return howManyThreadsDidSomething(_threadsDidCallWriteDatagramMutex, _threadsDidCallWriteDatagram, since);
 }
 

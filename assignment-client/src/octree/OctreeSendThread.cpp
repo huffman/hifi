@@ -57,7 +57,7 @@ OctreeSendThread::~OctreeSendThread() {
                                             "- ending sending thread [" << this << "]";
 
     OctreeServer::clientDisconnected();
-    OctreeServer::stopTrackingThread(this);
+    OctreeServerStats::stopTrackingThread(this);
 }
 
 void OctreeSendThread::setIsShuttingDown() {
@@ -70,7 +70,7 @@ bool OctreeSendThread::process() {
         return false; // exit early if we're shutting down
     }
 
-    OctreeServer::didProcess(this);
+    OctreeServerStats::didProcess(this);
 
     quint64  start = usecTimestampNow();
 
@@ -132,7 +132,7 @@ AtomicUIntStat OctreeSendThread::_totalSpecialPackets { 0 };
 
 
 int OctreeSendThread::handlePacketSend(SharedNodePointer node, OctreeQueryNode* nodeData, bool dontSuppressDuplicate) {
-    OctreeServer::didHandlePacketSend(this);
+    OctreeServerStats::didHandlePacketSend(this);
 
     // if we're shutting down, then exit early
     if (nodeData->isShuttingDown()) {
@@ -192,13 +192,13 @@ int OctreeSendThread::handlePacketSend(SharedNodePointer node, OctreeQueryNode* 
             }
 
             // actually send it
-            OctreeServer::didCallWriteDatagram(this);
+            OctreeServerStats::didCallWriteDatagram(this);
             DependencyManager::get<NodeList>()->sendUnreliablePacket(statsPacket, *node);
         } else {
             // not enough room in the packet, send two packets
 
             // first packet
-            OctreeServer::didCallWriteDatagram(this);
+            OctreeServerStats::didCallWriteDatagram(this);
             DependencyManager::get<NodeList>()->sendUnreliablePacket(statsPacket, *node);
 
             int numBytes = statsPacket.getDataSize();
@@ -229,7 +229,7 @@ int OctreeSendThread::handlePacketSend(SharedNodePointer node, OctreeQueryNode* 
             }
 
             // second packet
-            OctreeServer::didCallWriteDatagram(this);
+            OctreeServerStats::didCallWriteDatagram(this);
             DependencyManager::get<NodeList>()->sendUnreliablePacket(nodeData->getPacket(), *node);
 
             numBytes = nodeData->getPacket().getDataSize();
@@ -263,7 +263,7 @@ int OctreeSendThread::handlePacketSend(SharedNodePointer node, OctreeQueryNode* 
         // If there's actually a packet waiting, then send it.
         if (nodeData->isPacketWaiting() && !nodeData->isShuttingDown()) {
             // just send the octree packet
-            OctreeServer::didCallWriteDatagram(this);
+            OctreeServerStats::didCallWriteDatagram(this);
             DependencyManager::get<NodeList>()->sendUnreliablePacket(nodeData->getPacket(), *node);
 
             int numBytes = nodeData->getPacket().getDataSize();
@@ -323,7 +323,7 @@ void OctreeSendThread::preStartNewScene(OctreeQueryNode* nodeData, bool isFullSc
 
 /// Version of octree element distributor that sends the deepest LOD level at once
 int OctreeSendThread::packetDistributor(SharedNodePointer node, OctreeQueryNode* nodeData, bool viewFrustumChanged) {
-    OctreeServer::didPacketDistributor(this);
+    OctreeServerStats::didPacketDistributor(this);
 
     // if shutting down, exit early
     if (nodeData->isShuttingDown()) {
@@ -442,7 +442,7 @@ int OctreeSendThread::packetDistributor(SharedNodePointer node, OctreeQueryNode*
 
         quint64 end = usecTimestampNow();
         int elapsedmsec = (end - start) / USECS_PER_MSEC;
-        OctreeServer::trackLoopTime(elapsedmsec);
+        OctreeServerStats::trackLoopTime(elapsedmsec);
 
         // if after sending packets we've emptied our bag, then we want to remember that we've sent all
         // the octree elements from the current view frustum
@@ -471,7 +471,7 @@ bool OctreeSendThread::traverseTreeAndBuildNextPacketPayload(EncodeBitstreamPara
         quint64 lockWaitStart = encodeStart;
 
         _myServer->getOctree()->withReadLock([&]{
-            OctreeServer::trackTreeWaitTime((float)(usecTimestampNow() - lockWaitStart));
+            OctreeServerStats::trackTreeWaitTime((float)(usecTimestampNow() - lockWaitStart));
 
             OctreeElementPointer subTree = nodeData->elementBag.extract();
             if (subTree) {
@@ -484,10 +484,10 @@ bool OctreeSendThread::traverseTreeAndBuildNextPacketPayload(EncodeBitstreamPara
             }
         });
 
-        OctreeServer::trackEncodeTime((float)(usecTimestampNow() - encodeStart));
+        OctreeServerStats::trackEncodeTime((float)(usecTimestampNow() - encodeStart));
     } else {
-        OctreeServer::trackTreeWaitTime(OctreeServer::SKIP_TIME);
-        OctreeServer::trackEncodeTime(OctreeServer::SKIP_TIME);
+        OctreeServerStats::trackTreeWaitTime(OctreeServerStats::SKIP_TIME);
+        OctreeServerStats::trackEncodeTime(OctreeServerStats::SKIP_TIME);
     }
     return somethingToSend;
 }
@@ -519,8 +519,8 @@ void OctreeSendThread::traverseTreeAndSendContents(SharedNodePointer node, Octre
     bool somethingToSend = true; // assume we have something
     bool hadSomething = hasSomethingToSend(nodeData);
     while (somethingToSend && _packetsSentThisInterval < maxPacketsPerInterval && !nodeData->isShuttingDown()) {
-        float compressAndWriteElapsedUsec = OctreeServer::SKIP_TIME;
-        float packetSendingElapsedUsec = OctreeServer::SKIP_TIME;
+        float compressAndWriteElapsedUsec = OctreeServerStats::SKIP_TIME;
+        float packetSendingElapsedUsec = OctreeServerStats::SKIP_TIME;
 
         quint64 startInside = usecTimestampNow();
 
@@ -575,9 +575,9 @@ void OctreeSendThread::traverseTreeAndSendContents(SharedNodePointer node, Octre
             }
             _packetData.changeSettings(true, targetSize); // will do reset - NOTE: Always compressed
         }
-        OctreeServer::trackCompressAndWriteTime(compressAndWriteElapsedUsec);
-        OctreeServer::trackPacketSendingTime(packetSendingElapsedUsec);
-        OctreeServer::trackInsideTime((float)(usecTimestampNow() - startInside));
+        OctreeServerStats::trackCompressAndWriteTime(compressAndWriteElapsedUsec);
+        OctreeServerStats::trackPacketSendingTime(packetSendingElapsedUsec);
+        OctreeServerStats::trackInsideTime((float)(usecTimestampNow() - startInside));
     }
 
     if (somethingToSend && _myServer->wantsVerboseDebug()) {

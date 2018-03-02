@@ -25,6 +25,7 @@
 #include "OctreePersistThread.h"
 #include "OctreeSendThread.h"
 #include "OctreeServerConsts.h"
+#include "OctreeServerStats.h"
 #include "OctreeInboundPacketProcessor.h"
 
 #include <QLoggingCategory>
@@ -46,6 +47,10 @@ public:
     OctreeServer(ReceivedMessage& message);
     ~OctreeServer();
 
+    static int getCurrentClientCount() { return _clientCount; }
+    static void clientConnected() { _clientCount++; }
+    static void clientDisconnected() { _clientCount--; }
+
     OctreeServerState _state { OctreeServerState::WaitingForDomainSettings };
 
     /// allows setting of run arguments
@@ -63,10 +68,6 @@ public:
     int getPacketsPerClientPerSecond() const { return getPacketsPerClientPerInterval() * INTERVALS_PER_SECOND; }
     int getPacketsTotalPerInterval() const { return _packetsTotalPerInterval; }
     int getPacketsTotalPerSecond() const { return getPacketsTotalPerInterval() * INTERVALS_PER_SECOND; }
-
-    static int getCurrentClientCount() { return _clientCount; }
-    static void clientConnected() { _clientCount++; }
-    static void clientDisconnected() { _clientCount--; }
 
     bool isInitialLoadComplete() const { return (_persistThread) ? _persistThread->isInitialLoadComplete() : true; }
     bool isPersistEnabled() const { return (_persistThread) ? true : false; }
@@ -92,47 +93,6 @@ public:
     virtual QString serverSubclassStats() { return QString(); }
     virtual void trackSend(const QUuid& dataID, quint64 dataLastEdited, const QUuid& viewerNode) { }
     virtual void trackViewerGone(const QUuid& viewerNode) { }
-
-    static float SKIP_TIME; // use this for trackXXXTime() calls for non-times
-
-    static void trackLoopTime(float time) { _averageLoopTime.updateAverage(time); }
-    static float getAverageLoopTime() { return _averageLoopTime.getAverage(); }
-
-    static void trackEncodeTime(float time);
-    static float getAverageEncodeTime() { return _averageEncodeTime.getAverage(); }
-
-    static void trackInsideTime(float time) { _averageInsideTime.updateAverage(time); }
-    static float getAverageInsideTime() { return _averageInsideTime.getAverage(); }
-
-    static void trackTreeWaitTime(float time);
-    static float getAverageTreeWaitTime() { return _averageTreeWaitTime.getAverage(); }
-
-    static void trackTreeTraverseTime(float time) { _averageTreeTraverseTime.updateAverage(time); }
-    static float getAverageTreeTraverseTime() { return _averageTreeTraverseTime.getAverage(); }
-
-    static void trackNodeWaitTime(float time) { _averageNodeWaitTime.updateAverage(time); }
-    static float getAverageNodeWaitTime() { return _averageNodeWaitTime.getAverage(); }
-
-    static void trackCompressAndWriteTime(float time);
-    static float getAverageCompressAndWriteTime() { return _averageCompressAndWriteTime.getAverage(); }
-
-    static void trackPacketSendingTime(float time);
-    static float getAveragePacketSendingTime() { return _averagePacketSendingTime.getAverage(); }
-
-    static void trackProcessWaitTime(float time);
-    static float getAverageProcessWaitTime() { return _averageProcessWaitTime.getAverage(); }
-
-    // these methods allow us to track which threads got to various states
-    static void didProcess(OctreeSendThread* thread);
-    static void didPacketDistributor(OctreeSendThread* thread);
-    static void didHandlePacketSend(OctreeSendThread* thread);
-    static void didCallWriteDatagram(OctreeSendThread* thread);
-    static void stopTrackingThread(OctreeSendThread* thread);
-
-    static int howManyThreadsDidProcess(quint64 since = 0);
-    static int howManyThreadsDidPacketDistributor(quint64 since = 0);
-    static int howManyThreadsDidHandlePacketSend(quint64 since = 0);
-    static int howManyThreadsDidCallWriteDatagram(quint64 since = 0);
 
     bool handleHTTPRequest(HTTPConnection* connection, const QUrl& url, bool skipSubHandler) override;
 
@@ -165,7 +125,6 @@ protected:
     virtual void readAdditionalConfiguration(const QJsonObject& settingsSectionObject) { };
     void parsePayload();
     void initHTTPManager(int port);
-    void resetSendingStats();
     QString getUptime();
     QString getFileLoadTime();
     QString getConfiguration();
@@ -216,62 +175,6 @@ protected:
     SendThreads _sendThreads;
 
     static int _clientCount;
-    static SimpleMovingAverage _averageLoopTime;
-
-    static SimpleMovingAverage _averageEncodeTime;
-    static SimpleMovingAverage _averageShortEncodeTime;
-    static SimpleMovingAverage _averageLongEncodeTime;
-    static SimpleMovingAverage _averageExtraLongEncodeTime;
-    static int _extraLongEncode;
-    static int _longEncode;
-    static int _shortEncode;
-    static int _noEncode;
-
-    static SimpleMovingAverage _averageInsideTime;
-
-    static SimpleMovingAverage _averageTreeWaitTime;
-    static SimpleMovingAverage _averageTreeShortWaitTime;
-    static SimpleMovingAverage _averageTreeLongWaitTime;
-    static SimpleMovingAverage _averageTreeExtraLongWaitTime;
-    static int _extraLongTreeWait;
-    static int _longTreeWait;
-    static int _shortTreeWait;
-    static int _noTreeWait;
-
-    static SimpleMovingAverage _averageTreeTraverseTime;
-
-    static SimpleMovingAverage _averageNodeWaitTime;
-
-    static SimpleMovingAverage _averageCompressAndWriteTime;
-    static SimpleMovingAverage _averageShortCompressTime;
-    static SimpleMovingAverage _averageLongCompressTime;
-    static SimpleMovingAverage _averageExtraLongCompressTime;
-    static int _extraLongCompress;
-    static int _longCompress;
-    static int _shortCompress;
-    static int _noCompress;
-
-    static SimpleMovingAverage _averagePacketSendingTime;
-    static int _noSend;
-
-    static SimpleMovingAverage _averageProcessWaitTime;
-    static SimpleMovingAverage _averageProcessShortWaitTime;
-    static SimpleMovingAverage _averageProcessLongWaitTime;
-    static SimpleMovingAverage _averageProcessExtraLongWaitTime;
-    static int _extraLongProcessWait;
-    static int _longProcessWait;
-    static int _shortProcessWait;
-    static int _noProcessWait;
-
-    static QMap<OctreeSendThread*, quint64> _threadsDidProcess;
-    static QMap<OctreeSendThread*, quint64> _threadsDidPacketDistributor;
-    static QMap<OctreeSendThread*, quint64> _threadsDidHandlePacketSend;
-    static QMap<OctreeSendThread*, quint64> _threadsDidCallWriteDatagram;
-
-    static QMutex _threadsDidProcessMutex;
-    static QMutex _threadsDidPacketDistributorMutex;
-    static QMutex _threadsDidHandlePacketSendMutex;
-    static QMutex _threadsDidCallWriteDatagramMutex;
 };
 
 #endif // hifi_OctreeServer_h

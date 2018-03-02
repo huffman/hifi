@@ -160,7 +160,7 @@ void EntityTreeSendThread::traverseTreeAndSendContents(SharedNodePointer node, O
         const uint64_t TIME_BUDGET = 200; // usec
         #endif
         _traversal.traverse(TIME_BUDGET);
-        OctreeServer::trackTreeTraverseTime((float)(usecTimestampNow() - startTime));
+        OctreeServerStats::trackTreeTraverseTime((float)(usecTimestampNow() - startTime));
     }
 
     OctreeSendThread::traverseTreeAndSendContents(node, nodeData, viewFrustumChanged, isFullScene);
@@ -396,7 +396,7 @@ void EntityTreeSendThread::startNewTraversal(const ViewFrustum& view, EntityTree
 
 bool EntityTreeSendThread::traverseTreeAndBuildNextPacketPayload(EncodeBitstreamParams& params, const QJsonObject& jsonFilters) {
     if (_sendQueue.empty()) {
-        OctreeServer::trackEncodeTime(OctreeServer::SKIP_TIME);
+        OctreeServerStats::trackEncodeTime(OctreeServerStats::SKIP_TIME);
         return false;
     }
     quint64 encodeStart = usecTimestampNow();
@@ -478,12 +478,12 @@ bool EntityTreeSendThread::traverseTreeAndBuildNextPacketPayload(EncodeBitstream
 
     if (_numEntities == 0) {
         _packetData.discardLevel(entitiesLevel);
-        OctreeServer::trackEncodeTime((float)(usecTimestampNow() - encodeStart));
+        OctreeServerStats::trackEncodeTime((float)(usecTimestampNow() - encodeStart));
         return false;
     }
     _packetData.endLevel(entitiesLevel);
     _packetData.updatePriorBytes(_numEntitiesOffset, (const unsigned char*)&_numEntities, sizeof(_numEntities));
-    OctreeServer::trackEncodeTime((float)(usecTimestampNow() - encodeStart));
+    OctreeServerStats::trackEncodeTime((float)(usecTimestampNow() - encodeStart));
     return true;
 }
 
