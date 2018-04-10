@@ -31,6 +31,16 @@ namespace gpu {
 class Batch;
 }
 
+enum class TextureType {
+    ORIGINAL,
+    BCN,
+    ETC1
+};
+
+struct TextureMeta {
+    std::unordered_map<TextureType, QUrl> availableTextureTypes;
+};
+
 /// A simple object wrapper for an OpenGL texture.
 class Texture {
 public:
@@ -79,7 +89,9 @@ protected:
 
     bool handleFailedRequest(ResourceRequest::Result result) override;
 
-    Q_INVOKABLE void loadContent(const QByteArray& content);
+    Q_INVOKABLE void loadMetaContent(const QByteArray& content);
+    Q_INVOKABLE void loadTextureContent(const QByteArray& content);
+
     Q_INVOKABLE void setImage(gpu::TexturePointer texture, int originalWidth, int originalHeight);
 
     Q_INVOKABLE void startRequestForNextMipLevel();
@@ -93,6 +105,14 @@ private:
 
     image::TextureUsage::Type _type;
 
+    enum class ResourceType {
+        META,
+        ORIGINAL,
+        KTX
+    };
+
+    ResourceType _currentlyLoadingResourceType { ResourceType::META };
+
     static const uint16_t NULL_MIP_LEVEL;
     enum KTXResourceState {
         PENDING_INITIAL_LOAD = 0,
@@ -103,7 +123,6 @@ private:
         FAILED_TO_LOAD
     };
 
-    bool _sourceIsKTX { false };
     KTXResourceState _ktxResourceState { PENDING_INITIAL_LOAD };
 
     // The current mips that are currently being requested w/ _ktxMipRequest
@@ -178,6 +197,8 @@ public:
 
     static const int DEFAULT_SPECTATOR_CAM_WIDTH { 2048 };
     static const int DEFAULT_SPECTATOR_CAM_HEIGHT { 1024 };
+
+    static std::vector<TextureType> _supportedTextureTypes;
 
 signals:
     void spectatorCameraFramebufferReset();
