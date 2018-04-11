@@ -24,22 +24,13 @@
 #include <graphics/TextureMap.h>
 #include <image/Image.h>
 #include <ktx/KTX.h>
+#include <TextureMeta.h>
 
 #include "KTXCache.h"
 
 namespace gpu {
 class Batch;
 }
-
-enum class TextureType {
-    ORIGINAL,
-    BCN,
-    ETC1
-};
-
-struct TextureMeta {
-    std::unordered_map<TextureType, QUrl> availableTextureTypes;
-};
 
 /// A simple object wrapper for an OpenGL texture.
 class Texture {
@@ -85,7 +76,7 @@ protected:
 
     virtual bool isCacheable() const override { return _loaded; }
 
-    virtual void downloadFinished(const QByteArray& data) override;
+    Q_INVOKABLE virtual void downloadFinished(const QByteArray& data) override;
 
     bool handleFailedRequest(ResourceRequest::Result result) override;
 

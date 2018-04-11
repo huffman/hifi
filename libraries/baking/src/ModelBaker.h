@@ -49,6 +49,7 @@ public slots:
 
 protected:
     void checkIfTexturesFinished();
+    virtual void texturesFinished() { }
     
     QHash<QByteArray, QByteArray> _textureContentMap;
     QUrl _modelURL;
@@ -63,7 +64,7 @@ private slots:
     void handleAbortedTexture();
 
 private:
-    QString createBakedTextureFileName(const QFileInfo & textureFileInfo);
+    QString createBaseTextureFileName(const QFileInfo & textureFileInfo);
     QUrl getTextureURL(const QFileInfo& textureFileInfo, QString relativeFileName, bool isEmbedded = false);
     void bakeTexture(const QUrl & textureURL, image::TextureUsage::Type textureType, const QDir & outputDir, 
                      const QString & bakedFilename, const QByteArray & textureContent);

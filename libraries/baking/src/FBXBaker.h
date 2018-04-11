@@ -41,6 +41,9 @@ public slots:
 signals:
     void sourceCopyReadyToLoad();
 
+protected:
+    void texturesFinished() override;
+
 private slots:
     void bakeSourceCopy();
     void handleFBXNetworkReply();
@@ -51,6 +54,7 @@ private:
     void loadSourceFBX();
 
     void importScene();
+    void embedTextureMetaData();
     void rewriteAndBakeSceneModels();
     void rewriteAndBakeSceneTextures();
     void exportScene();

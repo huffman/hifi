@@ -43,6 +43,7 @@ private:
     void setMaterialNodeProperties(FBXNode& materialNode, QString material, FBXGeometry& geometry);
     NodeID nextNodeID() { return _nodeID++; }
 
+
     NodeID _nodeID { 0 };
     NodeID _geometryID;
     NodeID _modelID;
