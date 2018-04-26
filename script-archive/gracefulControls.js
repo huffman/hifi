@@ -36,7 +36,7 @@ var BRAKE_PARAMETERS = {
 }
 
 var DRIVE_AVATAR_ENABLED = true;
-var UPDATE_RATE = 90;
+var UPDATE_RATE = 160;
 var USE_INTERVAL = true;
 
 var movementParameters = DEFAULT_PARAMETERS;
