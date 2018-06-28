@@ -500,7 +500,7 @@ Menu::Menu() {
 
     // Developer > Assets >>>
     // Menu item is not currently needed but code should be kept in case it proves useful again at some stage.
-//#define WANT_ASSET_MIGRATION
+#define WANT_ASSET_MIGRATION
 #ifdef WANT_ASSET_MIGRATION
     MenuWrapper* assetDeveloperMenu = developerMenu->addMenu("Assets");
     auto& atpMigrator = ATPAssetMigrator::getInstance();
