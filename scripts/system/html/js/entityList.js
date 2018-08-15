@@ -47,8 +47,14 @@ debugPrint = function (message) {
 
 function loaded() {
     openEventBridge(function() {
-        entityList = new List('entity-list', { valueNames: ['name', 'type', 'url', 'locked', 'visible'], page: MAX_ITEMS});
-        entityList.clear();
+
+        var clusterize = new Clusterize({
+          scrollId: 'scrollArea',
+          contentId: 'contentArea'
+        });
+        $('#contentArea').on('click', 'tr', onRowClicked);
+        $('#contentArea').on('dblclick', 'tr', onRowDoubleClicked);
+
         elEntityTable = document.getElementById("entity-table");
         elEntityTableBody = document.getElementById("entity-table-body");
         elRefresh = document.getElementById("refresh");
@@ -84,6 +90,7 @@ function loaded() {
         document.getElementById("entity-visible").onclick = function () {
             setSortColumn('visible');
         };
+        /*
         document.getElementById("entity-verticesCount").onclick = function () {
             setSortColumn('verticesCount');
         };
@@ -105,23 +112,28 @@ function loaded() {
         document.getElementById("entity-hasScript").onclick = function () {
             setSortColumn('hasScript');
         };
+        */
 
-        function onRowClicked(clickEvent) {
-            var id = this.dataset.entityId;
-            var selection = [this.dataset.entityId];
-            if (clickEvent.ctrlKey) {
-                var selectedIndex = selectedEntities.indexOf(id);
+        function onRowClicked(event) {
+            console.log("CLICKED", this);
+            let entityID = $(this).data('entity-id');
+            console.log("CLICKED", entityID, event);
+
+            var selection = [entityID];
+            if (event.ctrlKey) {
+                var selectedIndex = selectedEntities.indexOf(entityID);
                 if (selectedIndex >= 0) {
                     selection = selectedEntities;
                     selection.splice(selectedIndex, 1)
                 } else {
                     selection = selection.concat(selectedEntities);
                 }
-            } else if (clickEvent.shiftKey && selectedEntities.length > 0) {
+            } else if (event.shiftKey && selectedEntities.length > 0) {
+                /*
                 var previousItemFound = -1;
                 var clickedItemFound = -1;
                 for (var entity in entityList.visibleItems) {
-                    if (clickedItemFound === -1 && this.dataset.entityId == entityList.visibleItems[entity].values().id) {
+                    if (clickedItemFound === -1 && entityID == entityList.visibleItems[entity].values().id) {
                         clickedItemFound = entity;
                     } else if(previousItemFound === -1 && selectedEntities[0] == entityList.visibleItems[entity].values().id) {
                         previousItemFound = entity;
@@ -141,6 +153,7 @@ function loaded() {
                     }
                     selection = selection.concat(betweenItems, selectedEntities);
                 }
+                */
             }
 
             selectedEntities = selection;
@@ -160,7 +173,7 @@ function loaded() {
             EventBridge.emitWebEvent(JSON.stringify({
                 type: "selectionUpdate",
                 focus: true,
-                entityIds: [this.dataset.entityId],
+                entityIds: [$(this).data('entity-id')],
             }));
         }
 
@@ -184,34 +197,31 @@ function loaded() {
         //texturesCount, texturesSize, hasTransparent,
         //isBaked, drawCalls, hasScript) {
         function addEntities(entityData) {
+            PROFILE("addEntities", function() {
             const IMAGE_MODEL_NAME = 'default-image-model.fbx';
 
-            let newEntities = entityData.filter(function(entity) {
-                if (entity.id in entities) {
-                    var item = entities[entity.id].item;
-                    item.values({
-                        name: entity.name,
-                        url: getFilename(entity.url),
-                        locked: entity.locked,
-                        visible: entity.visible
-                    });
-                    return false;
-                }
-                return true;
-            });
-
-            if (newEntities.length === 0) {
-                return;
-            }
-
-            newEntities = newEntities.map(function(entity) {
+                let cnt = 0;
+            newEntities = entityData.map(function(entity) {
                 let type = entity.type;
                 let filename = getFilename(entity.url);
                 if (filename === IMAGE_MODEL_NAME) {
                     type = "Image";
                 }
-                return {
-                    id: entity.id,
+
+                let row = '<tr data-entity-id="' + entity.id + '">'
+                row += '<td>' + cnt++ + '</td>';
+                function append(k) {
+                    row += '<td>v:' + entity[k] + '</td>';
+                }
+
+                append('type');
+                append('name');
+                append('url');
+                append('locked');
+                append('visible');
+                /**
+                    '<tr>'
+                    + '<td>' entity.id,
                     name: entity.name,
                     type: type,
                     url: filename,
@@ -226,43 +236,21 @@ function loaded() {
                     drawCalls: displayIfNonZero(entity.drawCalls),
                     hasScript: entity.hasScript ? SCRIPT_GLYPH : null
                 }
+                */
+                row += '</tr>';
+                return row;
             });
-                //newEntities = newEntities.splice(newEntities.length - 10);
-                console.log("Adding: " + newEntities.length);
+            console.log("Adding: " + newEntities.length);
 
-            let size = 2000;
-            let sets = Math.ceil(newEntities.length / size);
-            for (let i = 0; i < sets; i++) {
-                
-                console.log(Date.now(), "Adding", i * size, (i + 1) * size);
-            entityList.add(newEntities.splice(i * size, (i + 1) * size),
-                function (items) {
-                    console.log(Date.now(), "added: " + items.length);
-                    items.forEach(function(item) {
-                        var currentElement = item.elm;
-                        var values = item._values;
-
-                        entities[values.id] = {
-                            id: values.id,
-                            name: values.name,
-                            el: currentElement,
-                            item: item
-                        };
-                        currentElement.setAttribute('id', 'entity_' + values.id);
-                        currentElement.setAttribute('title', values.fullUrl);
-                        currentElement.dataset.entityId = values.id;
-                        currentElement.onclick = onRowClicked;
-                        currentElement.ondblclick = onRowDoubleClicked;
-                    });
-                });
-            }
+            clusterize.update(newEntities);
             console.log(Date.now(), "DONE");
+            });
         }
 
         function removeEntities(deletedIDs) {
             for (i = 0, length = deletedIDs.length; i < length; i++) {
                 delete entities[deletedIDs[i]];
-                entityList.remove("id", deletedIDs[i]);
+                //entityList.remove("id", deletedIDs[i]);
             }
         }
 
@@ -276,7 +264,7 @@ function loaded() {
 
         function clearEntities() {
             entities = {};
-            entityList.clear();
+            //entityList.clear();
             refreshFooter();
         }
 
@@ -303,7 +291,7 @@ function loaded() {
                 currentSortOrder = "asc";
             }
             elSortOrder[column].innerHTML = currentSortOrder == "asc" ? ASCENDING_STRING : DESCENDING_STRING;
-            entityList.sort(currentSortColumn, { order: currentSortOrder });
+            //entityList.sort(currentSortColumn, { order: currentSortOrder });
         }
         setSortColumn('type');
 
@@ -317,17 +305,17 @@ function loaded() {
                 elFooter.firstChild.nodeValue = selectedEntities.length + " entities selected";
             } else if (selectedEntities.length === 1) {
                 elFooter.firstChild.nodeValue = "1 entity selected";
-            } else if (entityList.visibleItems.length === 1) {
+            } else if (clusterize.getRowsAmount() === 1) {
                 elFooter.firstChild.nodeValue = "1 entity found";
             } else {
-                elFooter.firstChild.nodeValue = entityList.visibleItems.length + " entities found";
+                elFooter.firstChild.nodeValue = clusterize.getRowsAmount() + " entities found";
             }
         }
 
         function refreshEntityListObject() {
             refreshEntityListTimer = null;
-            entityList.sort(currentSortColumn, { order: currentSortOrder });
-            entityList.search(elFilter.value);
+            //entityList.sort(currentSortColumn, { order: currentSortOrder });
+            //entityList.search(elFilter.value);
             refreshFooter();
         }
 
@@ -426,32 +414,48 @@ function loaded() {
                         refreshEntities();
                     }
                 } else if (data.type === "update" && data.selectedIDs !== undefined) {
+                    PROFILE("do-sort", function() {
+                        data.entities.sort((a, b) => a.type < b.type);
+                    });
+                    //PROFILE("clear", function() {
+                        //$('#entity-table-body').not(':first').remove();
+                    //});
+                    //PROFILE("newupdate", function() {
+                        //data.entities.forEach(function(entity) {
+                            //$('<tr><td class=>' + 
+                        //});
+
+                        //data.entities.sort((a, b) => a.type < b.type);
+                    //});
                     PROFILE("update", function() {
                         var newEntities = data.entities;
                         if (newEntities && newEntities.length == 0) {
                             elNoEntitiesMessage.style.display = "block";
                             elFooter.firstChild.nodeValue = "0 entities found";
                         } else if (newEntities) {
-                            elNoEntitiesMessage.style.display = "none";
+                            //elNoEntitiesMessage.style.display = "none";
+                            clusterize.clear();
                             addEntities(newEntities);
-                            updateSelectedEntities(data.selectedIDs);
-                            scheduleRefreshEntityList();
-                            resize();
+                            //updateSelectedEntities(data.selectedIDs);
+                            //scheduleRefreshEntityList();
+                            //resize();
+                            refreshFooter();
                         }
                     });
                 } else if (data.type === "removeEntities" && data.deletedIDs !== undefined && data.selectedIDs !== undefined) {
-                    removeEntities(data.deletedIDs);
-                    updateSelectedEntities(data.selectedIDs);
-                    scheduleRefreshEntityList();
+                    //removeEntities(data.deletedIDs);
+                    //updateSelectedEntities(data.selectedIDs);
+                    //scheduleRefreshEntityList();
                 } else if (data.type === "deleted" && data.ids) {
-                    removeEntities(data.ids);
-                    refreshFooter();
+                    //removeEntities(data.ids);
+                    //refreshFooter();
                 }
             });
             setTimeout(refreshEntities, 1000);
         }
 
         function resize() {
+            return;
             // Take up available window space
             elEntityTableScroll.style.height = window.innerHeight - 207;
 

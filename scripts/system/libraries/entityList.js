@@ -133,15 +133,19 @@ EntityListTool = function(shouldUseEditTabletApp) {
             var entities = [];
 
             var ids;
+            PROFILE('Script-findEntities', function() {
             if (filterInView) {
                 ids = Entities.findEntitiesInFrustum(Camera.frustum);
             } else {
                 ids = Entities.findEntities(MyAvatar.position, searchRadius);
             }
+            });
 
+            PROFILE('Script-getProperties', function() {
             var cameraPosition = Camera.position;
             for (var i = 0; i < ids.length; i++) {
                 var id = ids[i];
+                //var properties = Entities.getEntityProperties(id, ['type', 'name', 'locked', 'visible', 'modelURL']);
                 var properties = Entities.getEntityProperties(id);
 
                 if (!filterInView || Vec3.distance(properties.position, cameraPosition) <= searchRadius) {
@@ -173,6 +177,7 @@ EntityListTool = function(shouldUseEditTabletApp) {
                     });
                 }
             }
+            });
 
             var selectedIDs = [];
             for (var j = 0; j < selectionManager.selections.length; j++) {

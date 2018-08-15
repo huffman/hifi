@@ -2089,7 +2089,9 @@ var PropertiesTool = function (opts) {
             entity.id = selectionManager.selections[i];
             entity.properties = Entities.getEntityProperties(selectionManager.selections[i]);
             if (entity.properties.rotation !== undefined) {
+                console.log("PreRotation is: ", JSON.stringify(entity.properties.rotation));
                 entity.properties.rotation = Quat.safeEulerAngles(entity.properties.rotation);
+                console.log("Rotation is: ", JSON.stringify(entity.properties.rotation));
             }
             if (entity.properties.keyLight !== undefined && entity.properties.keyLight.direction !== undefined) {
                 entity.properties.keyLight.direction = Vec3.multiply(RADIANS_TO_DEGREES,

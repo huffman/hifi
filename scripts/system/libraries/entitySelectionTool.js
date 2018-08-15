@@ -305,6 +305,7 @@ SelectionManager = (function() {
     that._update = function(selectionUpdated) {
         var properties = null;
         if (that.selections.length === 0) {
+            console.log("Selections is 0");
             that.localDimensions = null;
             that.localPosition = null;
             that.worldDimensions = null;
