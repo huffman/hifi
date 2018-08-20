@@ -145,8 +145,8 @@ EntityListTool = function(shouldUseEditTabletApp) {
             var cameraPosition = Camera.position;
             for (var i = 0; i < ids.length; i++) {
                 var id = ids[i];
-                //var properties = Entities.getEntityProperties(id, ['type', 'name', 'locked', 'visible', 'modelURL']);
-                var properties = Entities.getEntityProperties(id);
+                var properties = Entities.getEntityProperties(id, ['type', 'name', 'locked', 'visible', 'modelURL']);
+                //var properties = Entities.getEntityProperties(id);
 
                 if (!filterInView || Vec3.distance(properties.position, cameraPosition) <= searchRadius) {
                     var url = "";
