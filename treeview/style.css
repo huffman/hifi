@@ -1,0 +1,19 @@
+body {
+}
+
+div.row {
+    background: #eee;
+}
+div.row.drop-target {
+    background: #aab;
+}
+div.row .content {
+    height: 17px;
+    width: 100;
+}
+div.row .children {
+    background: #999;
+    margin: 0;
+    padding: 0;
+    padding-left: 20px;
+}
