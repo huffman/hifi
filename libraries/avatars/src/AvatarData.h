@@ -1189,6 +1189,7 @@ public:
     virtual void removeMaterial(graphics::MaterialPointer material, const std::string& parentMaterialName) {}
     void setReplicaIndex(int replicaIndex) { _replicaIndex = replicaIndex; }
     int getReplicaIndex() { return _replicaIndex; }
+    Q_INVOKABLE void updateAvatarEntityJson(const QUuid& entityID, QVariantMap entityData);
 
 signals:
 
@@ -1222,6 +1223,7 @@ signals:
      * @returns {Signal}
      */
     void sessionUUIDChanged();
+
 
 public slots:
 

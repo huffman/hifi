@@ -2675,6 +2675,12 @@ void AvatarData::setAttachmentsVariant(const QVariantList& variant) {
 
 const int MAX_NUM_AVATAR_ENTITIES = 42;
 
+void AvatarData::updateAvatarEntityJson(const QUuid& entityID, QVariantMap entityData) {
+    auto data = QJsonObject::fromVariantMap(entityData);
+   QJsonDocument doc(data);
+   updateAvatarEntity(entityID, doc.toBinaryData());
+    
+}
 void AvatarData::updateAvatarEntity(const QUuid& entityID, const QByteArray& entityData) {
     _avatarEntitiesLock.withWriteLock([&] {
         AvatarEntityMap::iterator itr = _avatarEntityData.find(entityID);
