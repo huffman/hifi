@@ -421,7 +421,6 @@ const DEFAULT_ENTITY_PROPERTIES = {
         emitOrientation: { x: 0, y: 0, z: 0, w: 1 },
         emitterShouldTrail: true,
         particleRadius: 0.25,
-        radiusStart: 0,
         radiusFinish: 0.1,
         radiusSpread: 0,
         particleColor: {
@@ -436,7 +435,6 @@ const DEFAULT_ENTITY_PROPERTIES = {
         },
         alpha: 0,
         alphaStart: 1,
-        alphaFinish: 0,
         alphaSpread: 0,
         emitAcceleration: {
             x: 0,
@@ -449,8 +447,6 @@ const DEFAULT_ENTITY_PROPERTIES = {
             z: 0
         },
         particleSpin: 0,
-        spinStart: 0,
-        spinFinish: 0,
         spinSpread: 0,
         rotateWithEntity: false,
         polarStart: 0,
