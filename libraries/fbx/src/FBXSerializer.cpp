@@ -477,6 +477,7 @@ HFMModel* FBXSerializer::extractHFMModel(const QVariantHash& mapping, const QStr
     hfmModel.hfmToHifiJointNameMapping = getJointNameMapping(mapping);
 
     float unitScaleFactor = 1.0f;
+    glm::quat upAxisRotation;
     glm::vec3 ambientColor;
     QString hifiGlobalNodeID;
     unsigned int meshIndex = 0;
@@ -514,11 +515,26 @@ HFMModel* FBXSerializer::extractHFMModel(const QVariantHash& mapping, const QStr
                         if (subobject.name == propertyName) {
                             static const QVariant UNIT_SCALE_FACTOR = QByteArray("UnitScaleFactor");
                             static const QVariant AMBIENT_COLOR = QByteArray("AmbientColor");
+                            static const QVariant UP_AXIS = QByteArray("UpAxis");
                             const auto& subpropName = subobject.properties.at(0);
                             if (subpropName == UNIT_SCALE_FACTOR) {
                                 unitScaleFactor = subobject.properties.at(index).toFloat();
                             } else if (subpropName == AMBIENT_COLOR) {
                                 ambientColor = getVec3(subobject.properties, index);
+                            } else if (subpropName == UP_AXIS) {
+                                constexpr int UP_AXIS_Y = 1;
+                                constexpr int UP_AXIS_Z = 2;
+                                static const glm::quat UP_AXIS_ROTATION_FOR_Z_UP = glm::angleAxis(glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+
+                                int upAxis = subobject.properties.at(index).toInt();
+                                qDebug() << "UpAxis: " << upAxis;
+                                if (upAxis == UP_AXIS_Y) {
+                                    // No update necessary, y up is the default
+                                } else if (upAxis == UP_AXIS_Z) {
+                                    upAxisRotation = UP_AXIS_ROTATION_FOR_Z_UP;
+                                } else {
+                                    qWarning() << "Found unknown UpAxis value in FBX: " << upAxis;
+                                }
                             }
                         }
                     }
@@ -1315,6 +1331,11 @@ HFMModel* FBXSerializer::extractHFMModel(const QVariantHash& mapping, const QStr
         joint.postTransform = fbxModel.postTransform;
         joint.rotationMin = fbxModel.rotationMin;
         joint.rotationMax = fbxModel.rotationMax;
+
+        if (joint.parentIndex == -1) {
+            qWarning() << "Adjusting joint:" << fbxModel.name;
+            joint.rotation *= upAxisRotation;
+        }
 
         joint.hasGeometricOffset = fbxModel.hasGeometricOffset;
         joint.geometricTranslation = fbxModel.geometricTranslation;
