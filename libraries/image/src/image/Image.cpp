@@ -202,11 +202,113 @@ QImage processRawImageData(QIODevice& content, const std::string& filename) {
     // Help the QImage loader by extracting the image file format from the url filename ext.
     // Some tga are not created properly without it.
     auto filenameExtension = filename.substr(filename.find_last_of('.') + 1);
+    content.open(QIODevice::ReadOnly);
+    content.reset();
     QImageReader imageReader(&content, filenameExtension.c_str());
 
+    if (filenameExtension == "tga") {
+        enum class TGAImageType : uint8_t {
+            NoImageData = 0,
+            UncompressedColorMapped = 1,
+            UncompressedTrueColor = 2,
+            UncompressedBlackWhite = 3,
+            RunLengthEncodedColorMapped = 9,
+            RunLengthEncodedTrueColor = 10,
+            RunLengthEncodedBlackWhite = 11,
+        };
+        struct TGAHeader {
+            uint8_t idLength;
+            uint8_t colorMapType;
+            TGAImageType imageType;
+            struct {
+                uint64_t firstEntryIndex : 16;
+                uint64_t length : 16;
+                uint64_t entrySize : 8;
+            } colorMap;
+            //uint8_t colorMap[5];
+            uint16_t xOrigin;
+            uint16_t yOrigin;
+            uint16_t width;
+            uint16_t height;
+            uint8_t pixelDepth;
+            struct {
+                uint8_t attributeBitsPerPixel : 4;
+                uint8_t orientation : 2;
+                uint8_t padding : 2;
+            } imageDescriptor;
+        };
+
+        static_assert(sizeof(TGAHeader::colorMap) == 8, "YO");
+
+        TGAHeader header;
+
+        content.read((char*)&header.idLength, 1);
+        content.read((char*)&header.colorMapType, 1);
+        content.read((char*)&header.imageType, 1);
+        content.read((char*)&header.colorMap, 5);
+        content.read((char*)&header.xOrigin, 2);
+        content.read((char*)&header.yOrigin, 2);
+        content.read((char*)&header.width, 2);
+        content.read((char*)&header.height, 2);
+        content.read((char*)&header.pixelDepth, 1);
+        content.read((char*)&header.imageDescriptor, 1);
+
+
+        qDebug() << "Id Length: " << (int)header.idLength << "..";
+        qDebug() << "Color map: " << (int)header.colorMap.firstEntryIndex << header.colorMap.length << header.colorMap.entrySize;
+        qDebug() << "Color map type: " << (int)header.colorMapType << "..";
+        qDebug() << "Image type: " << (int)header.imageType << "..";
+        qDebug() << "Origin: " << header.xOrigin << header.yOrigin;
+        qDebug() << "Size: " << header.width << header.height;
+        qDebug() << "Depth: " << header.pixelDepth;
+        qDebug() << "Image desc: " << header.imageDescriptor.attributeBitsPerPixel << header.imageDescriptor.orientation;
+
+
+        if (header.imageType == TGAImageType::UncompressedTrueColor) {
+            if (header.pixelDepth == 24 && header.imageDescriptor.attributeBitsPerPixel == 0) {
+                content.skip(header.idLength);
+
+                QImage image { header.width, header.height, QImage::Format_RGB888 };
+                for (int y = 0; y < header.height; ++y) {
+                    uchar* line = image.scanLine(y);
+                    for (int x = 0; x < header.width; ++x) {
+                        char r;
+                        char g;
+                        char b;
+                        content.read((char*)line + 2, 1);
+                        content.read((char*)line + 1, 1);
+                        content.read((char*)line, 1);
+                        //*line = b;
+                        //*line = g;
+                        //*line = r;
+                        line += 3;
+                        //qDebug() << "Writing pixel " << r << g << b;
+                    }
+                    //content.read((char*)image.scanLine(y), header.width * 3);
+                    //memcpy(image.scanLine(y), )
+
+                }
+                return image;
+            }
+        }
+
+        //return QImage();
+    }
+
+    qDebug() << "Supported types: " << QImageReader::supportedImageFormats();
+    qDebug() << "Reading raw image data: " << filename.c_str() << filenameExtension.c_str() << QImageReader::imageFormat(filename.c_str()) << imageReader.format();
+
+    qDebug() << "Supported types: " << QImageReader::supportedImageFormats();
+    qDebug() << "Reading raw image data: " << filename.c_str() << filenameExtension.c_str() << QImageReader::imageFormat(filename.c_str()) << imageReader.format();
+
     if (imageReader.canRead()) {
+        qDebug() << "Can read!";
         return imageReader.read();
     } else {
+        auto i = imageReader.read();
+        qDebug() << "error: " << imageReader.error() << imageReader.errorString() << i.format();
+
+        qDebug() << "Cannot read";
         // Extension could be incorrect, try to detect the format from the content
         QImageReader newImageReader;
         newImageReader.setDecideFormatFromContent(true);
@@ -214,9 +316,15 @@ QImage processRawImageData(QIODevice& content, const std::string& filename) {
         newImageReader.setDevice(&content);
 
         if (newImageReader.canRead()) {
-            return newImageReader.read();
+            qDebug() << "Can read based on content!" << newImageReader.format() << newImageReader.imageFormat();
+            auto i = newImageReader.read();
+            qDebug() << "error: " << newImageReader.error() << newImageReader.errorString();
+            content.reset();
+            qDebug() << content.size();
+            return i;
         }
     }
+    qDebug() << "Cannot read :(";
 
     return QImage();
 }
@@ -225,6 +333,7 @@ gpu::TexturePointer processImage(std::shared_ptr<QIODevice> content, const std::
                                  int maxNumPixels, TextureUsage::Type textureType,
                                  bool compress, BackendTarget target, const std::atomic<bool>& abortProcessing) {
 
+    qDebug() << "Loading image : " << filename.c_str();
     QImage image = processRawImageData(*content.get(), filename);
     // Texture content can take up a lot of memory. Here we release our ownership of that content
     // in case it can be released.

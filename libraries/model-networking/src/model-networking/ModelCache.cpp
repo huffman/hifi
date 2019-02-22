@@ -69,6 +69,7 @@ void GeometryMappingResource::downloadFinished(const QByteArray& data) {
     _mapping = FSTReader::readMapping(data);
 
     QString filename = _mapping.value("filename").toString();
+    qDebug() << "Filename: " << filename << QUrl(filename).toString(QUrl::FullyEncoded) << _url.resolved(filename).toString(QUrl::FullyEncoded);
 
     if (filename.isNull()) {
         finishedLoading(false);

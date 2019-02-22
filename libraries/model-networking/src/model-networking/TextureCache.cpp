@@ -1175,7 +1175,7 @@ void ImageReader::read() {
         constexpr bool shouldCompress = false;
 #endif
         auto target = getBackendTarget();
-        texture = image::processImage(std::move(buffer), _url.toString().toStdString(), _maxNumPixels, networkTexture->getTextureType(), shouldCompress, target);
+        texture = image::processImage(std::move(buffer), _url.fileName().toStdString(), _maxNumPixels, networkTexture->getTextureType(), shouldCompress, target);
 
         if (!texture) {
             QMetaObject::invokeMethod(resource.data(), "setImage",

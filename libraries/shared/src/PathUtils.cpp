@@ -256,13 +256,24 @@ QUrl PathUtils::defaultScriptsLocation(const QString& newDefaultPath) {
     if (!overriddenDefaultScriptsLocation.isEmpty()) {
         path = overriddenDefaultScriptsLocation;
     } else {
+#if defined(Q_OS_ANDROID)
+        path = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/scripts";
+#else // !defined(Q_OS_ANDROID)
+
 #if defined(Q_OS_OSX)
         path = QCoreApplication::applicationDirPath() + "/../Resources/scripts";
-#elif defined(Q_OS_ANDROID)
-        path = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/scripts";
 #else
         path = QCoreApplication::applicationDirPath() + "/scripts";
 #endif
+
+#if defined(DEV_BUILD)
+        if (USE_SOURCE_TREE_RESOURCES()) {
+            // For dev builds, optionally load content from the Git source tree
+            path = projectRootPath() + "/scripts";
+        }
+#endif // DEV_BUILD
+ 
+#endif // !defined(Q_OS_ANDROID)
     }
 
     // turn the string into a legit QUrl

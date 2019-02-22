@@ -369,6 +369,8 @@ QSharedPointer<Resource> ResourceCache::getResource(const QUrl& url, const QUrl&
         resource->ensureLoading();
     }
 
+    qDebug() << "reqesting resource: " << url << url.toString(QUrl::FullyEncoded);
+
     DependencyManager::get<ResourceRequestObserver>()->update(
         resource->getURL(), -1, "ResourceCache::getResource");
     return resource;
