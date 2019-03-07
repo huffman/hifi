@@ -7,7 +7,7 @@ UseTab: Never
 
 BreakBeforeBraces: Custom
 BraceWrapping:
-  AfterEnum: true
+  AfterEnum: false
   AfterClass: false
   AfterControlStatement: false
   AfterFunction: false
@@ -28,11 +28,12 @@ IndentCaseLabels: true
 ReflowComments: false
 Cpp11BracedListStyle: false
 ContinuationIndentWidth: 4
-ConstructorInitializerAllOnOneLineOrOnePerLine: false
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
 CompactNamespaces: true
 SortIncludes: false
 SpaceBeforeAssignmentOperators: true
 SpaceBeforeParens: ControlStatements
+SpaceBeforeCpp11BracedList: true
 
 PenaltyReturnTypeOnItsOwnLine: 1000
 PenaltyBreakBeforeFirstCallParameter: 1000
