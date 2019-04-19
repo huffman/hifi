@@ -29,7 +29,7 @@ Script.include([
     "libraries/progressDialog.js",
     "libraries/entitySelectionTool.js",
     "libraries/ToolTip.js",
-    "libraries/entityCameraTool.js",
+    "libraries/entityCameraTool.js" + "?" + Date.now(),
     "libraries/gridTool.js",
     "libraries/entityList.js",
     "libraries/utils.js",

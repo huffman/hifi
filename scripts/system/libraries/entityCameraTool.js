@@ -32,9 +32,9 @@ var MIN_ZOOM_DISTANCE = 0.01;
 // The maximum usable zoom level is somewhere around 14km, further than that the edit handles will fade-out. (FIXME: MS17493)
 var MAX_ZOOM_DISTANCE = 14000;
 
-var MODE_INACTIVE = 'inactive';
-var MODE_ORBIT = 'orbit';
-var MODE_PAN = 'pan';
+var MODE_INACTIVE = 0;
+var MODE_ORBIT = 1;
+var MODE_PAN = 2;
 
 var EASING_MULTIPLIER = 8;
 
@@ -46,7 +46,7 @@ var easeOutCubic = function(t) {
     return t * t * t + 1;
 };
 
-EASE_TIME = 0.5;
+EASE_TIME = 100;
 
 function clamp(value, minimum, maximum) {
     return Math.min(Math.max(value, minimum), maximum);
@@ -76,6 +76,13 @@ CameraManager = function() {
         orbitDown: 0,
         orbitForward: 0,
         orbitBackward: 0,
+
+        moveForward: 0,
+        moveBackward: 0,
+        strafeLeft: 0,
+        strafeRight: 0,
+        turnLeft: 0,
+        turnRight: 0,
     }
 
     var keyToActionMapping = {
@@ -85,6 +92,11 @@ CameraManager = function() {
         83: "orbitBackward", // "s"
         69: "orbitUp",       // "e"
         67: "orbitDown",     // "c"
+
+        73: "moveForward",
+        74: "strafeLeft",
+        75: "moveBackward",
+        76: "strafeRight",
         
         16777234: "orbitLeft",     // "LEFT"
         16777236: "orbitRight",    // "RIGHT"
@@ -381,6 +393,7 @@ CameraManager = function() {
     }
 
     that.keyPressEvent = function(event) {
+        console.log("Key press:" + JSON.stringify(event));
         var action = getActionForKeyEvent(event);
         if (action) {
             actions[action] = 1;
@@ -502,6 +515,24 @@ CameraManager = function() {
 
         var dZoom = that.targetZoomDistance - that.zoomDistance;
         that.zoomDistance += scale * dZoom;
+
+        var q = Quat.fromPitchYawRollDegrees(that.targetPitch, that.targetYaw, 0);
+        var moveForwardBackward = actions.moveForward - actions.moveBackward;
+        if (moveForwardBackward != 0) {
+            var backward = Quat.getFront(q);
+            that.targetFocalPoint.x += backward.x * -moveForwardBackward;
+            that.targetFocalPoint.y += backward.y * -moveForwardBackward;
+            that.targetFocalPoint.z += backward.z * -moveForwardBackward;
+        }
+
+        var strafeLeftRight = actions.strafeLeft - actions.strafeRight;
+        if (strafeLeftRight != 0) {
+            strafeLeftRight *= 0.1;
+            var right = Quat.getRight(q);
+            that.targetFocalPoint.x += right.x * strafeLeftRight;
+            that.targetFocalPoint.y += right.y * strafeLeftRight;
+            that.targetFocalPoint.z += right.z * strafeLeftRight;
+        }
 
         that.updateCamera();
 
