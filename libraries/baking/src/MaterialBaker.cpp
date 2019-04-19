@@ -88,6 +88,7 @@ void MaterialBaker::loadMaterial() {
 void MaterialBaker::processMaterial() {
     if (!_materialResource || _materialResource->parsedMaterials.networkMaterials.size() == 0) {
         handleError("Error processing " + _materialData);
+        // emit signal to indicate the material baking is finished
         return;
     }
 

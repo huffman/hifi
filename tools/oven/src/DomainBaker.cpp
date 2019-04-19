@@ -146,6 +146,7 @@ void DomainBaker::loadLocalFile() {
 }
 
 void DomainBaker::addModelBaker(const QString& property, const QString& url, const QJsonValueRef& jsonRef) {
+    qDebug() << "Adding model baker for: " << url;
     // grab a QUrl for the model URL
     QUrl bakeableModelURL = getBakeableModelURL(url);
     if (!bakeableModelURL.isEmpty() && (_shouldRebakeOriginals || !isModelBaked(bakeableModelURL))) {
@@ -170,8 +171,12 @@ void DomainBaker::addModelBaker(const QString& property, const QString& url, con
 
                 // move the baker to the baker thread
                 // and kickoff the bake
-                baker->moveToThread(Oven::instance().getNextWorkerThread());
-                QMetaObject::invokeMethod(baker.data(), "bake");
+                auto thread = Oven::instance().getNextWorkerThread();
+                qDebug() << "Chosen thread: " << thread << QThread::currentThread();
+                baker->moveToThread(thread);
+                qDebug() << "DOne moving";
+                QMetaObject::invokeMethod(baker.data(), "bake", Qt::QueuedConnection);
+                qDebug() << "DOne invoking bake";
 
                 // keep track of the total number of baking entities
                 ++_totalNumberOfSubBakes;
@@ -179,6 +184,7 @@ void DomainBaker::addModelBaker(const QString& property, const QString& url, con
         }
 
         if (haveBaker) {
+            qDebug() << "Inserting into _entitiesNeddingRewrite: " << bakeableModelURL;
             // add this QJsonValueRef to our multi hash so that we can easily re-write
             // the model URL to the baked version once the baker is complete
             _entitiesNeedingRewrite.insert(bakeableModelURL, { property, jsonRef });
@@ -267,12 +273,13 @@ void DomainBaker::addMaterialBaker(const QString& property, const QString& data,
         materialData = data;
     }
 
+    qDebug() << "Inserting material: " << materialData;
     // setup a material baker for this URL, as long as we aren't baking a material already
     if (!_materialBakers.contains(materialData)) {
 
         // setup a baker for this material
         QSharedPointer<MaterialBaker> materialBaker {
-            new MaterialBaker(data, isURL, _contentOutputPath),
+            new MaterialBaker(materialData, isURL, _contentOutputPath),
             &MaterialBaker::deleteLater
         };
 
@@ -429,7 +436,9 @@ void DomainBaker::enumerateEntities() {
 void DomainBaker::handleFinishedModelBaker() {
     auto baker = qobject_cast<ModelBaker*>(sender());
 
+
     if (baker) {
+        qDebug() << "baker finished" << baker->getModelURL();
         if (!baker->hasErrors()) {
             // this ModelBaker is done and everything went according to plan
             qDebug() << "Re-writing entity references to" << baker->getModelURL();
@@ -483,8 +492,10 @@ void DomainBaker::handleFinishedModelBaker() {
             _warningList << baker->getErrors();
         }
 
+        qDebug() << "REmoving " << baker->getModelURL() << _entitiesNeedingRewrite.keys();;
         // remove the baked URL from the multi hash of entities needing a re-write
         _entitiesNeedingRewrite.remove(baker->getModelURL());
+        qDebug() << "After:  " << _entitiesNeedingRewrite.keys();
 
         // drop our shared pointer to this baker so that it gets cleaned up
         _modelBakers.remove(baker->getModelURL());
@@ -646,6 +657,7 @@ void DomainBaker::handleFinishedScriptBaker() {
 }
 
 void DomainBaker::handleFinishedMaterialBaker() {
+    qDebug() << "Material baker is done";
     auto baker = qobject_cast<MaterialBaker*>(sender());
 
     if (baker) {
@@ -721,6 +733,8 @@ void DomainBaker::handleFinishedMaterialBaker() {
             _warningList << baker->getErrors();
         }
 
+        qDebug() << "Material data: " << baker->getMaterialData();
+        qDebug() << _entitiesNeedingRewrite;
         // remove the baked URL from the multi hash of entities needing a re-write
         _entitiesNeedingRewrite.remove(baker->getMaterialData());
 
@@ -745,6 +759,11 @@ void DomainBaker::checkIfRewritingComplete() {
 
         // we've now written out our new models file - time to say that we are finished up
         emit finished();
+    }
+    else {
+        if (_entitiesNeedingRewrite.count() < 2) {
+            qDebug() << "Still waiting for:" << _entitiesNeedingRewrite;
+        }
     }
 }
 

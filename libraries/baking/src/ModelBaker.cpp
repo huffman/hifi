@@ -79,7 +79,7 @@ QUrl ModelBaker::getFullOutputMappingURL() const {
 }
 
 void ModelBaker::bake() {
-    qDebug() << "ModelBaker" << _modelURL << "bake starting";
+    qDebug() << "ModelBaker" << _modelURL << "bake starting obn" << QThread::currentThread();
 
     // Setup the output folders for the results of this bake
     initializeOutputDirs();
