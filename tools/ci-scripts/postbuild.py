@@ -113,15 +113,31 @@ def fixupWinZip(filename):
     shutil.move(outFullPath, fullPath)
 
 def signBuild(executablePath):
-    if sys.platform != 'win32':
-        print('Skipping signing because platform is not win32')
-        return
+    if sys.platform not in ('win32', 'darwin'):
+        print('Skipping signing because platform is not supported for signing')
 
     RELEASE_TYPE = os.getenv("RELEASE_TYPE", "")
     if RELEASE_TYPE != "PRODUCTION":
         print('Skipping signing because RELEASE_TYPE "{}" != "PRODUCTION"'.format(RELEASE_TYPE))
         return
 
+    if sys.platform == 'win32':
+        signBuildWin32(executablePath)
+    else:
+        signBuildDarwin(executablePath)
+
+def signBuildDarwin(executablePath):
+    HF_IDENTITY = "High Fidelity"
+
+    hifi_utils.executeSubprocess([
+        'codesign',
+        '--deep',
+        '--timestamp',
+        '-s', HF_IDENTITY,
+        executablePath
+        ])
+
+def signBuildWin32(executablePath):
     HF_PFX_FILE = os.getenv("HF_PFX_FILE", "")
     if HF_PFX_FILE == "":
         print('Skipping signing because HF_PFX_FILE is empty')
@@ -138,7 +154,7 @@ def signBuild(executablePath):
     print("Signing {}".format(executablePath))
     hifi_utils.executeSubprocess([
             SIGN_TOOL,
-            'sign', 
+            'sign',
             '/fd', 'sha256',
             '/f', HF_PFX_FILE,
             '/p', HF_PFX_PASSPHRASE,
@@ -150,7 +166,7 @@ def signBuild(executablePath):
 
 def buildLightLauncher():
     launcherSourcePath = os.path.join(SOURCE_PATH, 'launchers', sys.platform)
-    launcherBuildPath = os.path.join(BUILD_PATH, 'launcher') 
+    launcherBuildPath = os.path.join(BUILD_PATH, 'launcher')
     if not os.path.exists(launcherBuildPath):
         os.makedirs(launcherBuildPath)
     # configure launcher build
@@ -165,29 +181,48 @@ def buildLightLauncher():
 
     hifi_utils.executeSubprocess(cmakeArgs, folder=launcherBuildPath)
 
-    buildTarget = 'package'
-    if sys.platform == 'win32':
-        buildTarget = 'ALL_BUILD'
-    hifi_utils.executeSubprocess([
-            'cmake', 
-            '--build', launcherBuildPath,
-            '--config', 'Release', 
-            '--target', buildTarget
-        ], folder=launcherBuildPath)
     if sys.platform == 'darwin':
+        # Build and sign HQ Launcher.app
+        hifi_utils.executeSubprocess([
+                'cmake',
+                '--build', launcherBuildPath,
+                '--config', 'Release',
+                '--target', 'HQLauncher'
+            ], folder=launcherBuildPath)
+        signBuild(os.path.join(launcherBuildPath, 'Release', 'HQ Launcher.app'))
+
+        # Build and sign .dmg
+        hifi_utils.executeSubprocess([
+                'cmake',
+                '--build', launcherBuildPath,
+                '--config', 'Release',
+                '--target', 'package'
+            ], folder=launcherBuildPath)
+
         launcherDestFile = os.path.join(BUILD_PATH, "{}.dmg".format(computeArchiveName('Launcher')))
         launcherSourceFile = os.path.join(launcherBuildPath, "HQ Launcher.dmg")
+
+        print("Moving {} to {}".format(launcherSourceFile, launcherDestFile))
+        shutil.move(launcherSourceFile, launcherDestFile)
+        signBuild(launcherDestFile)
     elif sys.platform == 'win32':
+        buildTarget = 'ALL_BUILD'
+        hifi_utils.executeSubprocess([
+                'cmake',
+                '--build', launcherBuildPath,
+                '--config', 'Release',
+                '--target', buildTarget
+            ], folder=launcherBuildPath)
         launcherDestFile = os.path.join(BUILD_PATH, "{}.exe".format(computeArchiveName('Launcher')))
         launcherSourceFile = os.path.join(launcherBuildPath, "Release", "HQLauncher.exe")
 
-    print("Moving {} to {}".format(launcherSourceFile, launcherDestFile))
-    shutil.move(launcherSourceFile, launcherDestFile)
-    signBuild(launcherDestFile)
+        print("Moving {} to {}".format(launcherSourceFile, launcherDestFile))
+        shutil.move(launcherSourceFile, launcherDestFile)
+        signBuild(launcherDestFile)
 
 
 
-# Main 
+# Main
 for wipePath in WIPE_PATHS:
     wipeClientBuildPath(wipePath)
 
