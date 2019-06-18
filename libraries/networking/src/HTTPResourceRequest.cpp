@@ -202,6 +202,7 @@ void HTTPResourceRequest::onRequestFinished() {
     
     _state = Finished;
     emit finished();
+    qDebug().nospace() << "!!REQUEST!! status(" << statusCode << ") cache(" << _loadedFromCache << ") " << _url;
 
     auto statTracker = DependencyManager::get<StatTracker>();
     if (_result == Success) {
