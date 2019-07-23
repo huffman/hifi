@@ -140,6 +140,5 @@ InteractiveWindowPointer DesktopScriptingInterface::createWindowOnThread(const Q
         return nullptr;
     }
     InteractiveWindowPointer window = new InteractiveWindow(sourceUrl, properties);
-    window->moveToThread(targetThread);
     return window;
 }
