@@ -440,7 +440,9 @@ void ScriptEngine::waitTillDoneRunning() {
             // flooding it with aborts/exceptions will persist it longer
             static const auto MAX_SCRIPT_QUITTING_TIME = 0.5 * MSECS_PER_SECOND;
             if (!workerThread->wait(MAX_SCRIPT_QUITTING_TIME)) {
+                qCWarning(scriptengine) << "Script Engine thread has not exited force terminating:" << getFilename();
                 workerThread->terminate();
+                workerThread->wait();
             }
         }
 #else
@@ -467,7 +469,9 @@ void ScriptEngine::waitTillDoneRunning() {
                 // flooding it with aborts/exceptions will persist it longer
                 static const auto MAX_SCRIPT_QUITTING_TIME = 0.5 * MSECS_PER_SECOND;
                 if (!workerThread->wait(MAX_SCRIPT_QUITTING_TIME)) {
+                    qCWarning(scriptengine) << "Script Engine thread has not exited force terminating:" << getFilename();
                     workerThread->terminate();
+                    workerThread->wait();
                 }
             }
 
